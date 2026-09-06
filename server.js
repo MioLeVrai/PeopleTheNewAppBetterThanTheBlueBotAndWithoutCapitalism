@@ -28,7 +28,8 @@ function emitVoiceState() {
     [...voiceUsers.entries()].map(([id, user]) => ({
       id,
       username: user.username,
-      muted: Boolean(user.muted)
+      muted: Boolean(user.muted),
+      camera: Boolean(user.camera)
     }))
   );
 }
@@ -42,9 +43,8 @@ function leaveVoice(socket) {
 }
 
 io.on("connection", (socket) => {
-  socket.on("keepalive", () => {
-    // Petit message d'activité pour garder la connexion temps réel saine.
-  });
+  socket.on("keepalive", () => {});
+
   socket.on("join", ({ username, reconnect } = {}) => {
     const cleanName = cleanUsername(username);
     const wasKnown = users.has(socket.id);
@@ -74,7 +74,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("voice-join", ({ muted } = {}) => {
+  socket.on("voice-join", ({ muted, camera } = {}) => {
     const username = users.get(socket.id);
     if (!username) return;
 
@@ -83,15 +83,16 @@ io.on("connection", (socket) => {
       .map(([id, user]) => ({
         id,
         username: user.username,
-        muted: Boolean(user.muted)
+        muted: Boolean(user.muted),
+        camera: Boolean(user.camera)
       }));
 
     voiceUsers.set(socket.id, {
       username,
-      muted: Boolean(muted)
+      muted: Boolean(muted),
+      camera: Boolean(camera)
     });
 
-    // Le nouvel arrivant initie les connexions vers les gens déjà présents.
     socket.emit("voice-peers", existingPeers);
     emitVoiceState();
   });
@@ -105,6 +106,15 @@ io.on("connection", (socket) => {
     if (!user) return;
 
     user.muted = Boolean(muted);
+    voiceUsers.set(socket.id, user);
+    emitVoiceState();
+  });
+
+  socket.on("voice-camera", ({ camera } = {}) => {
+    const user = voiceUsers.get(socket.id);
+    if (!user) return;
+
+    user.camera = Boolean(camera);
     voiceUsers.set(socket.id, user);
     emitVoiceState();
   });

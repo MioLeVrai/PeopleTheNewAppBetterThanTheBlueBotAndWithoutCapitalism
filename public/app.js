@@ -21,12 +21,17 @@ const voiceStatus = document.getElementById("voiceStatus");
 const voiceUsers = document.getElementById("voiceUsers");
 const voiceCount = document.getElementById("voiceCount");
 const muteButton = document.getElementById("muteButton");
+const cameraButton = document.getElementById("cameraButton");
 const micState = document.getElementById("micState");
 const audioContainer = document.getElementById("audioContainer");
+const videoStage = document.getElementById("videoStage");
+const videoGrid = document.getElementById("videoGrid");
 
 let username = "";
 let localStream = null;
+let cameraTrack = null;
 let micMuted = true;
+let cameraEnabled = false;
 let voiceJoined = false;
 let lastVoiceRoster = [];
 
@@ -95,6 +100,10 @@ function addChatMessage(data) {
   scrollBottom();
 }
 
+function getVoiceUser(peerId) {
+  return lastVoiceRoster.find(user => user.id === peerId) || null;
+}
+
 function renderVoiceUsers(roster) {
   lastVoiceRoster = Array.isArray(roster) ? roster : [];
   voiceCount.textContent = lastVoiceRoster.length ? `(${lastVoiceRoster.length})` : "";
@@ -105,6 +114,7 @@ function renderVoiceUsers(roster) {
     empty.className = "voice-empty";
     empty.textContent = "Personne dans le vocal";
     voiceUsers.appendChild(empty);
+    syncVideoTilesWithRoster();
     return;
   }
 
@@ -123,14 +133,176 @@ function renderVoiceUsers(roster) {
       ? `${user.username} (toi)`
       : user.username;
 
-    const mic = document.createElement("div");
-    mic.className = "voice-mic";
+    const icons = document.createElement("div");
+    icons.className = "voice-media-icons";
+
+    if (user.camera) {
+      const cam = document.createElement("span");
+      cam.title = "Caméra activée";
+      cam.textContent = "📹";
+      icons.appendChild(cam);
+    }
+
+    const mic = document.createElement("span");
     mic.title = user.muted ? "Micro coupé" : "Micro activé";
     mic.textContent = user.muted ? "🔇" : "🎙️";
+    icons.appendChild(mic);
 
-    row.append(av, name, mic);
+    row.append(av, name, icons);
     voiceUsers.appendChild(row);
   }
+
+  syncVideoTilesWithRoster();
+}
+
+function ensureVideoTile(peerId, displayName, isLocal = false) {
+  const tileId = isLocal ? "video-local" : `video-${peerId}`;
+  let tile = document.getElementById(tileId);
+
+  if (!tile) {
+    tile = document.createElement("div");
+    tile.id = tileId;
+    tile.className = `video-tile${isLocal ? " local" : ""}`;
+    tile.dataset.peerId = peerId;
+
+    const placeholder = document.createElement("div");
+    placeholder.className = "video-placeholder";
+
+    const bigAvatar = document.createElement("div");
+    bigAvatar.className = "big-avatar";
+    bigAvatar.textContent = initials(displayName);
+    placeholder.appendChild(bigAvatar);
+
+    const video = document.createElement("video");
+    video.autoplay = true;
+    video.playsInline = true;
+    if (isLocal) video.muted = true;
+
+    const label = document.createElement("div");
+    label.className = "video-label";
+
+    tile.append(placeholder, video, label);
+    videoGrid.appendChild(tile);
+  }
+
+  const label = tile.querySelector(".video-label");
+  const bigAvatar = tile.querySelector(".big-avatar");
+  if (label) label.textContent = isLocal ? `${displayName} (toi)` : displayName;
+  if (bigAvatar) bigAvatar.textContent = initials(displayName);
+
+  return tile;
+}
+
+function removeVideoTile(peerId, isLocal = false) {
+  const tileId = isLocal ? "video-local" : `video-${peerId}`;
+  const tile = document.getElementById(tileId);
+  if (!tile) return;
+
+  const video = tile.querySelector("video");
+  if (video) {
+    try { video.srcObject = null; } catch {}
+  }
+  tile.remove();
+}
+
+function syncVideoStageVisibility() {
+  videoStage.classList.toggle("hidden", videoGrid.children.length === 0);
+}
+
+function syncVideoTilesWithRoster() {
+  const cameraUsers = new Set(
+    lastVoiceRoster.filter(user => user.camera).map(user => user.id)
+  );
+
+  if (cameraEnabled && voiceJoined) {
+    ensureVideoTile(socket.id || "local", username || "Moi", true);
+  } else {
+    removeVideoTile(socket.id || "local", true);
+  }
+
+  for (const user of lastVoiceRoster) {
+    if (user.id === socket.id) continue;
+
+    if (user.camera) {
+      ensureVideoTile(user.id, user.username, false);
+    } else {
+      removeVideoTile(user.id, false);
+    }
+  }
+
+  for (const tile of [...videoGrid.querySelectorAll(".video-tile:not(.local)")]) {
+    const peerId = tile.dataset.peerId;
+    if (!cameraUsers.has(peerId)) tile.remove();
+  }
+
+  syncVideoStageVisibility();
+}
+
+function attachLocalPreview() {
+  if (!cameraEnabled || !cameraTrack) return;
+
+  const tile = ensureVideoTile(socket.id || "local", username || "Moi", true);
+  const video = tile.querySelector("video");
+  const placeholder = tile.querySelector(".video-placeholder");
+
+  if (video) {
+    video.srcObject = new MediaStream([cameraTrack]);
+    video.play().catch(() => {});
+  }
+  if (placeholder) placeholder.style.display = "none";
+
+  syncVideoStageVisibility();
+}
+
+function attachRemoteMedia(peerId, stream) {
+  const audioTracks = stream.getAudioTracks();
+  let audio = document.getElementById(`audio-${peerId}`);
+
+  if (audioTracks.length) {
+    if (!audio) {
+      audio = document.createElement("audio");
+      audio.id = `audio-${peerId}`;
+      audio.autoplay = true;
+      audio.playsInline = true;
+      audioContainer.appendChild(audio);
+    }
+
+    audio.srcObject = new MediaStream(audioTracks);
+    const audioPlay = audio.play();
+    if (audioPlay && typeof audioPlay.catch === "function") {
+      audioPlay.catch(() => {
+        const retry = () => {
+          audio.play().catch(() => {});
+          document.removeEventListener("click", retry);
+        };
+        document.addEventListener("click", retry, { once: true });
+      });
+    }
+  }
+
+  const videoTracks = stream.getVideoTracks();
+  if (videoTracks.length) {
+    const user = getVoiceUser(peerId);
+    const tile = ensureVideoTile(peerId, user?.username || "Caméra", false);
+    const video = tile.querySelector("video");
+    const placeholder = tile.querySelector(".video-placeholder");
+
+    if (video) {
+      video.srcObject = new MediaStream(videoTracks);
+      video.play().catch(() => {});
+    }
+    if (placeholder) placeholder.style.display = "none";
+
+    for (const track of videoTracks) {
+      track.addEventListener("ended", () => {
+        const latest = getVoiceUser(peerId);
+        if (!latest?.camera) removeVideoTile(peerId, false);
+        syncVideoStageVisibility();
+      }, { once: true });
+    }
+  }
+
+  syncVideoStageVisibility();
 }
 
 joinForm.addEventListener("submit", (e) => {
@@ -162,7 +334,10 @@ socket.on("connect", () => {
   if (voiceJoined && localStream) {
     closeAllPeers();
     setTimeout(() => {
-      socket.emit("voice-join", { muted: micMuted });
+      socket.emit("voice-join", {
+        muted: micMuted,
+        camera: cameraEnabled
+      });
     }, 150);
   }
 });
@@ -181,7 +356,9 @@ socket.on("user-count", count => userCount.textContent = count);
 socket.on("voice-state", renderVoiceUsers);
 
 async function ensureLocalAudio() {
-  if (localStream && localStream.active) return localStream;
+  if (localStream && localStream.getAudioTracks().some(track => track.readyState === "live")) {
+    return localStream;
+  }
 
   localStream = await navigator.mediaDevices.getUserMedia({
     audio: {
@@ -215,8 +392,14 @@ function updateMicUi() {
   socket.emit("voice-mute", { muted: micMuted });
 }
 
+function updateCameraUi() {
+  cameraButton.textContent = cameraEnabled ? "📹" : "📷";
+  cameraButton.classList.toggle("active", cameraEnabled);
+  cameraButton.title = cameraEnabled ? "Couper la caméra" : "Activer la caméra";
+}
+
 async function joinVoice() {
-  if (voiceJoined) return;
+  if (voiceJoined) return true;
 
   try {
     voiceStatus.textContent = "Connexion au vocal...";
@@ -224,11 +407,16 @@ async function joinVoice() {
 
     voiceJoined = true;
     updateMicUi();
+    updateCameraUi();
 
     voiceStatus.textContent = "Connecté au vocal";
     voiceStatus.classList.add("connected");
     voiceButton.childNodes[0].nodeValue = "🔊 quitter le vocal ";
-    socket.emit("voice-join", { muted: micMuted });
+    socket.emit("voice-join", {
+      muted: micMuted,
+      camera: cameraEnabled
+    });
+    return true;
   } catch (err) {
     console.error(err);
     voiceJoined = false;
@@ -239,6 +427,85 @@ async function joinVoice() {
     } else {
       voiceStatus.textContent = "Micro indisponible";
     }
+    return false;
+  }
+}
+
+async function enableCamera() {
+  if (cameraEnabled) return;
+
+  if (!voiceJoined) {
+    const joined = await joinVoice();
+    if (!joined) return;
+  }
+
+  try {
+    cameraButton.textContent = "…";
+
+    const cameraStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: "user",
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 24, max: 30 }
+      }
+    });
+
+    const track = cameraStream.getVideoTracks()[0];
+    if (!track) throw new Error("Aucune caméra disponible");
+
+    cameraTrack = track;
+    cameraEnabled = true;
+    localStream.addTrack(cameraTrack);
+
+    cameraTrack.addEventListener("ended", () => {
+      if (cameraEnabled) disableCamera({ trackAlreadyEnded: true });
+    }, { once: true });
+
+    attachLocalPreview();
+    updateCameraUi();
+    socket.emit("voice-camera", { camera: true });
+
+    await rebuildPeersForMediaChange();
+  } catch (err) {
+    console.error(err);
+    cameraEnabled = false;
+    cameraTrack = null;
+    updateCameraUi();
+
+    if (err && err.name === "NotAllowedError") {
+      voiceStatus.textContent = "Autorise la caméra dans le navigateur";
+    } else if (err && err.name === "NotFoundError") {
+      voiceStatus.textContent = "Aucune caméra trouvée";
+    } else {
+      voiceStatus.textContent = "Caméra indisponible";
+    }
+  }
+}
+
+async function disableCamera({ trackAlreadyEnded = false } = {}) {
+  if (!cameraEnabled && !cameraTrack) return;
+
+  const oldTrack = cameraTrack;
+  cameraEnabled = false;
+  cameraTrack = null;
+
+  if (localStream && oldTrack) {
+    try { localStream.removeTrack(oldTrack); } catch {}
+  }
+
+  if (oldTrack && !trackAlreadyEnded) {
+    try { oldTrack.stop(); } catch {}
+  }
+
+  removeVideoTile(socket.id || "local", true);
+  updateCameraUi();
+  socket.emit("voice-camera", { camera: false });
+  syncVideoStageVisibility();
+
+  if (voiceJoined) {
+    await rebuildPeersForMediaChange();
   }
 }
 
@@ -250,11 +517,18 @@ function leaveVoice() {
 
   closeAllPeers();
 
+  if (cameraTrack) {
+    try { cameraTrack.stop(); } catch {}
+    cameraTrack = null;
+  }
+  cameraEnabled = false;
+
   if (localStream) {
     for (const track of localStream.getTracks()) track.stop();
     localStream = null;
   }
 
+  removeVideoTile(socket.id || "local", true);
   micMuted = true;
   voiceStatus.textContent = "Pas connecté";
   voiceStatus.classList.remove("connected");
@@ -262,6 +536,8 @@ function leaveVoice() {
   voiceCount.textContent = lastVoiceRoster.length ? `(${lastVoiceRoster.length})` : "";
   micState.textContent = "hors du vocal";
   muteButton.textContent = "🎙️";
+  updateCameraUi();
+  syncVideoStageVisibility();
 }
 
 voiceButton.addEventListener("click", () => {
@@ -279,33 +555,10 @@ muteButton.addEventListener("click", async () => {
   updateMicUi();
 });
 
-function addRemoteAudio(peerId, stream) {
-  let audio = document.getElementById(`audio-${peerId}`);
-
-  if (!audio) {
-    audio = document.createElement("audio");
-    audio.id = `audio-${peerId}`;
-    audio.autoplay = true;
-    audio.playsInline = true;
-    audio.muted = false;
-    audioContainer.appendChild(audio);
-  }
-
-  audio.srcObject = stream;
-
-  const playPromise = audio.play();
-  if (playPromise && typeof playPromise.catch === "function") {
-    playPromise.catch(() => {
-      // Le clic sur "vocal" débloque normalement l'audio.
-      // Si le navigateur bloque encore, un clic n'importe où réessaie.
-      const retry = () => {
-        audio.play().catch(() => {});
-        document.removeEventListener("click", retry);
-      };
-      document.addEventListener("click", retry, { once: true });
-    });
-  }
-}
+cameraButton.addEventListener("click", async () => {
+  if (cameraEnabled) await disableCamera();
+  else await enableCamera();
+});
 
 function queueCandidate(peerId, candidate) {
   if (!pendingCandidates.has(peerId)) {
@@ -347,6 +600,9 @@ function closePeer(peerId) {
     try { audio.srcObject = null; } catch {}
     audio.remove();
   }
+
+  const user = getVoiceUser(peerId);
+  if (!user?.camera) removeVideoTile(peerId, false);
 }
 
 function closeAllPeers() {
@@ -372,7 +628,6 @@ function recoverPeer(peerId) {
 
   if (!voiceJoined || !peerIsStillInVoice(peerId) || !socket.id) return;
 
-  // Une seule des deux personnes relance l'offre pour éviter deux offres simultanées.
   if (socket.id.localeCompare(peerId) > 0) {
     const timer = setTimeout(() => {
       reconnectTimers.delete(peerId);
@@ -405,7 +660,7 @@ function createPeer(peerId) {
 
   pc.ontrack = (event) => {
     const stream = event.streams && event.streams[0];
-    if (stream) addRemoteAudio(peerId, stream);
+    if (stream) attachRemoteMedia(peerId, stream);
   };
 
   pc.onconnectionstatechange = () => {
@@ -456,7 +711,8 @@ async function makeOffer(peerId) {
   const pc = createPeer(peerId);
 
   const offer = await pc.createOffer({
-    offerToReceiveAudio: true
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: true
   });
 
   await pc.setLocalDescription(offer);
@@ -467,10 +723,19 @@ async function makeOffer(peerId) {
   });
 }
 
+async function rebuildPeersForMediaChange() {
+  if (!voiceJoined) return;
+
+  const peerIds = lastVoiceRoster
+    .map(user => user.id)
+    .filter(peerId => peerId && peerId !== socket.id);
+
+  await Promise.allSettled(peerIds.map(peerId => makeOffer(peerId)));
+}
+
 socket.on("voice-peers", async (existingPeers) => {
   if (!voiceJoined) return;
 
-  // Le nouvel arrivant appelle tous ceux qui étaient déjà dans le vocal.
   for (const peer of existingPeers) {
     if (!peer || !peer.id || peer.id === socket.id) continue;
 
@@ -486,7 +751,6 @@ socket.on("webrtc-offer", async ({ from, sdp }) => {
   if (!voiceJoined || !from || !sdp) return;
 
   try {
-    // Garde les candidats ICE qui auraient pu arriver juste avant l'offre.
     const queuedBeforeOffer = pendingCandidates.get(from) || [];
     closePeer(from);
     if (queuedBeforeOffer.length) {
@@ -550,16 +814,18 @@ socket.on("voice-peer-reconnect", ({ from }) => {
 
 socket.on("peer-left", (peerId) => {
   closePeer(peerId);
+  removeVideoTile(peerId, false);
+  syncVideoStageVisibility();
 });
 
 window.addEventListener("beforeunload", () => {
   if (voiceJoined) socket.emit("voice-leave");
 });
 
-
-// Garde la connexion temps réel active pendant que la page est ouverte.
 setInterval(() => {
   if (socket.connected) {
     socket.emit("keepalive");
   }
 }, 5 * 60 * 1000);
+
+updateCameraUi();

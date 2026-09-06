@@ -45,11 +45,14 @@
 
       <div class="profile">
         <div class="avatar" id="avatar">?</div>
-        <div>
+        <div class="profile-copy">
           <strong id="profileName">Invité</strong>
           <span id="micState">hors du vocal</span>
         </div>
-        <button id="muteButton" class="icon-btn" title="Activer/couper le micro">🎙️</button>
+        <div class="profile-actions">
+          <button id="muteButton" class="icon-btn" title="Activer/couper le micro">🎙️</button>
+          <button id="cameraButton" class="icon-btn" title="Activer/couper la caméra">📷</button>
+        </div>
       </div>
     </aside>
 
@@ -60,6 +63,10 @@
           <span>Le coin de toute la bande</span>
         </div>
       </header>
+
+      <section id="videoStage" class="video-stage hidden" aria-label="Caméras du vocal">
+        <div id="videoGrid" class="video-grid"></div>
+      </section>
 
       <section id="messages" class="messages">
         <div class="welcome">
