@@ -142,7 +142,7 @@
           title="Ouvrir mon profil"
         >
           <strong id="profileName">Invité</strong>
-          <span id="micState">hors du vocal</span>
+          <span id="micState"></span>
         </button>
 
         <div class="profile-actions">
@@ -157,10 +157,12 @@
             title="Activer/couper la caméra"
           >📷</button>
           <button
-            id="logoutButton"
+            id="leaveVoiceQuickButton"
             class="icon-btn"
-            title="Se deconnecter"
-          >🚪</button>
+            title="Quitter le vocal"
+            aria-label="Quitter le vocal"
+            disabled
+          >📞</button>
         </div>
       </div>
     </aside>
@@ -232,6 +234,45 @@
             autocomplete="off"
           />
         </div>
+
+        <!-- === PEOPLE_FRIEND_REQUESTS_UI_V2_START === -->
+        <div class="home-section friend-requests-section">
+          <div class="home-section-title">
+            <strong>Demandes d'ami</strong>
+            <span id="friendRequestsCount">0</span>
+          </div>
+
+          <div class="friend-request-columns">
+            <div class="friend-request-column">
+              <div class="friend-request-label">
+                À accepter
+              </div>
+              <div
+                id="incomingFriendRequests"
+                class="friend-request-list"
+              >
+                <div class="home-empty">
+                  Aucune demande reçue.
+                </div>
+              </div>
+            </div>
+
+            <div class="friend-request-column">
+              <div class="friend-request-label">
+                Envoyées
+              </div>
+              <div
+                id="outgoingFriendRequests"
+                class="friend-request-list"
+              >
+                <div class="home-empty">
+                  Aucune demande en attente.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- === PEOPLE_FRIEND_REQUESTS_UI_V2_END === -->
 
         <div class="home-section">
           <div class="home-section-title">
@@ -318,7 +359,15 @@
     </aside>
   </div>
 
-  <div id="profileModal" class="profile-modal hidden">
+    <button
+    id="logoutButton"
+    class="people-fixed-logout"
+    type="button"
+    title="Se deconnecter"
+    aria-label="Se deconnecter"
+  >🚪</button>
+
+<div id="profileModal" class="profile-modal hidden">
     <div class="profile-modal-backdrop" data-profile-close="1"></div>
     <section class="profile-card-modal" role="dialog" aria-modal="true">
       <button

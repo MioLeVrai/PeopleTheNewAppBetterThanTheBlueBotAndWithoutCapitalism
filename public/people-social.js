@@ -16,6 +16,14 @@
   const peopleSearchInput = document.getElementById("peopleSearchInput");
   const friendsList = document.getElementById("friendsList");
   const friendsCount = document.getElementById("friendsCount");
+// === PEOPLE_FRIEND_REQUESTS_CLIENT_V2_START ===
+  const friendRequestsCount =
+    document.getElementById("friendRequestsCount");
+  const incomingFriendRequests =
+    document.getElementById("incomingFriendRequests");
+  const outgoingFriendRequests =
+    document.getElementById("outgoingFriendRequests");
+  // === PEOPLE_FRIEND_REQUESTS_CLIENT_V2_END ===
   const peopleDirectory = document.getElementById("peopleDirectory");
   const homeMainTitle = document.getElementById("homeMainTitle");
   const homeMainSubtitle = document.getElementById("homeMainSubtitle");
@@ -149,6 +157,7 @@
       .querySelectorAll(".dm-conversation-row.active")
       .forEach((row) => row.classList.remove("active"));
 
+    refreshFriendRequests();
     refreshFriends();
     refreshDirectory(
       peopleSearchInput?.value || ""
@@ -202,11 +211,26 @@
 
     const friend = document.createElement("button");
     friend.type = "button";
-    friend.className = "people-card-action secondary";
-    friend.textContent =
-      person.isFriend || inFriends
-        ? "Retirer"
-        : "Ajouter";
+    friend.className =
+      "people-card-action secondary";
+
+    const isFriend =
+      Boolean(person.isFriend || inFriends);
+
+    if (isFriend) {
+      friend.textContent = "Retirer";
+    } else if (
+      person.friendRequest === "incoming"
+    ) {
+      friend.textContent = "Accepter";
+    } else if (
+      person.friendRequest === "outgoing"
+    ) {
+      friend.textContent = "En attente";
+      friend.disabled = true;
+    } else {
+      friend.textContent = "Ajouter";
+    }
 
     av.addEventListener(
       "click",
@@ -224,38 +248,247 @@
     );
 
     friend.addEventListener("click", async () => {
+      if (friend.disabled) return;
+
       try {
-        const remove =
-          person.isFriend || inFriends;
+        if (isFriend) {
+          await api(
+            "/api/social/friends/" +
+              encodeURIComponent(person.username),
+            { method: "DELETE" }
+          );
+        } else if (
+          person.friendRequest === "incoming" &&
+          person.friendRequestId
+        ) {
+          await api(
+            "/api/social/friend-requests/" +
+              encodeURIComponent(
+                person.friendRequestId
+              ) +
+              "/accept",
+            { method: "POST" }
+          );
+        } else {
+          await api(
+            "/api/social/friends/" +
+              encodeURIComponent(person.username),
+            { method: "POST" }
+          );
+        }
 
-        await api(
-          "/api/social/friends/" +
-            encodeURIComponent(person.username),
-          {
-            method: remove ? "DELETE" : "POST"
-          }
-        );
-
-        await Promise.all([
-          refreshFriends(),
-          refreshDirectory(
-            peopleSearchInput?.value || ""
-          )
-        ]);
+        await refreshFriendSurfaces();
 
         if (
           currentProfile &&
-          currentProfile.username === person.username
+          currentProfile.username ===
+            person.username
         ) {
           openProfile(person.username);
         }
       } catch (err) {
         alert(err.message);
+        await refreshFriendSurfaces();
       }
     });
 
     row.append(av, copy, dm, friend);
     return row;
+  }
+
+  function makeFriendRequestRow(
+    request,
+    direction
+  ) {
+    const row = document.createElement("div");
+    row.className = "friend-request-row";
+
+    const av = document.createElement("button");
+    av.type = "button";
+    av.className = "friend-request-avatar";
+    av.textContent =
+      initialsSocial(request.user.username);
+
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "friend-request-copy";
+
+    const name = document.createElement("strong");
+    name.textContent = request.user.username;
+
+    const status = document.createElement("span");
+    status.textContent =
+      direction === "incoming"
+        ? "Veut devenir ton ami"
+        : "En attente de sa réponse";
+
+    copy.append(name, status);
+
+    av.addEventListener(
+      "click",
+      () => openProfile(request.user.username)
+    );
+
+    copy.addEventListener(
+      "click",
+      () => openProfile(request.user.username)
+    );
+
+    const actions = document.createElement("div");
+    actions.className = "friend-request-actions";
+
+    if (direction === "incoming") {
+      const accept = document.createElement("button");
+      accept.type = "button";
+      accept.className = "friend-request-accept";
+      accept.textContent = "Accepter";
+
+      const refuse = document.createElement("button");
+      refuse.type = "button";
+      refuse.className = "friend-request-refuse";
+      refuse.textContent = "Refuser";
+
+      accept.addEventListener("click", async () => {
+        try {
+          await api(
+            "/api/social/friend-requests/" +
+              encodeURIComponent(request.id) +
+              "/accept",
+            { method: "POST" }
+          );
+
+          await refreshFriendSurfaces();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+
+      refuse.addEventListener("click", async () => {
+        try {
+          await api(
+            "/api/social/friend-requests/" +
+              encodeURIComponent(request.id),
+            { method: "DELETE" }
+          );
+
+          await refreshFriendSurfaces();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+
+      actions.append(accept, refuse);
+    } else {
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "friend-request-refuse";
+      cancel.textContent = "Annuler";
+
+      cancel.addEventListener("click", async () => {
+        try {
+          await api(
+            "/api/social/friend-requests/" +
+              encodeURIComponent(request.id),
+            { method: "DELETE" }
+          );
+
+          await refreshFriendSurfaces();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+
+      actions.appendChild(cancel);
+    }
+
+    row.append(av, copy, actions);
+    return row;
+  }
+
+  async function refreshFriendRequests() {
+    if (
+      !socialReady ||
+      !incomingFriendRequests ||
+      !outgoingFriendRequests
+    ) {
+      return;
+    }
+
+    try {
+      const data = await api(
+        "/api/social/friend-requests"
+      );
+
+      const incoming =
+        Array.isArray(data.incoming)
+          ? data.incoming
+          : [];
+
+      const outgoing =
+        Array.isArray(data.outgoing)
+          ? data.outgoing
+          : [];
+
+      if (friendRequestsCount) {
+        friendRequestsCount.textContent =
+          String(incoming.length);
+      }
+
+      incomingFriendRequests.innerHTML = "";
+      outgoingFriendRequests.innerHTML = "";
+
+      if (!incoming.length) {
+        const empty = document.createElement("div");
+        empty.className = "home-empty";
+        empty.textContent =
+          "Aucune demande reçue.";
+        incomingFriendRequests.appendChild(empty);
+      } else {
+        for (const request of incoming) {
+          incomingFriendRequests.appendChild(
+            makeFriendRequestRow(
+              request,
+              "incoming"
+            )
+          );
+        }
+      }
+
+      if (!outgoing.length) {
+        const empty = document.createElement("div");
+        empty.className = "home-empty";
+        empty.textContent =
+          "Aucune demande en attente.";
+        outgoingFriendRequests.appendChild(empty);
+      } else {
+        for (const request of outgoing) {
+          outgoingFriendRequests.appendChild(
+            makeFriendRequestRow(
+              request,
+              "outgoing"
+            )
+          );
+        }
+      }
+    } catch (err) {
+      incomingFriendRequests.innerHTML = "";
+      outgoingFriendRequests.innerHTML = "";
+
+      const empty = document.createElement("div");
+      empty.className = "home-empty";
+      empty.textContent = err.message;
+      incomingFriendRequests.appendChild(empty);
+    }
+  }
+
+  async function refreshFriendSurfaces() {
+    await Promise.all([
+      refreshFriendRequests(),
+      refreshFriends(),
+      refreshDirectory(
+        peopleSearchInput?.value || ""
+      )
+    ]);
   }
 
   async function refreshFriends() {
@@ -630,11 +863,29 @@
         profileDescriptionInput.value = description;
         profileDescriptionCount.textContent =
           String(description.length);
-      } else {
-        profileFriendButton.textContent =
-          currentProfile.isFriend
-            ? "Retirer des amis"
-            : "Ajouter en ami";
+} else {
+        profileFriendButton.disabled = false;
+
+        if (currentProfile.isFriend) {
+          profileFriendButton.textContent =
+            "Retirer des amis";
+        } else if (
+          currentProfile.friendRequest ===
+            "incoming"
+        ) {
+          profileFriendButton.textContent =
+            "Accepter la demande";
+        } else if (
+          currentProfile.friendRequest ===
+            "outgoing"
+        ) {
+          profileFriendButton.textContent =
+            "Demande envoyée";
+          profileFriendButton.disabled = true;
+        } else {
+          profileFriendButton.textContent =
+            "Ajouter en ami";
+        }
       }
 
       profileModal.classList.remove("hidden");
@@ -662,6 +913,7 @@
 
       await Promise.all([
         refreshConversations(),
+        refreshFriendRequests(),
         refreshFriends(),
         refreshDirectory("")
       ]);
@@ -840,39 +1092,53 @@
   profileFriendButton?.addEventListener(
     "click",
     async () => {
-      if (!currentProfile?.username) return;
+      if (
+        !currentProfile?.username ||
+        profileFriendButton.disabled
+      ) {
+        return;
+      }
 
       try {
-        const remove =
-          Boolean(currentProfile.isFriend);
+        if (currentProfile.isFriend) {
+          await api(
+            "/api/social/friends/" +
+              encodeURIComponent(
+                currentProfile.username
+              ),
+            { method: "DELETE" }
+          );
+        } else if (
+          currentProfile.friendRequest ===
+            "incoming" &&
+          currentProfile.friendRequestId
+        ) {
+          await api(
+            "/api/social/friend-requests/" +
+              encodeURIComponent(
+                currentProfile.friendRequestId
+              ) +
+              "/accept",
+            { method: "POST" }
+          );
+        } else {
+          await api(
+            "/api/social/friends/" +
+              encodeURIComponent(
+                currentProfile.username
+              ),
+            { method: "POST" }
+          );
+        }
 
-        await api(
-          "/api/social/friends/" +
-            encodeURIComponent(
-              currentProfile.username
-            ),
-          {
-            method: remove
-              ? "DELETE"
-              : "POST"
-          }
-        );
+        const username =
+          currentProfile.username;
 
-        currentProfile.isFriend = !remove;
-
-        profileFriendButton.textContent =
-          currentProfile.isFriend
-            ? "Retirer des amis"
-            : "Ajouter en ami";
-
-        await Promise.all([
-          refreshFriends(),
-          refreshDirectory(
-            peopleSearchInput?.value || ""
-          )
-        ]);
+        await refreshFriendSurfaces();
+        await openProfile(username);
       } catch (err) {
         alert(err.message);
+        await refreshFriendSurfaces();
       }
     }
   );
@@ -925,11 +1191,148 @@
     }
   );
 
+  // === PEOPLE_DM_MENTION_PING_V2_START ===
+  let peopleDmPingAudioContext = null;
+
+  function peopleDmEscapeRegex(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function peopleDmMentionsMe(text) {
+    const username = String(me?.username || "").trim();
+    if (!username || !text) return false;
+
+    const escaped = peopleDmEscapeRegex(username);
+    const mention = new RegExp(
+      "(^|\\s)@" + escaped + "(?=$|\\s|[.,!?;:])",
+      "i"
+    );
+
+    return mention.test(String(text));
+  }
+
+  function peopleDmUnlockPingAudio() {
+    try {
+      if (!peopleDmPingAudioContext) {
+        const AudioCtx =
+          window.AudioContext ||
+          window.webkitAudioContext;
+
+        if (AudioCtx) {
+          peopleDmPingAudioContext = new AudioCtx();
+        }
+      }
+
+      if (peopleDmPingAudioContext?.state === "suspended") {
+        peopleDmPingAudioContext.resume().catch(() => {});
+      }
+    } catch {}
+  }
+
+  function peopleDmPlayPing() {
+    try {
+      peopleDmUnlockPingAudio();
+      if (!peopleDmPingAudioContext) return;
+
+      const now = peopleDmPingAudioContext.currentTime;
+
+      const beep = (start, frequency) => {
+        const osc =
+          peopleDmPingAudioContext.createOscillator();
+        const gain =
+          peopleDmPingAudioContext.createGain();
+
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(frequency, start);
+
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(
+          0.16,
+          start + 0.015
+        );
+        gain.gain.exponentialRampToValueAtTime(
+          0.0001,
+          start + 0.16
+        );
+
+        osc.connect(gain);
+        gain.connect(
+          peopleDmPingAudioContext.destination
+        );
+
+        osc.start(start);
+        osc.stop(start + 0.18);
+      };
+
+      beep(now, 880);
+      beep(now + 0.12, 1175);
+    } catch {}
+  }
+
+  function peopleDmShowPingToast(sender, body) {
+    let host =
+      document.getElementById("peoplePingToasts");
+
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "peoplePingToasts";
+      host.className = "people-ping-toasts";
+      document.body.appendChild(host);
+    }
+
+    const toast = document.createElement("div");
+    toast.className = "people-ping-toast";
+
+    const title = document.createElement("strong");
+    title.textContent = "@ Ping MP de " + sender;
+
+    const text = document.createElement("span");
+    text.textContent =
+      String(body || "").slice(0, 180);
+
+    toast.append(title, text);
+    host.appendChild(toast);
+
+    requestAnimationFrame(
+      () => toast.classList.add("show")
+    );
+
+    setTimeout(() => {
+      toast.classList.remove("show");
+      setTimeout(() => toast.remove(), 250);
+    }, 5000);
+  }
+
+  function peopleDmHandleMention(payload) {
+    if (!peopleDmMentionsMe(payload?.body)) {
+      return;
+    }
+
+    const sender =
+      payload?.sender?.username ||
+      "Quelqu'un";
+
+    peopleDmPlayPing();
+    peopleDmShowPingToast(
+      sender,
+      payload.body
+    );
+  }
+
+  document.addEventListener(
+    "click",
+    peopleDmUnlockPingAudio,
+    { passive: true }
+  );
+  // === PEOPLE_DM_MENTION_PING_V2_END ===
+
   socket.on("dm-message", async (payload) => {
     const senderName =
       payload?.sender?.username;
 
     if (!senderName) return;
+
+    peopleDmHandleMention(payload);
 
     if (
       activeDmUser &&
@@ -961,6 +1364,12 @@
     "dm-message-sent",
     () => refreshConversations()
   );
+
+  socket.on("friend-state-changed", () => {
+    if (socialReady) {
+      refreshFriendSurfaces();
+    }
+  });
 
   socket.on(
     "online-users",

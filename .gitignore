@@ -6,3 +6,5 @@ people-accounts.local.json
 .people-local-secret
 *.backup_*
 people-social.local.json
+people-general.local.json
+backup/

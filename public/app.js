@@ -29,6 +29,7 @@ const voiceUsers = document.getElementById("voiceUsers");
 const voiceCount = document.getElementById("voiceCount");
 const muteButton = document.getElementById("muteButton");
 const cameraButton = document.getElementById("cameraButton");
+const leaveVoiceQuickButton = document.getElementById("leaveVoiceQuickButton");
 const micState = document.getElementById("micState");
 const audioContainer = document.getElementById("audioContainer");
 const videoStage = document.getElementById("videoStage");
@@ -69,6 +70,29 @@ function timeText(ts) {
 function scrollBottom() {
   messages.scrollTop = messages.scrollHeight;
 }
+
+// === PEOPLE_GENERAL_HISTORY_V1_START ===
+function renderChatHistory(history) {
+  const items =
+    Array.isArray(history)
+      ? history
+      : [];
+
+  messages
+    .querySelectorAll(
+      ".message, .system-message"
+    )
+    .forEach(
+      (element) => element.remove()
+    );
+
+  for (const item of items) {
+    addChatMessage(item);
+  }
+
+  scrollBottom();
+}
+// === PEOPLE_GENERAL_HISTORY_V1_END ===
 
 function addSystemMessage(data) {
   const div = document.createElement("div");
@@ -527,6 +551,7 @@ socket.on("disconnect", () => {
   closeAllPeers();
 });
 
+socket.on("chat-history", renderChatHistory);
 socket.on("chat-message", addChatMessage);
 socket.on("system-message", addSystemMessage);
 socket.on("user-count", count => userCount.textContent = count);
@@ -555,8 +580,8 @@ function updateMicUi() {
   if (!voiceJoined || !localStream) {
     muteButton.textContent = micMuted ? "🔇" : "🎙️";
     micState.textContent = micMuted
-      ? "micro coupé avant le vocal"
-      : "hors du vocal";
+      ? "micro coupé"
+      : "";
     muteButton.title = micMuted
       ? "Réactiver le micro avant de rejoindre"
       : "Couper le micro avant de rejoindre";
@@ -601,6 +626,9 @@ async function joinVoice() {
     await ensureLocalAudio();
 
     voiceJoined = true;
+    if (leaveVoiceQuickButton) {
+      leaveVoiceQuickButton.disabled = false;
+    }
     updateMicUi();
     updateCameraUi();
 
@@ -711,6 +739,10 @@ function leaveVoice() {
   socket.emit("voice-leave");
   voiceJoined = false;
 
+  if (leaveVoiceQuickButton) {
+    leaveVoiceQuickButton.disabled = true;
+  }
+
   closeAllPeers();
 
   if (cameraTrack) {
@@ -739,6 +771,24 @@ voiceButton.addEventListener("click", () => {
   if (voiceJoined) leaveVoice();
   else joinVoice();
 });
+
+leaveVoiceQuickButton?.addEventListener(
+  "click",
+  () => {
+    if (voiceJoined) {
+      leaveVoice();
+    }
+  }
+);
+
+leaveVoiceQuickButton?.addEventListener(
+  "click",
+  () => {
+    if (voiceJoined) {
+      leaveVoice();
+    }
+  }
+);
 
 muteButton.addEventListener("click", () => {
   micMuted = !micMuted;

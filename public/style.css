@@ -1673,3 +1673,214 @@ button, input { font: inherit; }
 }
 
 /* === PEOPLE_DM_LAYOUT_FIX_END === */
+
+/* === PEOPLE_FRIEND_REQUESTS_UI_V2_START === */
+
+.friend-request-columns {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.friend-request-column {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: #2b2d31;
+}
+
+.friend-request-label {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.friend-request-list {
+  display: grid;
+  gap: 4px;
+}
+
+.friend-request-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns:
+    36px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px;
+  border-radius: 7px;
+}
+
+.friend-request-row:hover {
+  background: var(--hover);
+}
+
+.friend-request-avatar {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--brand);
+  color: white;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.friend-request-copy {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.friend-request-copy strong,
+.friend-request-copy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-request-copy strong {
+  font-size: 12px;
+}
+
+.friend-request-copy span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.friend-request-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.friend-request-actions button {
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.friend-request-accept {
+  background: #23a559;
+}
+
+.friend-request-refuse {
+  background: #4e5058;
+}
+
+.people-card-action:disabled,
+#profileFriendButton:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
+@media (max-width: 820px) {
+  .friend-request-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* === PEOPLE_FRIEND_REQUESTS_UI_V2_END === */
+
+/* === PEOPLE_LOGOUT_LEAVEVOICE_UI_V1_START === */
+
+#leaveVoiceQuickButton:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+#leaveVoiceQuickButton:not(:disabled) {
+  background: rgba(242, 63, 66, 0.16);
+}
+
+#leaveVoiceQuickButton:not(:disabled):hover {
+  background: rgba(242, 63, 66, 0.28);
+}
+
+.people-fixed-logout {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 180;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #2b2d31;
+  color: #dbdee1;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+  font-size: 17px;
+}
+
+.people-fixed-logout:hover {
+  background: #da373c;
+  color: white;
+}
+
+/* === PEOPLE_LOGOUT_LEAVEVOICE_UI_V1_END === */
+
+/* === PEOPLE_LOGOUT_LEAVEVOICE_CLEAN_V2_START === */
+
+#leaveVoiceQuickButton:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+#leaveVoiceQuickButton:not(:disabled) {
+  background: rgba(242, 63, 66, 0.16);
+}
+
+#leaveVoiceQuickButton:not(:disabled):hover {
+  background: rgba(242, 63, 66, 0.28);
+}
+
+.people-fixed-logout {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 10000;
+
+  width: 42px;
+  height: 42px;
+
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+
+  display: grid;
+  place-items: center;
+
+  background: #2b2d31;
+  color: #dbdee1;
+
+  box-shadow:
+    0 8px 28px
+    rgba(0, 0, 0, 0.34);
+
+  cursor: pointer;
+  font-size: 17px;
+}
+
+.people-fixed-logout:hover {
+  background: #da373c;
+  color: white;
+}
+
+/* === PEOPLE_LOGOUT_LEAVEVOICE_CLEAN_V2_END === */
