@@ -453,11 +453,965 @@ app.post("/api/auth/logout", (req, res) => {
 });
 // === PEOPLE_ACCOUNTS_V1_END ===
 
+// === PEOPLE_SOCIAL_V2_START ===
+const PEOPLE_LOCAL_SOCIAL = pathAccounts.join(
+  __dirname,
+  "people-social.local.json"
+);
+
+function peopleReadLocalSocial() {
+  try {
+    if (!fsAccounts.existsSync(PEOPLE_LOCAL_SOCIAL)) {
+      return { friends: [], dms: [] };
+    }
+
+    const raw = JSON.parse(
+      fsAccounts.readFileSync(PEOPLE_LOCAL_SOCIAL, "utf8")
+    );
+
+    return {
+      friends: Array.isArray(raw.friends) ? raw.friends : [],
+      dms: Array.isArray(raw.dms) ? raw.dms : []
+    };
+  } catch {
+    return { friends: [], dms: [] };
+  }
+}
+
+function peopleWriteLocalSocial(data) {
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_SOCIAL,
+    JSON.stringify(
+      {
+        friends: Array.isArray(data.friends) ? data.friends : [],
+        dms: Array.isArray(data.dms) ? data.dms : []
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+}
+
+function peoplePublicAccount(account) {
+  if (!account) return null;
+
+  return {
+    id: String(account.id),
+    username: peopleUsername(account.username),
+    description: String(account.description || ""),
+    createdAt: account.created_at || account.createdAt || null
+  };
+}
+
+function peopleSessionForRequest(req, res) {
+  const session = peopleSessionFromCookie(req.headers.cookie || "");
+
+  if (!session) {
+    res.status(401).json({
+      ok: false,
+      error: "Connexion requise."
+    });
+    return null;
+  }
+
+  return session;
+}
+
+function peopleAccountIsOnline(accountId) {
+  const wanted = String(accountId);
+
+  for (const id of userIds.values()) {
+    if (String(id) === wanted) return true;
+  }
+
+  return false;
+}
+
+async function peopleFindAccountById(id) {
+  const wanted = String(id);
+
+  if (peoplePool) {
+    const result = await peoplePool.query(
+      "SELECT id, username, username_key, password_hash, " +
+      "description, created_at " +
+      "FROM people_accounts WHERE id = $1 LIMIT 1",
+      [wanted]
+    );
+
+    return result.rows[0] || null;
+  }
+
+  return (
+    peopleReadLocalAccounts().find(
+      (account) => String(account.id) === wanted
+    ) || null
+  );
+}
+
+async function peopleListAccounts(search = "") {
+  const q = peopleUsername(search).toLocaleLowerCase("fr-FR");
+
+  if (peoplePool) {
+    const params = [];
+    let where = "";
+
+    if (q) {
+      params.push("%" + q + "%");
+      where = "WHERE LOWER(username) LIKE $1";
+    }
+
+    const result = await peoplePool.query(
+      "SELECT id, username, description, created_at " +
+      "FROM people_accounts " +
+      where +
+      " ORDER BY LOWER(username) ASC LIMIT 50",
+      params
+    );
+
+    return result.rows;
+  }
+
+  return peopleReadLocalAccounts()
+    .filter((account) => {
+      if (!q) return true;
+      return String(account.username || "")
+        .toLocaleLowerCase("fr-FR")
+        .includes(q);
+    })
+    .sort((a, b) =>
+      String(a.username || "").localeCompare(
+        String(b.username || ""),
+        "fr",
+        { sensitivity: "base" }
+      )
+    )
+    .slice(0, 50);
+}
+
+async function peopleUpdateDescription(accountId, description) {
+  const clean = String(description || "").trim().slice(0, 280);
+
+  if (peoplePool) {
+    const result = await peoplePool.query(
+      "UPDATE people_accounts " +
+      "SET description = $1 " +
+      "WHERE id = $2 " +
+      "RETURNING id, username, description, created_at",
+      [clean, String(accountId)]
+    );
+
+    return result.rows[0] || null;
+  }
+
+  const accounts = peopleReadLocalAccounts();
+  const account = accounts.find(
+    (item) => String(item.id) === String(accountId)
+  );
+
+  if (!account) return null;
+
+  account.description = clean;
+  peopleWriteLocalAccounts(accounts);
+  return account;
+}
+
+async function peopleFriendIds(accountId) {
+  const owner = String(accountId);
+
+  if (peoplePool) {
+    const result = await peoplePool.query(
+      "SELECT friend_id FROM people_friends " +
+      "WHERE user_id = $1 ORDER BY created_at ASC",
+      [owner]
+    );
+
+    return result.rows.map((row) => String(row.friend_id));
+  }
+
+  const data = peopleReadLocalSocial();
+
+  return data.friends
+    .filter((item) => String(item.user_id) === owner)
+    .map((item) => String(item.friend_id));
+}
+
+async function peopleHasFriend(accountId, friendId) {
+  const ids = await peopleFriendIds(accountId);
+  return ids.includes(String(friendId));
+}
+
+async function peopleAddFriend(accountId, friendId) {
+  const owner = String(accountId);
+  const friend = String(friendId);
+
+  if (owner === friend) return;
+
+  if (peoplePool) {
+    await peoplePool.query(
+      "INSERT INTO people_friends (user_id, friend_id) " +
+      "VALUES ($1, $2) ON CONFLICT DO NOTHING",
+      [owner, friend]
+    );
+    return;
+  }
+
+  const data = peopleReadLocalSocial();
+
+  if (
+    !data.friends.some(
+      (item) =>
+        String(item.user_id) === owner &&
+        String(item.friend_id) === friend
+    )
+  ) {
+    data.friends.push({
+      user_id: owner,
+      friend_id: friend,
+      created_at: new Date().toISOString()
+    });
+
+    peopleWriteLocalSocial(data);
+  }
+}
+
+async function peopleRemoveFriend(accountId, friendId) {
+  const owner = String(accountId);
+  const friend = String(friendId);
+
+  if (peoplePool) {
+    await peoplePool.query(
+      "DELETE FROM people_friends " +
+      "WHERE user_id = $1 AND friend_id = $2",
+      [owner, friend]
+    );
+    return;
+  }
+
+  const data = peopleReadLocalSocial();
+
+  data.friends = data.friends.filter(
+    (item) =>
+      !(
+        String(item.user_id) === owner &&
+        String(item.friend_id) === friend
+      )
+  );
+
+  peopleWriteLocalSocial(data);
+}
+
+async function peopleCreateDm(senderId, recipientId, body) {
+  const sender = String(senderId);
+  const recipient = String(recipientId);
+  const cleanBody = String(body || "").trim().slice(0, 2000);
+
+  if (!cleanBody) return null;
+
+  if (peoplePool) {
+    const result = await peoplePool.query(
+      "INSERT INTO people_direct_messages " +
+      "(sender_id, recipient_id, body) " +
+      "VALUES ($1, $2, $3) " +
+      "RETURNING id, sender_id, recipient_id, body, created_at, read_at",
+      [sender, recipient, cleanBody]
+    );
+
+    return result.rows[0] || null;
+  }
+
+  const data = peopleReadLocalSocial();
+
+  const message = {
+    id: cryptoAccounts.randomUUID(),
+    sender_id: sender,
+    recipient_id: recipient,
+    body: cleanBody,
+    created_at: new Date().toISOString(),
+    read_at: null
+  };
+
+  data.dms.push(message);
+
+  if (data.dms.length > 10000) {
+    data.dms = data.dms.slice(-10000);
+  }
+
+  peopleWriteLocalSocial(data);
+  return message;
+}
+
+async function peopleDmHistory(accountId, otherId) {
+  const me = String(accountId);
+  const other = String(otherId);
+
+  if (peoplePool) {
+    const result = await peoplePool.query(
+      "SELECT id, sender_id, recipient_id, body, created_at, read_at " +
+      "FROM people_direct_messages " +
+      "WHERE (sender_id = $1 AND recipient_id = $2) " +
+      "OR (sender_id = $2 AND recipient_id = $1) " +
+      "ORDER BY created_at DESC LIMIT 150",
+      [me, other]
+    );
+
+    return result.rows.reverse();
+  }
+
+  return peopleReadLocalSocial()
+    .dms
+    .filter(
+      (message) =>
+        (
+          String(message.sender_id) === me &&
+          String(message.recipient_id) === other
+        ) ||
+        (
+          String(message.sender_id) === other &&
+          String(message.recipient_id) === me
+        )
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() -
+        new Date(b.created_at).getTime()
+    )
+    .slice(-150);
+}
+
+async function peopleMarkDmRead(accountId, otherId) {
+  const me = String(accountId);
+  const other = String(otherId);
+
+  if (peoplePool) {
+    await peoplePool.query(
+      "UPDATE people_direct_messages SET read_at = NOW() " +
+      "WHERE recipient_id = $1 AND sender_id = $2 AND read_at IS NULL",
+      [me, other]
+    );
+    return;
+  }
+
+  const data = peopleReadLocalSocial();
+  let changed = false;
+
+  for (const message of data.dms) {
+    if (
+      String(message.recipient_id) === me &&
+      String(message.sender_id) === other &&
+      !message.read_at
+    ) {
+      message.read_at = new Date().toISOString();
+      changed = true;
+    }
+  }
+
+  if (changed) peopleWriteLocalSocial(data);
+}
+
+async function peopleDmConversations(accountId) {
+  const me = String(accountId);
+  let messages;
+
+  if (peoplePool) {
+    const result = await peoplePool.query(
+      "SELECT id, sender_id, recipient_id, body, created_at, read_at " +
+      "FROM people_direct_messages " +
+      "WHERE sender_id = $1 OR recipient_id = $1 " +
+      "ORDER BY created_at DESC LIMIT 1000",
+      [me]
+    );
+
+    messages = result.rows;
+  } else {
+    messages = peopleReadLocalSocial()
+      .dms
+      .filter(
+        (message) =>
+          String(message.sender_id) === me ||
+          String(message.recipient_id) === me
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() -
+          new Date(a.created_at).getTime()
+      )
+      .slice(0, 1000);
+  }
+
+  const map = new Map();
+
+  for (const message of messages) {
+    const otherId =
+      String(message.sender_id) === me
+        ? String(message.recipient_id)
+        : String(message.sender_id);
+
+    if (!map.has(otherId)) {
+      map.set(otherId, {
+        otherId,
+        lastMessage: message.body,
+        lastAt: message.created_at,
+        unreadCount: 0
+      });
+    }
+
+    if (
+      String(message.recipient_id) === me &&
+      !message.read_at
+    ) {
+      map.get(otherId).unreadCount += 1;
+    }
+  }
+
+  const out = [];
+
+  for (const item of map.values()) {
+    const account = await peopleFindAccountById(item.otherId);
+    if (!account) continue;
+
+    out.push({
+      user: {
+        ...peoplePublicAccount(account),
+        online: peopleAccountIsOnline(account.id)
+      },
+      lastMessage: item.lastMessage,
+      lastAt: item.lastAt,
+      unreadCount: item.unreadCount
+    });
+  }
+
+  out.sort(
+    (a, b) =>
+      new Date(b.lastAt).getTime() -
+      new Date(a.lastAt).getTime()
+  );
+
+  return out;
+}
+
+function peopleEmitToAccount(accountId, event, payload) {
+  const wanted = String(accountId);
+
+  for (const [socketId, id] of userIds.entries()) {
+    if (String(id) === wanted) {
+      io.to(socketId).emit(event, payload);
+    }
+  }
+}
+
+async function peopleInitSocial() {
+  if (!PEOPLE_DB_URL) {
+    if (!fsAccounts.existsSync(PEOPLE_LOCAL_SOCIAL)) {
+      peopleWriteLocalSocial({
+        friends: [],
+        dms: []
+      });
+    }
+
+    const accounts = peopleReadLocalAccounts();
+    let changed = false;
+
+    for (const account of accounts) {
+      if (typeof account.description !== "string") {
+        account.description = "";
+        changed = true;
+      }
+    }
+
+    if (changed) peopleWriteLocalAccounts(accounts);
+
+    console.log("[People] Profils et MP locaux actives.");
+    return;
+  }
+
+  await peoplePool.query(
+    "ALTER TABLE people_accounts " +
+    "ADD COLUMN IF NOT EXISTS description VARCHAR(280) NOT NULL DEFAULT ''"
+  );
+
+  await peoplePool.query(
+    "CREATE TABLE IF NOT EXISTS people_friends (" +
+    "user_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+    "friend_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+    "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+    "PRIMARY KEY (user_id, friend_id)" +
+    ")"
+  );
+
+  await peoplePool.query(
+    "CREATE TABLE IF NOT EXISTS people_direct_messages (" +
+    "id BIGSERIAL PRIMARY KEY, " +
+    "sender_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+    "recipient_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+    "body VARCHAR(2000) NOT NULL, " +
+    "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+    "read_at TIMESTAMPTZ NULL" +
+    ")"
+  );
+
+  await peoplePool.query(
+    "CREATE INDEX IF NOT EXISTS people_dm_sender_recipient_idx " +
+    "ON people_direct_messages(sender_id, recipient_id, created_at DESC)"
+  );
+
+  await peoplePool.query(
+    "CREATE INDEX IF NOT EXISTS people_dm_recipient_unread_idx " +
+    "ON people_direct_messages(recipient_id, read_at)"
+  );
+
+  console.log("[People] Profils, amis et MP PostgreSQL actives.");
+}
+
+app.get("/api/profile/:username", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const account = await peopleFindAccount(req.params.username);
+
+    if (!account) {
+      return res.status(404).json({
+        ok: false,
+        error: "Profil introuvable."
+      });
+    }
+
+    const isFriend = await peopleHasFriend(
+      session.id,
+      account.id
+    );
+
+    return res.json({
+      ok: true,
+      profile: {
+        ...peoplePublicAccount(account),
+        online: peopleAccountIsOnline(account.id),
+        isFriend,
+        isSelf: String(account.id) === String(session.id)
+      }
+    });
+  } catch (err) {
+    console.error("[People profile/get]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible de charger ce profil."
+    });
+  }
+});
+
+app.put("/api/profile/me", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const description = String(
+      req.body?.description || ""
+    ).trim();
+
+    if (description.length > 280) {
+      return res.status(400).json({
+        ok: false,
+        error: "La description est limitee a 280 caracteres."
+      });
+    }
+
+    const account = await peopleUpdateDescription(
+      session.id,
+      description
+    );
+
+    if (!account) {
+      return res.status(404).json({
+        ok: false,
+        error: "Compte introuvable."
+      });
+    }
+
+    res.json({
+      ok: true,
+      profile: {
+        ...peoplePublicAccount(account),
+        online: true,
+        isFriend: false,
+        isSelf: true
+      }
+    });
+  } catch (err) {
+    console.error("[People profile/update]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible de modifier le profil."
+    });
+  }
+});
+
+app.get("/api/social/people", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const accounts = await peopleListAccounts(
+      String(req.query.q || "").slice(0, 50)
+    );
+
+    const friendIds = new Set(
+      await peopleFriendIds(session.id)
+    );
+
+    res.json({
+      ok: true,
+      people: accounts
+        .filter(
+          (account) =>
+            String(account.id) !== String(session.id)
+        )
+        .map((account) => ({
+          ...peoplePublicAccount(account),
+          online: peopleAccountIsOnline(account.id),
+          isFriend: friendIds.has(String(account.id))
+        }))
+    });
+  } catch (err) {
+    console.error("[People social/people]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible de charger les personnes."
+    });
+  }
+});
+
+app.get("/api/social/friends", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const ids = await peopleFriendIds(session.id);
+    const friends = [];
+
+    for (const id of ids) {
+      const account = await peopleFindAccountById(id);
+      if (!account) continue;
+
+      friends.push({
+        ...peoplePublicAccount(account),
+        online: peopleAccountIsOnline(account.id),
+        isFriend: true
+      });
+    }
+
+    friends.sort((a, b) => {
+      if (a.online !== b.online) {
+        return a.online ? -1 : 1;
+      }
+
+      return a.username.localeCompare(
+        b.username,
+        "fr",
+        { sensitivity: "base" }
+      );
+    });
+
+    res.json({
+      ok: true,
+      friends
+    });
+  } catch (err) {
+    console.error("[People social/friends]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible de charger les amis."
+    });
+  }
+});
+
+app.post("/api/social/friends/:username", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const target = await peopleFindAccount(
+      req.params.username
+    );
+
+    if (!target) {
+      return res.status(404).json({
+        ok: false,
+        error: "Utilisateur introuvable."
+      });
+    }
+
+    if (String(target.id) === String(session.id)) {
+      return res.status(400).json({
+        ok: false,
+        error: "Tu ne peux pas t'ajouter toi-meme."
+      });
+    }
+
+    await peopleAddFriend(session.id, target.id);
+
+    res.json({
+      ok: true
+    });
+  } catch (err) {
+    console.error("[People friends/add]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible d'ajouter cet ami."
+    });
+  }
+});
+
+app.delete("/api/social/friends/:username", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const target = await peopleFindAccount(
+      req.params.username
+    );
+
+    if (!target) {
+      return res.status(404).json({
+        ok: false,
+        error: "Utilisateur introuvable."
+      });
+    }
+
+    await peopleRemoveFriend(session.id, target.id);
+
+    res.json({
+      ok: true
+    });
+  } catch (err) {
+    console.error("[People friends/remove]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible de retirer cet ami."
+    });
+  }
+});
+
+app.get("/api/dm/conversations", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const conversations =
+      await peopleDmConversations(session.id);
+
+    res.json({
+      ok: true,
+      conversations,
+      unreadTotal: conversations.reduce(
+        (sum, item) => sum + Number(item.unreadCount || 0),
+        0
+      )
+    });
+  } catch (err) {
+    console.error("[People dm/conversations]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible de charger les MP."
+    });
+  }
+});
+
+app.get("/api/dm/:username", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const target = await peopleFindAccount(
+      req.params.username
+    );
+
+    if (!target) {
+      return res.status(404).json({
+        ok: false,
+        error: "Utilisateur introuvable."
+      });
+    }
+
+    if (String(target.id) === String(session.id)) {
+      return res.status(400).json({
+        ok: false,
+        error: "Tu ne peux pas ouvrir un MP avec toi-meme."
+      });
+    }
+
+    const messages = await peopleDmHistory(
+      session.id,
+      target.id
+    );
+
+    res.json({
+      ok: true,
+      user: {
+        ...peoplePublicAccount(target),
+        online: peopleAccountIsOnline(target.id),
+        isFriend: await peopleHasFriend(
+          session.id,
+          target.id
+        )
+      },
+      messages: messages.map((message) => ({
+        id: String(message.id),
+        senderId: String(message.sender_id),
+        recipientId: String(message.recipient_id),
+        body: message.body,
+        createdAt: message.created_at,
+        readAt: message.read_at || null
+      }))
+    });
+  } catch (err) {
+    console.error("[People dm/history]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible de charger cette conversation."
+    });
+  }
+});
+
+app.post("/api/dm/:username/read", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const target = await peopleFindAccount(
+      req.params.username
+    );
+
+    if (!target) {
+      return res.status(404).json({
+        ok: false,
+        error: "Utilisateur introuvable."
+      });
+    }
+
+    await peopleMarkDmRead(session.id, target.id);
+
+    res.json({
+      ok: true
+    });
+  } catch (err) {
+    console.error("[People dm/read]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible de marquer les MP comme lus."
+    });
+  }
+});
+
+const peopleDmRate = new Map();
+
+function peopleDmRateAllowed(accountId) {
+  const key = String(accountId);
+  const now = Date.now();
+  const old = peopleDmRate.get(key) || [];
+  const fresh = old.filter(
+    (time) => now - time < 5000
+  );
+
+  if (fresh.length >= 12) {
+    peopleDmRate.set(key, fresh);
+    return false;
+  }
+
+  fresh.push(now);
+  peopleDmRate.set(key, fresh);
+  return true;
+}
+
+app.post("/api/dm/:username", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    if (!peopleDmRateAllowed(session.id)) {
+      return res.status(429).json({
+        ok: false,
+        error: "Tu envoies trop de messages trop vite."
+      });
+    }
+
+    const target = await peopleFindAccount(
+      req.params.username
+    );
+
+    if (!target) {
+      return res.status(404).json({
+        ok: false,
+        error: "Utilisateur introuvable."
+      });
+    }
+
+    if (String(target.id) === String(session.id)) {
+      return res.status(400).json({
+        ok: false,
+        error: "Tu ne peux pas t'envoyer un MP."
+      });
+    }
+
+    const body = String(req.body?.body || "").trim();
+
+    if (!body || body.length > 2000) {
+      return res.status(400).json({
+        ok: false,
+        error: "Le message doit contenir entre 1 et 2000 caracteres."
+      });
+    }
+
+    const message = await peopleCreateDm(
+      session.id,
+      target.id,
+      body
+    );
+
+    const sender = await peopleFindAccountById(
+      session.id
+    );
+
+    const payload = {
+      id: String(message.id),
+      sender: peoplePublicAccount(sender),
+      recipient: peoplePublicAccount(target),
+      body: message.body,
+      createdAt: message.created_at
+    };
+
+    peopleEmitToAccount(
+      target.id,
+      "dm-message",
+      payload
+    );
+
+    peopleEmitToAccount(
+      session.id,
+      "dm-message-sent",
+      payload
+    );
+
+    res.json({
+      ok: true,
+      message: payload
+    });
+  } catch (err) {
+    console.error("[People dm/send]", err);
+    res.status(500).json({
+      ok: false,
+      error: "Impossible d'envoyer ce MP."
+    });
+  }
+});
+// === PEOPLE_SOCIAL_V2_END ===
+
 app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, app: "People" });
 });
 
 const users = new Map();
+const userIds = new Map();
 const voiceUsers = new Map();
 
 function cleanUsername(value) {
@@ -514,6 +1468,7 @@ io.on("connection", (socket) => {
     const wasKnown = users.has(socket.id);
 
     users.set(socket.id, cleanName);
+    userIds.set(socket.id, String(account.id));
     io.emit("user-count", users.size);
     emitOnlineUsers();
 
@@ -625,6 +1580,7 @@ io.on("connection", (socket) => {
 
     leaveVoice(socket);
     users.delete(socket.id);
+    userIds.delete(socket.id);
     io.emit("user-count", users.size);
     emitOnlineUsers();
 
@@ -640,6 +1596,7 @@ io.on("connection", (socket) => {
 const PORT = Number(process.env.PORT) || 3000;
 
 peopleInitAccounts()
+  .then(() => peopleInitSocial())
   .then(() => {
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`People lance sur http://localhost:${PORT}`);

@@ -359,6 +359,7 @@ function applyAuthenticatedUser(user) {
   profileName.textContent = username;
   avatar.textContent = initials(username);
   joinScreen.classList.add("hidden");
+  window.dispatchEvent(new CustomEvent("people-authenticated", { detail: user }));
   return true;
 }
 
@@ -1096,6 +1097,7 @@ function peopleRenderOnlineUsers(roster) {
   for (const user of sorted) {
     const row = document.createElement("div");
     row.className = "online-user-row";
+    row.dataset.username = user.username;
 
     const av = document.createElement("div");
     av.className = "online-user-avatar";
