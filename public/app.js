@@ -8,6 +8,13 @@ const socket = io({
 const joinScreen = document.getElementById("joinScreen");
 const joinForm = document.getElementById("joinForm");
 const usernameInput = document.getElementById("usernameInput");
+const passwordInput = document.getElementById("passwordInput");
+const loginTab = document.getElementById("loginTab");
+const registerTab = document.getElementById("registerTab");
+const authSubmit = document.getElementById("authSubmit");
+const authError = document.getElementById("authError");
+const authSubtitle = document.getElementById("authSubtitle");
+const logoutButton = document.getElementById("logoutButton");
 const profileName = document.getElementById("profileName");
 const avatar = document.getElementById("avatar");
 const userCount = document.getElementById("userCount");
@@ -30,7 +37,7 @@ const videoGrid = document.getElementById("videoGrid");
 let username = "";
 let localStream = null;
 let cameraTrack = null;
-let micMuted = true;
+let micMuted = false;
 let cameraEnabled = false;
 let voiceJoined = false;
 let lastVoiceRoster = [];
@@ -305,15 +312,184 @@ function attachRemoteMedia(peerId, stream) {
   syncVideoStageVisibility();
 }
 
-joinForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  username = usernameInput.value.trim().slice(0, 24) || "Invité";
+let authMode = "login";
+
+function setAuthMode(mode) {
+  authMode = mode === "register" ? "register" : "login";
+
+  loginTab?.classList.toggle(
+    "active",
+    authMode === "login"
+  );
+
+  registerTab?.classList.toggle(
+    "active",
+    authMode === "register"
+  );
+
+  if (authSubmit) {
+    authSubmit.textContent =
+      authMode === "register"
+        ? "Creer mon compte"
+        : "Se connecter";
+  }
+
+  if (authSubtitle) {
+    authSubtitle.textContent =
+      authMode === "register"
+        ? "Choisis un pseudo unique et un mot de passe."
+        : "Connecte-toi avec ton pseudo.";
+  }
+
+  if (passwordInput) {
+    passwordInput.autocomplete =
+      authMode === "register"
+        ? "new-password"
+        : "current-password";
+  }
+
+  if (authError) authError.textContent = "";
+}
+
+function applyAuthenticatedUser(user) {
+  username = String(user?.username || "").trim();
+
+  if (!username) return false;
+
   profileName.textContent = username;
   avatar.textContent = initials(username);
   joinScreen.classList.add("hidden");
-  socket.emit("join", { username });
-  messageInput.focus();
+  return true;
+}
+
+async function reconnectSocketAfterAuth() {
+  if (socket.connected) {
+    socket.disconnect();
+  }
+
+  socket.connect();
+}
+
+async function bootstrapAuth() {
+  try {
+    const response = await fetch("/api/auth/me", {
+      credentials: "same-origin"
+    });
+
+    if (!response.ok) {
+      joinScreen.classList.remove("hidden");
+      return;
+    }
+
+    const data = await response.json();
+
+    if (!applyAuthenticatedUser(data.user)) {
+      joinScreen.classList.remove("hidden");
+      return;
+    }
+
+    if (socket.connected) {
+      socket.emit("join", { reconnect: true });
+    }
+  } catch {
+    joinScreen.classList.remove("hidden");
+  }
+}
+
+loginTab?.addEventListener(
+  "click",
+  () => setAuthMode("login")
+);
+
+registerTab?.addEventListener(
+  "click",
+  () => setAuthMode("register")
+);
+
+joinForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const wantedUsername = usernameInput.value.trim();
+  const password = passwordInput.value;
+
+  if (authError) {
+    authError.textContent =
+      authMode === "register"
+        ? "Creation du compte..."
+        : "Connexion...";
+  }
+
+  try {
+    const response = await fetch(
+      authMode === "register"
+        ? "/api/auth/register"
+        : "/api/auth/login",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          username: wantedUsername,
+          password
+        })
+      }
+    );
+
+    const data = await response
+      .json()
+      .catch(() => ({}));
+
+    if (!response.ok || !data.ok) {
+      if (authError) {
+        authError.textContent =
+          data.error || "Impossible de se connecter.";
+      }
+      return;
+    }
+
+    if (!applyAuthenticatedUser(data.user)) {
+      if (authError) {
+        authError.textContent = "Compte invalide.";
+      }
+      return;
+    }
+
+    passwordInput.value = "";
+    await reconnectSocketAfterAuth();
+    messageInput.focus();
+  } catch {
+    if (authError) {
+      authError.textContent = "Serveur indisponible.";
+    }
+  }
 });
+
+logoutButton?.addEventListener("click", async () => {
+  try {
+    if (voiceJoined) leaveVoice();
+
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin"
+    });
+  } catch {}
+
+  location.reload();
+});
+
+socket.on("auth-required", () => {
+  username = "";
+  joinScreen.classList.remove("hidden");
+
+  if (authError) {
+    authError.textContent =
+      "Ta session a expire. Reconnecte-toi.";
+  }
+});
+
+bootstrapAuth();
 
 messageForm.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -370,15 +546,19 @@ async function ensureLocalAudio() {
     video: false
   });
 
-  micMuted = false;
   updateMicUi();
   return localStream;
 }
 
 function updateMicUi() {
   if (!voiceJoined || !localStream) {
-    muteButton.textContent = "🎙️";
-    micState.textContent = "hors du vocal";
+    muteButton.textContent = micMuted ? "🔇" : "🎙️";
+    micState.textContent = micMuted
+      ? "micro coupé avant le vocal"
+      : "hors du vocal";
+    muteButton.title = micMuted
+      ? "Réactiver le micro avant de rejoindre"
+      : "Couper le micro avant de rejoindre";
     return;
   }
 
@@ -395,7 +575,21 @@ function updateMicUi() {
 function updateCameraUi() {
   cameraButton.textContent = cameraEnabled ? "📹" : "📷";
   cameraButton.classList.toggle("active", cameraEnabled);
-  cameraButton.title = cameraEnabled ? "Couper la caméra" : "Activer la caméra";
+
+  const cameraAllowed = voiceJoined || cameraEnabled;
+  cameraButton.disabled = !cameraAllowed;
+  cameraButton.setAttribute(
+    "aria-disabled",
+    cameraAllowed ? "false" : "true"
+  );
+
+  if (!voiceJoined && !cameraEnabled) {
+    cameraButton.title = "Rejoins le vocal pour activer la caméra";
+  } else {
+    cameraButton.title = cameraEnabled
+      ? "Couper la caméra"
+      : "Activer la caméra";
+  }
 }
 
 async function joinVoice() {
@@ -435,8 +629,9 @@ async function enableCamera() {
   if (cameraEnabled) return;
 
   if (!voiceJoined) {
-    const joined = await joinVoice();
-    if (!joined) return;
+    voiceStatus.textContent = "Rejoins le vocal pour activer la caméra";
+    updateCameraUi();
+    return;
   }
 
   try {
@@ -529,13 +724,12 @@ function leaveVoice() {
   }
 
   removeVideoTile(socket.id || "local", true);
-  micMuted = true;
+  micMuted = false;
   voiceStatus.textContent = "Pas connecté";
   voiceStatus.classList.remove("connected");
   voiceButton.childNodes[0].nodeValue = "🔊 vocal ";
   voiceCount.textContent = lastVoiceRoster.length ? `(${lastVoiceRoster.length})` : "";
-  micState.textContent = "hors du vocal";
-  muteButton.textContent = "🎙️";
+  updateMicUi();
   updateCameraUi();
   syncVideoStageVisibility();
 }
@@ -545,17 +739,18 @@ voiceButton.addEventListener("click", () => {
   else joinVoice();
 });
 
-muteButton.addEventListener("click", async () => {
-  if (!voiceJoined) {
-    await joinVoice();
-    return;
-  }
-
+muteButton.addEventListener("click", () => {
   micMuted = !micMuted;
   updateMicUi();
 });
 
 cameraButton.addEventListener("click", async () => {
+  if (!voiceJoined && !cameraEnabled) {
+    voiceStatus.textContent = "Rejoins le vocal pour activer la caméra";
+    updateCameraUi();
+    return;
+  }
+
   if (cameraEnabled) await disableCamera();
   else await enableCamera();
 });
@@ -829,3 +1024,126 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 updateCameraUi();
+
+// === PEOPLE_ONLINE_PANEL_V1_START ===
+const peopleAppRoot = document.querySelector(".app");
+const onlinePanel = document.getElementById("onlinePanel");
+const onlinePanelToggle = document.getElementById("onlinePanelToggle");
+const onlinePanelClose = document.getElementById("onlinePanelClose");
+const onlinePanelCount = document.getElementById("onlinePanelCount");
+const onlinePanelToggleCount = document.getElementById("onlinePanelToggleCount");
+const onlineUsersList = document.getElementById("onlineUsersList");
+
+let peopleOnlineRoster = [];
+
+function peopleSetOnlinePanel(open) {
+  if (!peopleAppRoot) return;
+
+  peopleAppRoot.classList.toggle("people-online-open", Boolean(open));
+
+  try {
+    localStorage.setItem(
+      "people-online-panel-open",
+      open ? "1" : "0"
+    );
+  } catch {}
+
+  if (onlinePanelToggle) {
+    onlinePanelToggle.setAttribute(
+      "aria-expanded",
+      open ? "true" : "false"
+    );
+  }
+}
+
+function peopleRenderOnlineUsers(roster) {
+  peopleOnlineRoster = Array.isArray(roster) ? roster : [];
+
+  const count = peopleOnlineRoster.length;
+
+  if (onlinePanelCount) {
+    onlinePanelCount.textContent =
+      count === 1 ? "1 personne" : count + " personnes";
+  }
+
+  if (onlinePanelToggleCount) {
+    onlinePanelToggleCount.textContent = String(count);
+  }
+
+  if (!onlineUsersList) return;
+
+  onlineUsersList.innerHTML = "";
+
+  if (!count) {
+    const empty = document.createElement("div");
+    empty.className = "online-users-empty";
+    empty.textContent = "Personne en ligne";
+    onlineUsersList.appendChild(empty);
+    return;
+  }
+
+  const sorted = [...peopleOnlineRoster].sort((a, b) => {
+    if (a.id === socket.id) return -1;
+    if (b.id === socket.id) return 1;
+
+    return String(a.username || "").localeCompare(
+      String(b.username || ""),
+      "fr",
+      { sensitivity: "base" }
+    );
+  });
+
+  for (const user of sorted) {
+    const row = document.createElement("div");
+    row.className = "online-user-row";
+
+    const av = document.createElement("div");
+    av.className = "online-user-avatar";
+    av.textContent = initials(user.username || "?");
+
+    const info = document.createElement("div");
+    info.className = "online-user-info";
+
+    const name = document.createElement("strong");
+    name.textContent =
+      user.id === socket.id
+        ? (user.username || "Invité") + " (toi)"
+        : (user.username || "Invité");
+
+    const status = document.createElement("span");
+    status.textContent = "En ligne";
+
+    const dot = document.createElement("span");
+    dot.className = "online-user-dot";
+    dot.setAttribute("aria-label", "En ligne");
+
+    info.append(name, status);
+    row.append(av, info, dot);
+    onlineUsersList.appendChild(row);
+  }
+}
+
+onlinePanelToggle?.addEventListener("click", () => {
+  const isOpen =
+    peopleAppRoot?.classList.contains("people-online-open");
+
+  peopleSetOnlinePanel(!isOpen);
+});
+
+onlinePanelClose?.addEventListener("click", () => {
+  peopleSetOnlinePanel(false);
+});
+
+socket.on("online-users", (roster) => {
+  peopleRenderOnlineUsers(roster);
+});
+
+let peopleOnlineOpenByDefault = true;
+
+try {
+  peopleOnlineOpenByDefault =
+    localStorage.getItem("people-online-panel-open") !== "0";
+} catch {}
+
+peopleSetOnlinePanel(peopleOnlineOpenByDefault);
+// === PEOPLE_ONLINE_PANEL_V1_END ===

@@ -8,14 +8,45 @@
 </head>
 <body>
   <div id="joinScreen" class="overlay">
-    <div class="join-card">
+    <div class="join-card auth-card">
       <div class="logo">P</div>
       <h1>People</h1>
-      <p>Entre ton pseudo pour rejoindre tes potes.</p>
+      <p id="authSubtitle">Connecte-toi avec ton pseudo.</p>
+
+      <div class="auth-tabs">
+        <button id="loginTab" class="auth-tab active" type="button">
+          Connexion
+        </button>
+        <button id="registerTab" class="auth-tab" type="button">
+          Creer un compte
+        </button>
+      </div>
+
       <form id="joinForm">
-        <input id="usernameInput" maxlength="24" placeholder="Ton pseudo" autocomplete="nickname" required />
-        <button type="submit">Rejoindre</button>
+        <input
+          id="usernameInput"
+          maxlength="24"
+          placeholder="Pseudo"
+          autocomplete="username"
+          required
+        />
+        <input
+          id="passwordInput"
+          type="password"
+          maxlength="128"
+          placeholder="Mot de passe"
+          autocomplete="current-password"
+          required
+        />
+        <div id="authError" class="auth-error" role="status"></div>
+        <button id="authSubmit" type="submit">
+          Se connecter
+        </button>
       </form>
+
+      <p class="auth-note">
+        Pas d'e-mail pour l'instant. Garde bien ton mot de passe.
+      </p>
     </div>
   </div>
 
@@ -52,6 +83,7 @@
         <div class="profile-actions">
           <button id="muteButton" class="icon-btn" title="Activer/couper le micro">🎙️</button>
           <button id="cameraButton" class="icon-btn" title="Activer/couper la caméra">📷</button>
+          <button id="logoutButton" class="icon-btn" title="Se deconnecter">🚪</button>
         </div>
       </div>
     </aside>
@@ -60,8 +92,17 @@
       <header class="topbar">
         <div>
           <strong># général</strong>
-          <span>Le coin de toute la bande</span>
+          <span>ça c'est sensé être la description sous le salon</span>
         </div>
+        <button
+          id="onlinePanelToggle"
+          class="online-panel-toggle"
+          type="button"
+          title="Afficher les personnes en ligne"
+          aria-label="Afficher les personnes en ligne"
+        >
+          👥 <span id="onlinePanelToggleCount">0</span>
+        </button>
       </header>
 
       <section id="videoStage" class="video-stage hidden" aria-label="Caméras du vocal">
@@ -81,6 +122,26 @@
         <button type="submit">Envoyer</button>
       </form>
     </main>
+
+    <aside id="onlinePanel" class="online-panel" aria-label="Personnes en ligne">
+      <div class="online-panel-header">
+        <div>
+          <strong>En ligne</strong>
+          <span id="onlinePanelCount">0 personne</span>
+        </div>
+        <button
+          id="onlinePanelClose"
+          class="online-panel-close"
+          type="button"
+          aria-label="Fermer la liste des personnes en ligne"
+          title="Fermer"
+        >✕</button>
+      </div>
+
+      <div id="onlineUsersList" class="online-users-list">
+        <div class="online-users-empty">Personne en ligne</div>
+      </div>
+    </aside>
   </div>
 
   <div id="audioContainer"></div>

@@ -2,3 +2,6 @@ node_modules/
 .env
 npm-debug.log*
 .DS_Store
+people-accounts.local.json
+.people-local-secret
+*.backup_*
