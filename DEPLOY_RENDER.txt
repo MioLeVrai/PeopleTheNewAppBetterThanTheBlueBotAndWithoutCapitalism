@@ -1,0 +1,24 @@
+PEOPLE - MISE EN LIGNE GRATUITE SUR RENDER
+
+Nom de l'application :
+People
+
+Nom du service Render configure :
+peoplethenewappbetterthanthebluebotandwithoutcapitalism
+
+Adresse souhaitee :
+https://peoplethenewappbetterthanthebluebotandwithoutcapitalism.onrender.com
+
+IMPORTANT :
+- Les noms de domaine s'affichent normalement en minuscules.
+- Si ce nom Render est deja pris, Render demandera un autre nom.
+- Une fois le service cree avec un nom disponible, l'adresse reste la meme.
+- Tes amis n'ont rien a installer.
+- Pour le vocal, ils autorisent simplement le micro dans leur navigateur.
+
+DEPLOIEMENT :
+1. Mets le contenu de ce dossier dans un depot GitHub.
+2. Sur Render, cree un Blueprint depuis ce depot.
+3. Render lit automatiquement render.yaml.
+4. Attends la fin du deploiement.
+5. Envoie l'URL Render a tes amis.

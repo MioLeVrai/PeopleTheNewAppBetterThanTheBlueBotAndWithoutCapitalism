@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>People</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="joinScreen" class="overlay">
+    <div class="join-card">
+      <div class="logo">P</div>
+      <h1>People</h1>
+      <p>Entre ton pseudo pour rejoindre tes potes.</p>
+      <form id="joinForm">
+        <input id="usernameInput" maxlength="24" placeholder="Ton pseudo" autocomplete="nickname" required />
+        <button type="submit">Rejoindre</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="server-title">
+        <div class="server-icon">P</div>
+        <div>
+          <strong>People</strong>
+          <span><b id="userCount">0</b> en ligne</span>
+        </div>
+      </div>
+
+      <div class="channel-group">
+        <div class="group-label">SALONS TEXTUELS</div>
+        <button class="channel active"># général</button>
+      </div>
+
+      <div class="channel-group voice-group">
+        <div class="group-label">SALONS VOCAUX</div>
+        <button id="voiceButton" class="channel">🔊 vocal <span id="voiceCount"></span></button>
+        <div id="voiceStatus" class="voice-status">Pas connecté</div>
+        <div id="voiceUsers" class="voice-users">
+          <div class="voice-empty">Personne dans le vocal</div>
+        </div>
+      </div>
+
+      <div class="profile">
+        <div class="avatar" id="avatar">?</div>
+        <div>
+          <strong id="profileName">Invité</strong>
+          <span id="micState">hors du vocal</span>
+        </div>
+        <button id="muteButton" class="icon-btn" title="Activer/couper le micro">🎙️</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <strong># général</strong>
+          <span>Le coin de toute la bande</span>
+        </div>
+      </header>
+
+      <section id="messages" class="messages">
+        <div class="welcome">
+          <div class="hash">#</div>
+          <h2>Bienvenue dans # général</h2>
+          <p>Le salon texte de People.</p>
+        </div>
+      </section>
+
+      <form id="messageForm" class="composer">
+        <input id="messageInput" maxlength="1000" placeholder="Message dans #général" autocomplete="off" />
+        <button type="submit">Envoyer</button>
+      </form>
+    </main>
+  </div>
+
+  <div id="audioContainer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
