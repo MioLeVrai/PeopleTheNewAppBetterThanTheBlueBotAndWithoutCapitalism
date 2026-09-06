@@ -1574,3 +1574,102 @@ button, input { font: inherit; }
 }
 
 /* === PEOPLE_SOCIAL_V2_END === */
+
+/* === PEOPLE_DM_BADGE_DISCREET_START === */
+
+.rail-badge,
+.rail-badge.hidden {
+  display: grid !important;
+  background: #3f4147 !important;
+  color: #b5bac1 !important;
+  border-color: #1e1f22 !important;
+  opacity: 0.72;
+  box-shadow: none;
+}
+
+.rail-badge.has-unread {
+  background: #23a559 !important;
+  color: #ffffff !important;
+  opacity: 1;
+}
+
+/* === PEOPLE_DM_BADGE_DISCREET_END === */
+
+/* === PEOPLE_DM_LAYOUT_FIX_START === */
+
+/*
+  En mode MP, on retire le double en-tete "Message prive /
+  Conversation avec ..." et on laisse uniquement l'en-tete
+  de la conversation avec le pseudo.
+*/
+.home-main.dm-open {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.home-main.dm-open > .home-topbar {
+  display: none;
+}
+
+/*
+  Grille MP explicite.
+  Important : .dm-composer heritait de grid-area: composer
+  du chat general, ce qui creait une colonne implicite et
+  decalait la conversation vers la droite.
+*/
+.home-main.dm-open .dm-view {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  grid-row: 1;
+  grid-column: 1;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 56px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "dm-header"
+    "dm-messages"
+    "dm-composer";
+}
+
+.home-main.dm-open .dm-header {
+  grid-area: dm-header;
+  width: 100%;
+  min-width: 0;
+}
+
+/* La liste des MP a gauche sert deja de navigation. */
+.home-main.dm-open .dm-back-button {
+  display: none;
+}
+
+.home-main.dm-open .dm-messages {
+  grid-area: dm-messages;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.home-main.dm-open .dm-composer {
+  grid-area: dm-composer !important;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.home-main.dm-open .dm-composer input {
+  min-width: 0;
+}
+
+/* Les messages restent alignes a gauche de la conversation. */
+.home-main.dm-open .dm-message {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* === PEOPLE_DM_LAYOUT_FIX_END === */

@@ -134,6 +134,7 @@
 
   function showFriends() {
     setMode("home");
+    homeMain?.classList.remove("dm-open");
     activeDmUser = null;
 
     friendsView?.classList.remove("hidden");
@@ -162,9 +163,10 @@
     homeUnreadBadge.textContent =
       count > 99 ? "99+" : String(count);
 
+    homeUnreadBadge.classList.remove("hidden");
     homeUnreadBadge.classList.toggle(
-      "hidden",
-      count === 0
+      "has-unread",
+      count > 0
     );
   }
 
@@ -550,6 +552,7 @@
     if (!username) return;
 
     setMode("home");
+    homeMain?.classList.add("dm-open");
     friendsView?.classList.add("hidden");
     dmView?.classList.remove("hidden");
 

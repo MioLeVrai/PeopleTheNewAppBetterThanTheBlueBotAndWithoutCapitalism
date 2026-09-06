@@ -213,7 +213,7 @@ async function peopleFindAccount(username) {
 
   if (peoplePool) {
     const result = await peoplePool.query(
-      "SELECT id, username, username_key, password_hash, created_at " +
+      "SELECT id, username, username_key, password_hash, description, created_at " +
       "FROM people_accounts WHERE username_key = $1 LIMIT 1",
       [key]
     );
