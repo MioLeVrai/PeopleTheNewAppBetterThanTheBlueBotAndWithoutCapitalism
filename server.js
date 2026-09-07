@@ -86,6 +86,104 @@ function peopleSessionSecret() {
 
 const PEOPLE_SESSION_SECRET = peopleSessionSecret();
 
+// === PEOPLE_SIMPLE_ADMIN_DELETE_V1_START ===
+const PEOPLE_SIMPLE_ADMIN_TOKEN =
+  String(
+    process.env.PEOPLE_SIMPLE_ADMIN_TOKEN ||
+    ""
+  ).trim();
+
+const peopleSimpleDeletedAccounts =
+  new Set();
+
+function peopleSimpleAdminAuthorized(
+  req,
+  res
+) {
+  if (
+    !PEOPLE_SIMPLE_ADMIN_TOKEN
+  ) {
+    res.status(503).json({
+      ok: false,
+      error:
+        "PEOPLE_SIMPLE_ADMIN_TOKEN n'est pas configuré sur Render."
+    });
+
+    return false;
+  }
+
+  const authorization =
+    String(
+      req.headers.authorization ||
+      ""
+    );
+
+  const match =
+    authorization.match(
+      /^Bearer\s+(.+)$/i
+    );
+
+  const candidate =
+    match
+      ? match[1].trim()
+      : "";
+
+  const left =
+    Buffer.from(
+      candidate,
+      "utf8"
+    );
+
+  const right =
+    Buffer.from(
+      PEOPLE_SIMPLE_ADMIN_TOKEN,
+      "utf8"
+    );
+
+  if (
+    !candidate ||
+    left.length !==
+      right.length
+  ) {
+    res.status(403).json({
+      ok: false,
+      error:
+        "Accès admin refusé."
+    });
+
+    return false;
+  }
+
+  try {
+    if (
+      !cryptoAccounts
+        .timingSafeEqual(
+          left,
+          right
+        )
+    ) {
+      res.status(403).json({
+        ok: false,
+        error:
+          "Accès admin refusé."
+      });
+
+      return false;
+    }
+  } catch {
+    res.status(403).json({
+      ok: false,
+      error:
+        "Accès admin refusé."
+    });
+
+    return false;
+  }
+
+  return true;
+}
+// === PEOPLE_SIMPLE_ADMIN_DELETE_V1_END ===
+
 function peopleReadCookies(header) {
   const out = {};
 
@@ -446,6 +544,69 @@ app.get("/api/auth/me", (req, res) => {
     user: session
   });
 });
+
+// === PEOPLE_SIMPLE_ADMIN_DELETE_ROUTE_V1 ===
+app.post(
+  "/api/simple-admin/delete-account",
+  async (
+    req,
+    res
+  ) => {
+    try {
+      if (
+        !peopleSimpleAdminAuthorized(
+          req,
+          res
+        )
+      ) {
+        return;
+      }
+
+      const username =
+        peopleUsername(
+          req.body?.username
+        );
+
+      if (!username) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Pseudo invalide."
+        });
+      }
+
+      const deleted =
+        await peopleSimpleAdminDeleteAccount(
+          username
+        );
+
+      if (!deleted) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Compte introuvable."
+        });
+      }
+
+      return res.json({
+        ok: true,
+        deleted
+      });
+    } catch (err) {
+      console.error(
+        "[People simple admin delete]",
+        err
+      );
+
+      return res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de supprimer ce compte."
+      });
+    }
+  }
+);
+// === PEOPLE_SIMPLE_ADMIN_DELETE_ROUTE_V1 ===
 
 app.post("/api/auth/logout", (req, res) => {
   peopleClearSession(res);
@@ -2754,6 +2915,289 @@ async function peopleInitSocial() {
 
   console.log("[People] Profils, amis et MP PostgreSQL actives.");
 }
+
+// === PEOPLE_SIMPLE_ADMIN_DELETE_HELPERS_V1 ===
+function peopleSimpleAdminKickAccount(
+  accountId
+) {
+  const wanted =
+    String(
+      accountId
+    );
+
+  peopleSimpleDeletedAccounts.add(
+    wanted
+  );
+
+  for (
+    const call of
+    [...peopleDmCalls.values()]
+  ) {
+    if (
+      String(
+        call?.callerAccountId ||
+        ""
+      ) === wanted ||
+      String(
+        call?.calleeAccountId ||
+        ""
+      ) === wanted
+    ) {
+      peopleDmCallFinish(
+        call.id,
+        "disconnected"
+      );
+    }
+  }
+
+  for (
+    const [
+      socketId,
+      currentId
+    ]
+    of [...userIds.entries()]
+  ) {
+    if (
+      String(
+        currentId ||
+        ""
+      ) !== wanted
+    ) {
+      continue;
+    }
+
+    const socket =
+      io.sockets.sockets.get(
+        socketId
+      );
+
+    if (socket) {
+      leaveVoice(
+        socket
+      );
+
+      socket.emit(
+        "account-deleted",
+        {
+          ok: true
+        }
+      );
+
+      socket.disconnect(
+        true
+      );
+    }
+
+    users.delete(
+      socketId
+    );
+
+    userIds.delete(
+      socketId
+    );
+
+    socketServerIds.delete(
+      socketId
+    );
+
+    voiceUsers.delete(
+      socketId
+    );
+  }
+}
+
+async function peopleSimpleAdminDeleteLocal(
+  account
+) {
+  const id =
+    String(
+      account.id
+    );
+
+  const accounts =
+    peopleReadLocalAccounts()
+      .filter(
+        (item) =>
+          String(
+            item.id
+          ) !== id
+      );
+
+  peopleWriteLocalAccounts(
+    accounts
+  );
+
+  const social =
+    peopleReadLocalSocial();
+
+  social.friends =
+    (
+      Array.isArray(
+        social.friends
+      )
+        ? social.friends
+        : []
+    ).filter(
+      (item) =>
+        String(
+          item.user_id
+        ) !== id &&
+        String(
+          item.friend_id
+        ) !== id
+    );
+
+  social.friend_requests =
+    (
+      Array.isArray(
+        social.friend_requests
+      )
+        ? social.friend_requests
+        : []
+    ).filter(
+      (item) =>
+        String(
+          item.sender_id
+        ) !== id &&
+        String(
+          item.recipient_id
+        ) !== id
+    );
+
+  social.dms =
+    (
+      Array.isArray(
+        social.dms
+      )
+        ? social.dms
+        : []
+    ).filter(
+      (item) =>
+        String(
+          item.sender_id
+        ) !== id &&
+        String(
+          item.recipient_id
+        ) !== id
+    );
+
+  if (
+    Array.isArray(
+      social.closed_dms
+    )
+  ) {
+    social.closed_dms =
+      social.closed_dms
+        .filter(
+          (item) =>
+            String(
+              item.user_id
+            ) !== id &&
+            String(
+              item.other_id
+            ) !== id
+        );
+  }
+
+  peopleWriteLocalSocial(
+    social
+  );
+
+  const serverData =
+    peopleReadLocalServers();
+
+  serverData.members =
+    serverData.members
+      .filter(
+        (item) =>
+          String(
+            item.userId ??
+            item.user_id ??
+            ""
+          ) !== id
+      );
+
+  /*
+    On ne détruit PAS les serveurs créés par ce compte.
+    Ils restent présents sans propriétaire.
+  */
+  serverData.servers =
+    serverData.servers.map(
+      (item) => {
+        const owner =
+          String(
+            item.ownerId ??
+            item.owner_id ??
+            ""
+          );
+
+        if (
+          owner !== id
+        ) {
+          return item;
+        }
+
+        return {
+          ...item,
+          ownerId: null,
+          owner_id: null
+        };
+      }
+    );
+
+  peopleWriteLocalServers(
+    serverData
+  );
+}
+
+async function peopleSimpleAdminDeleteAccount(
+  username
+) {
+  const account =
+    await peopleFindAccount(
+      username
+    );
+
+  if (!account) {
+    return null;
+  }
+
+  const accountId =
+    String(
+      account.id
+    );
+
+  if (peoplePool) {
+    /*
+      Les FK existantes de People nettoient les amis,
+      demandes, MP, PP, images et memberships.
+      Les messages serveur gardent leur historique
+      avec sender_id = NULL lorsque prévu par le schéma.
+    */
+    await peoplePool.query(
+      "DELETE FROM people_accounts WHERE id = $1",
+      [
+        accountId
+      ]
+    );
+  } else {
+    await peopleSimpleAdminDeleteLocal(
+      account
+    );
+  }
+
+  peopleSimpleAdminKickAccount(
+    accountId
+  );
+
+  return {
+    id:
+      accountId,
+    username:
+      account.username
+  };
+}
+// === PEOPLE_SIMPLE_ADMIN_DELETE_HELPERS_V1 ===
 
 // === PEOPLE_PROFILE_AVATARS_V1_START ===
 const PEOPLE_LOCAL_AVATAR_DIR =
