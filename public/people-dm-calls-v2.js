@@ -221,20 +221,93 @@
   }
 
   /*
-    Le nom du MP / l'écran actif est géré
-    par people-social.js. Un petit observateur
-    suffit pour déplacer le panneau au bon endroit.
+    PEOPLE_DM_CALLS_V2_PLACEMENT_FIX
+
+    IMPORTANT :
+    on ne surveille surtout PAS tout document.body.
+
+    L'ancien observateur global pouvait se réveiller sur
+    chaque mutation de People, puis modifier lui-même des
+    classes DOM, ce qui pouvait créer une boucle de travail
+    et figer complètement l'interface.
+
+    On surveille uniquement les 3 états réellement utiles :
+    - appel visible/caché ;
+    - MP visible/caché ;
+    - pseudo du MP actuellement ouvert.
+
+    La signature évite aussi toute boucle quand syncPlacement()
+    modifie ses propres classes docked/floating.
   */
+  let placementScheduled =
+    false;
+
+  let lastPlacementSignature =
+    "";
+
+  function placementSignature() {
+    return [
+      overlay.classList
+        .contains(
+          "hidden"
+        )
+        ? "0"
+        : "1",
+      dmView.classList
+        .contains(
+          "hidden"
+        )
+        ? "0"
+        : "1",
+      normalized(
+        dmHeaderName.textContent
+      )
+    ].join(
+      "|"
+    );
+  }
+
+  function schedulePlacement() {
+    if (
+      placementScheduled
+    ) {
+      return;
+    }
+
+    placementScheduled =
+      true;
+
+    requestAnimationFrame(
+      () => {
+        placementScheduled =
+          false;
+
+        const signature =
+          placementSignature();
+
+        if (
+          signature ===
+          lastPlacementSignature
+        ) {
+          return;
+        }
+
+        lastPlacementSignature =
+          signature;
+
+        syncPlacement();
+      }
+    );
+  }
+
   const placementObserver =
     new MutationObserver(
-      syncPlacement
+      schedulePlacement
     );
 
   placementObserver.observe(
-    document.body,
+    overlay,
     {
-      subtree: true,
-      childList: true,
       attributes: true,
       attributeFilter: [
         "class"
@@ -242,10 +315,26 @@
     }
   );
 
-  setInterval(
-    syncPlacement,
-    500
+  placementObserver.observe(
+    dmView,
+    {
+      attributes: true,
+      attributeFilter: [
+        "class"
+      ]
+    }
   );
+
+  placementObserver.observe(
+    dmHeaderName,
+    {
+      childList: true,
+      subtree: true,
+      characterData: true
+    }
+  );
+
+  schedulePlacement();
 
   // ==========================================================
   // VOLUME LOCAL DE LA PERSONNE EN FACE
