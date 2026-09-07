@@ -21,7 +21,134 @@ const userCount = document.getElementById("userCount");
 
 const messageForm = document.getElementById("messageForm");
 const messageInput = document.getElementById("messageInput");
+const messageImageButton =
+  document.getElementById(
+    "messageImageButton"
+  );
+
+const messageImageInput =
+  document.getElementById(
+    "messageImageInput"
+  );
+
+const messageImagePreview =
+  document.getElementById(
+    "messageImagePreview"
+  );
+
+const peopleGeneralImagePicker =
+  window.PeopleRichContent
+    ?.createImagePicker({
+      button:
+        messageImageButton,
+      input:
+        messageImageInput,
+      preview:
+        messageImagePreview
+    });
 const messages = document.getElementById("messages");
+
+// === PEOPLE_GENERAL_MESSAGE_ACTIONS_V1_START ===
+const peopleGeneralReplyController =
+  window.PeopleMessageActions
+    ?.createReplyController({
+      form:
+        messageForm,
+      input:
+        messageInput
+    });
+
+function peopleGeneralOwnMessage(
+  data
+) {
+  return (
+    String(
+      data?.username || ""
+    ).toLocaleLowerCase("fr-FR") ===
+    String(
+      username || ""
+    ).toLocaleLowerCase("fr-FR")
+  );
+}
+
+function peopleDeleteGeneralMessageFromServer(
+  id
+) {
+  return new Promise(
+    (resolve, reject) => {
+      socket.emit(
+        "chat-message-delete",
+        { id },
+        (response) => {
+          if (!response?.ok) {
+            reject(
+              new Error(
+                response?.error ||
+                "Suppression impossible."
+              )
+            );
+
+            return;
+          }
+
+          resolve();
+        }
+      );
+    }
+  );
+}
+
+function peopleRemoveGeneralMessageFromDom(
+  id
+) {
+  const wanted =
+    String(id || "");
+
+  const unit =
+    Array.from(
+      messages.querySelectorAll(
+        "[data-message-id]"
+      )
+    ).find(
+      (element) =>
+        String(
+          element.dataset
+            .messageId || ""
+        ) === wanted
+    );
+
+  window.PeopleMessageActions
+    ?.markDeleted(wanted);
+
+  peopleGeneralReplyController
+    ?.clearIfId(wanted);
+
+  if (!unit) return;
+
+  const row =
+    unit.closest(
+      ".message"
+    );
+
+  const body =
+    unit.closest(
+      ".people-message-group-body"
+    );
+
+  unit.remove();
+
+  if (
+    body &&
+    !body.querySelector(
+      ".people-message-unit"
+    )
+  ) {
+    row?.remove();
+  }
+
+  peopleResetGeneralGroup();
+}
+// === PEOPLE_GENERAL_MESSAGE_ACTIONS_V1_END ===
 
 const voiceButton = document.getElementById("voiceButton");
 const voiceStatus = document.getElementById("voiceStatus");
@@ -78,6 +205,8 @@ function renderChatHistory(history) {
       ? history
       : [];
 
+  peopleResetGeneralGroup();
+
   messages
     .querySelectorAll(
       ".message, .system-message"
@@ -95,6 +224,7 @@ function renderChatHistory(history) {
 // === PEOPLE_GENERAL_HISTORY_V1_END ===
 
 function addSystemMessage(data) {
+  peopleResetGeneralGroup();
   const div = document.createElement("div");
   div.className = "system-message";
   div.textContent = `${data.text} • ${timeText(data.time)}`;
@@ -102,34 +232,233 @@ function addSystemMessage(data) {
   scrollBottom();
 }
 
+// === PEOPLE_MESSAGE_GROUPING_V1_START ===
+const PEOPLE_GROUP_MAX_MESSAGES = 10;
+const PEOPLE_GROUP_MAX_GAP_MS =
+  10 * 60 * 1000;
+
+let peopleGeneralGroup = null;
+
+function peopleResetGeneralGroup() {
+  peopleGeneralGroup = null;
+}
+
+function peopleMessageTime(value) {
+  const time =
+    new Date(value).getTime();
+
+  return Number.isFinite(time)
+    ? time
+    : Date.now();
+}
+
+function peopleGeneralTextLine(
+  data,
+  grouped = false
+) {
+  const unit =
+    document.createElement("div");
+
+  unit.className =
+    "people-message-unit";
+
+  const messageId =
+    String(
+      data?.id || ""
+    );
+
+  if (messageId) {
+    unit.dataset.messageId =
+      messageId;
+  }
+
+  const replyPreview =
+    window.PeopleMessageActions
+      ?.createReplyPreview(
+        data?.replyTo
+      );
+
+  if (replyPreview) {
+    unit.appendChild(
+      replyPreview
+    );
+  }
+
+  const text =
+    document.createElement("div");
+
+  text.className =
+    grouped
+      ? "message-text people-grouped-message-line"
+      : "message-text";
+
+  if (window.PeopleRichContent) {
+    window.PeopleRichContent.render(
+      text,
+      {
+        text:
+          data.text,
+        imageId:
+          data.imageId
+      }
+    );
+  } else {
+    text.textContent =
+      String(data.text || "");
+  }
+
+  if (grouped) {
+    text.title =
+      timeText(data.time);
+  }
+
+  unit.appendChild(text);
+
+  if (messageId) {
+    window.PeopleMessageActions
+      ?.bindContext(
+        unit,
+        {
+          message: {
+            id:
+              messageId,
+            username:
+              data.username,
+            text:
+              data.text,
+            imageId:
+              data.imageId
+          },
+          canDelete:
+            peopleGeneralOwnMessage(
+              data
+            ),
+          onReply:
+            () =>
+              peopleGeneralReplyController
+                ?.set({
+                  id:
+                    messageId,
+                  username:
+                    data.username,
+                  text:
+                    data.text,
+                  imageId:
+                    data.imageId
+                }),
+          onDelete:
+            () =>
+              peopleDeleteGeneralMessageFromServer(
+                messageId
+              )
+        }
+      );
+  }
+
+  return unit;
+}
+
 function addChatMessage(data) {
-  const row = document.createElement("div");
+  const messageTime =
+    peopleMessageTime(data.time);
+
+  const sameGroup =
+    peopleGeneralGroup &&
+    peopleGeneralGroup.username ===
+      String(data.username || "") &&
+    peopleGeneralGroup.count <
+      PEOPLE_GROUP_MAX_MESSAGES &&
+    messageTime -
+      peopleGeneralGroup.lastTime <
+      PEOPLE_GROUP_MAX_GAP_MS;
+
+  if (sameGroup) {
+    peopleGeneralGroup.body.appendChild(
+      peopleGeneralTextLine(
+        data,
+        true
+      )
+    );
+
+    peopleGeneralGroup.lastTime =
+      messageTime;
+
+    peopleGeneralGroup.count += 1;
+
+    scrollBottom();
+    return;
+  }
+
+  const row =
+    document.createElement("div");
+
   row.className = "message";
 
-  const av = document.createElement("div");
+  const av =
+    document.createElement("div");
+
   av.className = "avatar";
-  av.textContent = initials(data.username);
 
-  const body = document.createElement("div");
-  const head = document.createElement("div");
-  head.className = "message-head";
+  window.PeopleAvatars?.apply(
+    av,
+    data.username
+  );
 
-  const strong = document.createElement("strong");
-  strong.textContent = data.username;
+  const body =
+    document.createElement("div");
 
-  const time = document.createElement("time");
-  time.textContent = timeText(data.time);
+  body.className =
+    "people-message-group-body";
 
-  const text = document.createElement("div");
-  text.className = "message-text";
-  text.textContent = data.text;
+  const head =
+    document.createElement("div");
 
-  head.append(strong, time);
-  body.append(head, text);
-  row.append(av, body);
+  head.className =
+    "message-head";
+
+  const strong =
+    document.createElement("strong");
+
+  strong.textContent =
+    data.username;
+
+  const time =
+    document.createElement("time");
+
+  time.textContent =
+    timeText(data.time);
+
+  head.append(
+    strong,
+    time
+  );
+
+  body.append(
+    head,
+    peopleGeneralTextLine(
+      data,
+      false
+    )
+  );
+
+  row.append(
+    av,
+    body
+  );
+
   messages.appendChild(row);
+
+  peopleGeneralGroup = {
+    username:
+      String(data.username || ""),
+    lastTime: messageTime,
+    count: 1,
+    body
+  };
+
   scrollBottom();
 }
+// === PEOPLE_MESSAGE_GROUPING_V1_END ===
 
 function getVoiceUser(peerId) {
   return lastVoiceRoster.find(user => user.id === peerId) || null;
@@ -156,7 +485,10 @@ function renderVoiceUsers(roster) {
 
     const av = document.createElement("div");
     av.className = "voice-user-avatar";
-    av.textContent = initials(user.username);
+    window.PeopleAvatars?.apply(
+    av,
+    user.username
+  );
 
     const name = document.createElement("div");
     name.className = "voice-user-name";
@@ -201,7 +533,10 @@ function ensureVideoTile(peerId, displayName, isLocal = false) {
 
     const bigAvatar = document.createElement("div");
     bigAvatar.className = "big-avatar";
-    bigAvatar.textContent = initials(displayName);
+    window.PeopleAvatars?.apply(
+      bigAvatar,
+      displayName
+    );
     placeholder.appendChild(bigAvatar);
 
     const video = document.createElement("video");
@@ -219,7 +554,12 @@ function ensureVideoTile(peerId, displayName, isLocal = false) {
   const label = tile.querySelector(".video-label");
   const bigAvatar = tile.querySelector(".big-avatar");
   if (label) label.textContent = isLocal ? `${displayName} (toi)` : displayName;
-  if (bigAvatar) bigAvatar.textContent = initials(displayName);
+  if (bigAvatar) {
+    window.PeopleAvatars?.apply(
+      bigAvatar,
+      displayName
+    );
+  }
 
   return tile;
 }
@@ -381,7 +721,10 @@ function applyAuthenticatedUser(user) {
   if (!username) return false;
 
   profileName.textContent = username;
-  avatar.textContent = initials(username);
+  window.PeopleAvatars?.apply(
+    avatar,
+    username
+  );
   joinScreen.classList.add("hidden");
   window.dispatchEvent(new CustomEvent("people-authenticated", { detail: user }));
   return true;
@@ -516,13 +859,93 @@ socket.on("auth-required", () => {
 
 bootstrapAuth();
 
-messageForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  const text = messageInput.value.trim();
-  if (!text) return;
-  socket.emit("chat-message", { text });
-  messageInput.value = "";
-});
+messageForm.addEventListener(
+  "submit",
+  async (e) => {
+    e.preventDefault();
+
+    const text =
+      messageInput.value.trim();
+
+    const file =
+      peopleGeneralImagePicker
+        ?.getFile();
+
+    if (
+      !text &&
+      !file
+    ) {
+      return;
+    }
+
+    const submitButton =
+      messageForm.querySelector(
+        'button[type="submit"]'
+      );
+
+    messageInput.disabled =
+      true;
+
+    if (submitButton) {
+      submitButton.disabled =
+        true;
+    }
+
+    peopleGeneralImagePicker
+      ?.setBusy(true);
+
+    try {
+      let imageId =
+        null;
+
+      if (file) {
+        imageId =
+          await window
+            .PeopleRichContent
+            .uploadImage(
+              file
+            );
+      }
+
+      socket.emit(
+        "chat-message",
+        {
+          text,
+          imageId,
+          replyToId:
+            peopleGeneralReplyController
+              ?.get()?.id || null
+        }
+      );
+
+      peopleGeneralReplyController
+        ?.clear();
+
+      messageInput.value =
+        "";
+
+      peopleGeneralImagePicker
+        ?.clear();
+    } catch (err) {
+      alert(
+        err.message
+      );
+    } finally {
+      messageInput.disabled =
+        false;
+
+      if (submitButton) {
+        submitButton.disabled =
+          false;
+      }
+
+      peopleGeneralImagePicker
+        ?.setBusy(false);
+
+      messageInput.focus();
+    }
+  }
+);
 
 socket.on("connect", () => {
   if (!username) return;
@@ -552,6 +975,30 @@ socket.on("disconnect", () => {
 });
 
 socket.on("chat-history", renderChatHistory);
+socket.on(
+  "profile-avatar-updated",
+  (data) => {
+    if (data?.username) {
+      window.PeopleAvatars?.refresh(
+        data.username
+      );
+    }
+  }
+);
+
+// === PEOPLE_GENERAL_DELETE_CLIENT_V1_START ===
+socket.on(
+  "chat-message-deleted",
+  ({ id } = {}) => {
+    if (id) {
+      peopleRemoveGeneralMessageFromDom(
+        id
+      );
+    }
+  }
+);
+// === PEOPLE_GENERAL_DELETE_CLIENT_V1_END ===
+
 socket.on("chat-message", addChatMessage);
 socket.on("system-message", addSystemMessage);
 socket.on("user-count", count => userCount.textContent = count);
@@ -1151,7 +1598,10 @@ function peopleRenderOnlineUsers(roster) {
 
     const av = document.createElement("div");
     av.className = "online-user-avatar";
-    av.textContent = initials(user.username || "?");
+    window.PeopleAvatars?.apply(
+      av,
+      user.username || "?"
+    );
 
     const info = document.createElement("div");
     info.className = "online-user-info";

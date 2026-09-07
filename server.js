@@ -1043,82 +1043,346 @@ async function peopleDeleteFriendRequest(accountId, requestId) {
 }
 // === PEOPLE_FRIEND_REQUESTS_V2_END ===
 
-async function peopleCreateDm(senderId, recipientId, body) {
-  const sender = String(senderId);
-  const recipient = String(recipientId);
-  const cleanBody = String(body || "").trim().slice(0, 2000);
+async function peopleCreateDm(
+  senderId,
+  recipientId,
+  body,
+  imageId = null,
+  replyToId = null
+) {
+  const sender =
+    String(senderId);
 
-  if (!cleanBody) return null;
+  const recipient =
+    String(recipientId);
 
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "INSERT INTO people_direct_messages " +
-      "(sender_id, recipient_id, body) " +
-      "VALUES ($1, $2, $3) " +
-      "RETURNING id, sender_id, recipient_id, body, created_at, read_at",
-      [sender, recipient, cleanBody]
+  const cleanBody =
+    String(body || "")
+      .trim()
+      .slice(0, 2000);
+
+  const imageKey =
+    peopleNormalizeMessageImageId(
+      imageId
     );
 
-    return result.rows[0] || null;
+  const replyKey =
+    peopleReplyId(
+      replyToId
+    );
+
+  if (
+    !cleanBody &&
+    !imageKey
+  ) {
+    return null;
   }
 
-  const data = peopleReadLocalSocial();
+  if (peoplePool) {
+    await peopleEnsureReplyColumns();
+
+    const client =
+      await peoplePool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const reply =
+        replyKey
+          ? await peopleDmReplyPreview(
+              sender,
+              recipient,
+              replyKey,
+              client
+            )
+          : null;
+
+      if (
+        replyKey &&
+        !reply
+      ) {
+        const err =
+          new Error("REPLY_INVALID");
+
+        err.code =
+          "REPLY_INVALID";
+
+        throw err;
+      }
+
+      const result =
+        await client.query(
+          "INSERT INTO people_direct_messages " +
+          "(sender_id, recipient_id, body, reply_to_id) " +
+          "VALUES ($1, $2, $3, $4) " +
+          "RETURNING id, sender_id, recipient_id, body, reply_to_id, created_at, read_at",
+          [
+            sender,
+            recipient,
+            cleanBody,
+            replyKey || null
+          ]
+        );
+
+      const row =
+        result.rows[0];
+
+      let boundImageId =
+        null;
+
+      if (imageKey) {
+        boundImageId =
+          await peopleBindDmMessageImage(
+            sender,
+            imageKey,
+            row.id,
+            sender,
+            recipient,
+            client
+          );
+
+        if (!boundImageId) {
+          const err =
+            new Error("IMAGE_INVALID");
+
+          err.code =
+            "IMAGE_INVALID";
+
+          throw err;
+        }
+      }
+
+      await client.query("COMMIT");
+
+      row.image_id =
+        boundImageId;
+
+      row.reply_to =
+        reply;
+
+      return row;
+    } catch (err) {
+      await client
+        .query("ROLLBACK")
+        .catch(() => {});
+
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  const data =
+    peopleReadLocalSocial();
+
+  const reply =
+    replyKey
+      ? await peopleDmReplyPreview(
+          sender,
+          recipient,
+          replyKey
+        )
+      : null;
+
+  if (
+    replyKey &&
+    !reply
+  ) {
+    const err =
+      new Error("REPLY_INVALID");
+
+    err.code =
+      "REPLY_INVALID";
+
+    throw err;
+  }
 
   const message = {
-    id: cryptoAccounts.randomUUID(),
-    sender_id: sender,
-    recipient_id: recipient,
-    body: cleanBody,
-    created_at: new Date().toISOString(),
-    read_at: null
+    id:
+      cryptoAccounts.randomUUID(),
+    sender_id:
+      sender,
+    recipient_id:
+      recipient,
+    body:
+      cleanBody,
+    image_id:
+      null,
+    reply_to_id:
+      replyKey || null,
+    created_at:
+      new Date().toISOString(),
+    read_at:
+      null
   };
+
+  if (imageKey) {
+    const bound =
+      await peopleBindDmMessageImage(
+        sender,
+        imageKey,
+        message.id,
+        sender,
+        recipient
+      );
+
+    if (!bound) {
+      const err =
+        new Error("IMAGE_INVALID");
+
+      err.code =
+        "IMAGE_INVALID";
+
+      throw err;
+    }
+
+    message.image_id =
+      bound;
+  }
 
   data.dms.push(message);
 
-  if (data.dms.length > 10000) {
-    data.dms = data.dms.slice(-10000);
+  if (
+    data.dms.length >
+    10000
+  ) {
+    data.dms =
+      data.dms.slice(-10000);
   }
 
   peopleWriteLocalSocial(data);
+
+  message.reply_to =
+    reply;
+
   return message;
 }
 
-async function peopleDmHistory(accountId, otherId) {
-  const me = String(accountId);
-  const other = String(otherId);
+async function peopleDmHistory(
+  accountId,
+  otherId
+) {
+  const me =
+    String(accountId);
+
+  const other =
+    String(otherId);
 
   if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT id, sender_id, recipient_id, body, created_at, read_at " +
-      "FROM people_direct_messages " +
-      "WHERE (sender_id = $1 AND recipient_id = $2) " +
-      "OR (sender_id = $2 AND recipient_id = $1) " +
-      "ORDER BY created_at DESC LIMIT 150",
-      [me, other]
-    );
+    await peopleEnsureReplyColumns();
+
+    const result =
+      await peoplePool.query(
+        "SELECT " +
+        "dm.id, dm.sender_id, dm.recipient_id, dm.body, dm.reply_to_id, dm.created_at, dm.read_at, " +
+        "(SELECT i.id FROM people_message_images i " +
+        "WHERE i.dm_message_id = dm.id LIMIT 1) AS image_id, " +
+        "ra.username AS reply_sender_username, " +
+        "rdm.body AS reply_body, " +
+        "(SELECT ri.id FROM people_message_images ri " +
+        "WHERE ri.dm_message_id = rdm.id LIMIT 1) AS reply_image_id " +
+        "FROM people_direct_messages dm " +
+        "LEFT JOIN people_direct_messages rdm " +
+        "ON rdm.id = dm.reply_to_id " +
+        "LEFT JOIN people_accounts ra " +
+        "ON ra.id = rdm.sender_id " +
+        "WHERE (dm.sender_id = $1 AND dm.recipient_id = $2) " +
+        "OR (dm.sender_id = $2 AND dm.recipient_id = $1) " +
+        "ORDER BY dm.created_at DESC LIMIT 150",
+        [
+          me,
+          other
+        ]
+      );
 
     return result.rows.reverse();
   }
 
-  return peopleReadLocalSocial()
-    .dms
-    .filter(
-      (message) =>
-        (
-          String(message.sender_id) === me &&
-          String(message.recipient_id) === other
-        ) ||
-        (
-          String(message.sender_id) === other &&
-          String(message.recipient_id) === me
-        )
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.created_at).getTime() -
-        new Date(b.created_at).getTime()
-    )
-    .slice(-150);
+  const all =
+    peopleReadLocalSocial()
+      .dms;
+
+  const byId =
+    new Map(
+      all.map(
+        (message) => [
+          String(message.id),
+          message
+        ]
+      )
+    );
+
+  const filtered =
+    all
+      .filter(
+        (message) =>
+          (
+            String(
+              message.sender_id
+            ) === me &&
+            String(
+              message.recipient_id
+            ) === other
+          ) ||
+          (
+            String(
+              message.sender_id
+            ) === other &&
+            String(
+              message.recipient_id
+            ) === me
+          )
+      )
+      .sort(
+        (a, b) =>
+          new Date(
+            a.created_at
+          ).getTime() -
+          new Date(
+            b.created_at
+          ).getTime()
+      )
+      .slice(-150);
+
+  for (const message of filtered) {
+    const replyId =
+      peopleReplyId(
+        message.reply_to_id
+      );
+
+    const reply =
+      replyId
+        ? byId.get(replyId)
+        : null;
+
+    if (replyId && reply) {
+      const sender =
+        await peopleFindAccountById(
+          reply.sender_id
+        );
+
+      message.reply_sender_username =
+        sender?.username ||
+        "Utilisateur";
+
+      message.reply_body =
+        reply.body || "";
+
+      message.reply_image_id =
+        reply.image_id || null;
+    } else {
+      message.reply_sender_username =
+        null;
+
+      message.reply_body =
+        null;
+
+      message.reply_image_id =
+        null;
+    }
+  }
+
+  return filtered;
 }
 
 async function peopleMarkDmRead(accountId, otherId) {
@@ -1152,81 +1416,143 @@ async function peopleMarkDmRead(accountId, otherId) {
 }
 
 async function peopleDmConversations(accountId) {
-  const me = String(accountId);
+  const me =
+    String(accountId);
+
   let messages;
 
   if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT id, sender_id, recipient_id, body, created_at, read_at " +
-      "FROM people_direct_messages " +
-      "WHERE sender_id = $1 OR recipient_id = $1 " +
-      "ORDER BY created_at DESC LIMIT 1000",
-      [me]
-    );
+    const result =
+      await peoplePool.query(
+        "SELECT " +
+        "dm.id, dm.sender_id, dm.recipient_id, dm.body, dm.created_at, dm.read_at, " +
+        "(SELECT i.id FROM people_message_images i " +
+        "WHERE i.dm_message_id = dm.id LIMIT 1) AS image_id " +
+        "FROM people_direct_messages dm " +
+        "WHERE dm.sender_id = $1 OR dm.recipient_id = $1 " +
+        "ORDER BY dm.created_at DESC LIMIT 1000",
+        [me]
+      );
 
-    messages = result.rows;
+    messages =
+      result.rows;
   } else {
-    messages = peopleReadLocalSocial()
-      .dms
-      .filter(
-        (message) =>
-          String(message.sender_id) === me ||
-          String(message.recipient_id) === me
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() -
-          new Date(a.created_at).getTime()
-      )
-      .slice(0, 1000);
+    messages =
+      peopleReadLocalSocial()
+        .dms
+        .filter(
+          (message) =>
+            String(
+              message.sender_id
+            ) === me ||
+            String(
+              message.recipient_id
+            ) === me
+        )
+        .sort(
+          (a, b) =>
+            new Date(
+              b.created_at
+            ).getTime() -
+            new Date(
+              a.created_at
+            ).getTime()
+        )
+        .slice(0, 1000);
   }
 
-  const map = new Map();
+  const map =
+    new Map();
 
-  for (const message of messages) {
+  for (
+    const message of messages
+  ) {
     const otherId =
-      String(message.sender_id) === me
-        ? String(message.recipient_id)
-        : String(message.sender_id);
+      String(
+        message.sender_id
+      ) === me
+        ? String(
+            message.recipient_id
+          )
+        : String(
+            message.sender_id
+          );
 
-    if (!map.has(otherId)) {
-      map.set(otherId, {
+    if (
+      !map.has(otherId)
+    ) {
+      map.set(
         otherId,
-        lastMessage: message.body,
-        lastAt: message.created_at,
-        unreadCount: 0
-      });
+        {
+          otherId,
+          lastMessage:
+            message.body ||
+            (
+              message.image_id
+                ? "🖼️ Image"
+                : ""
+            ),
+          lastAt:
+            message.created_at,
+          unreadCount:
+            0
+        }
+      );
     }
 
     if (
-      String(message.recipient_id) === me &&
+      String(
+        message.recipient_id
+      ) === me &&
       !message.read_at
     ) {
-      map.get(otherId).unreadCount += 1;
+      map.get(
+        otherId
+      ).unreadCount += 1;
     }
   }
 
   const out = [];
 
-  for (const item of map.values()) {
-    const account = await peopleFindAccountById(item.otherId);
-    if (!account) continue;
+  for (
+    const item of map.values()
+  ) {
+    const account =
+      await peopleFindAccountById(
+        item.otherId
+      );
+
+    if (!account) {
+      continue;
+    }
 
     out.push({
       user: {
-        ...peoplePublicAccount(account),
-        online: peopleAccountIsOnline(account.id)
+        ...peoplePublicAccount(
+          account
+        ),
+        online:
+          peopleAccountIsOnline(
+            account.id
+          )
       },
-      lastMessage: item.lastMessage,
-      lastAt: item.lastAt,
-      unreadCount: item.unreadCount
+      lastMessage:
+        item.lastMessage,
+      lastAt:
+        item.lastAt,
+      unreadCount:
+        item.unreadCount
     });
   }
 
   out.sort(
     (a, b) =>
-      new Date(b.lastAt).getTime() -
-      new Date(a.lastAt).getTime()
+      new Date(
+        b.lastAt
+      ).getTime() -
+      new Date(
+        a.lastAt
+      ).getTime()
   );
 
   return out;
@@ -1272,10 +1598,456 @@ function peopleWriteLocalGeneral(messages) {
   );
 }
 
+// === PEOPLE_MESSAGE_REPLIES_DELETE_V1_START ===
+let peopleReplyColumnsPromise = null;
+
+function peopleReplyId(value) {
+  return String(value || "")
+    .trim()
+    .slice(0, 100);
+}
+
+async function peopleEnsureReplyColumns() {
+  if (!peoplePool) return;
+
+  if (!peopleReplyColumnsPromise) {
+    peopleReplyColumnsPromise =
+      Promise.all([
+        peoplePool.query(
+          "ALTER TABLE people_general_messages " +
+          "ADD COLUMN IF NOT EXISTS reply_to_id BIGINT NULL"
+        ),
+        peoplePool.query(
+          "ALTER TABLE people_direct_messages " +
+          "ADD COLUMN IF NOT EXISTS reply_to_id BIGINT NULL"
+        ),
+        peoplePool.query(
+          "CREATE INDEX IF NOT EXISTS people_general_reply_idx " +
+          "ON people_general_messages(reply_to_id)"
+        ),
+        peoplePool.query(
+          "CREATE INDEX IF NOT EXISTS people_dm_reply_idx " +
+          "ON people_direct_messages(reply_to_id)"
+        )
+      ]).catch((err) => {
+        peopleReplyColumnsPromise = null;
+        throw err;
+      });
+  }
+
+  await peopleReplyColumnsPromise;
+}
+
+function peopleDeletedReply(id) {
+  return {
+    id: String(id),
+    username: "Message supprimé",
+    text: "",
+    imageId: null,
+    deleted: true
+  };
+}
+
+async function peopleGeneralReplyPreview(
+  replyToId,
+  db = peoplePool
+) {
+  const id =
+    peopleReplyId(replyToId);
+
+  if (!id) return null;
+
+  if (peoplePool) {
+    if (!/^\d+$/.test(id)) {
+      return null;
+    }
+
+    const result =
+      await db.query(
+        "SELECT gm.id, gm.username, gm.body, " +
+        "(SELECT i.id FROM people_message_images i " +
+        "WHERE i.general_message_id = gm.id LIMIT 1) AS image_id " +
+        "FROM people_general_messages gm " +
+        "WHERE gm.id = $1 LIMIT 1",
+        [id]
+      );
+
+    const row =
+      result.rows[0];
+
+    if (!row) return null;
+
+    return {
+      id: String(row.id),
+      username: row.username,
+      text: row.body,
+      imageId:
+        row.image_id
+          ? String(row.image_id)
+          : null,
+      deleted: false
+    };
+  }
+
+  const message =
+    peopleReadLocalGeneral()
+      .find(
+        (item) =>
+          String(item.id) === id
+      );
+
+  if (!message) return null;
+
+  return {
+    id: String(message.id),
+    username:
+      String(message.username || ""),
+    text:
+      String(message.text || ""),
+    imageId:
+      message.imageId
+        ? String(message.imageId)
+        : null,
+    deleted: false
+  };
+}
+
+async function peopleDmReplyPreview(
+  accountA,
+  accountB,
+  replyToId,
+  db = peoplePool
+) {
+  const me =
+    String(accountA);
+
+  const other =
+    String(accountB);
+
+  const id =
+    peopleReplyId(replyToId);
+
+  if (!id) return null;
+
+  if (peoplePool) {
+    if (!/^\d+$/.test(id)) {
+      return null;
+    }
+
+    const result =
+      await db.query(
+        "SELECT dm.id, dm.sender_id, dm.body, " +
+        "a.username AS sender_username, " +
+        "(SELECT i.id FROM people_message_images i " +
+        "WHERE i.dm_message_id = dm.id LIMIT 1) AS image_id " +
+        "FROM people_direct_messages dm " +
+        "LEFT JOIN people_accounts a ON a.id = dm.sender_id " +
+        "WHERE dm.id = $3 AND (" +
+        "(dm.sender_id = $1 AND dm.recipient_id = $2) OR " +
+        "(dm.sender_id = $2 AND dm.recipient_id = $1)" +
+        ") LIMIT 1",
+        [me, other, id]
+      );
+
+    const row =
+      result.rows[0];
+
+    if (!row) return null;
+
+    return {
+      id: String(row.id),
+      username:
+        row.sender_username ||
+        "Utilisateur",
+      text: row.body,
+      imageId:
+        row.image_id
+          ? String(row.image_id)
+          : null,
+      deleted: false
+    };
+  }
+
+  const message =
+    peopleReadLocalSocial()
+      .dms
+      .find(
+        (item) =>
+          String(item.id) === id &&
+          (
+            (
+              String(item.sender_id) === me &&
+              String(item.recipient_id) === other
+            ) ||
+            (
+              String(item.sender_id) === other &&
+              String(item.recipient_id) === me
+            )
+          )
+      );
+
+  if (!message) return null;
+
+  const sender =
+    await peopleFindAccountById(
+      message.sender_id
+    );
+
+  return {
+    id: String(message.id),
+    username:
+      sender?.username ||
+      "Utilisateur",
+    text:
+      String(message.body || ""),
+    imageId:
+      message.image_id
+        ? String(message.image_id)
+        : null,
+    deleted: false
+  };
+}
+
+function peopleDeleteLocalBoundMessageImage(
+  scope,
+  messageId
+) {
+  if (peoplePool) return;
+
+  const wantedScope =
+    String(scope);
+
+  const wantedMessage =
+    String(messageId);
+
+  const meta =
+    peopleReadLocalMessageImageMeta();
+
+  let changed = false;
+
+  for (
+    const [id, item]
+    of Object.entries(meta)
+  ) {
+    if (
+      String(item?.scope) !==
+        wantedScope ||
+      String(item?.messageId) !==
+        wantedMessage
+    ) {
+      continue;
+    }
+
+    if (item.file) {
+      try {
+        fsAccounts.unlinkSync(
+          pathAccounts.join(
+            PEOPLE_LOCAL_MESSAGE_IMAGE_DIR,
+            item.file
+          )
+        );
+      } catch {}
+    }
+
+    delete meta[id];
+    changed = true;
+  }
+
+  if (changed) {
+    peopleWriteLocalMessageImageMeta(
+      meta
+    );
+  }
+}
+
+async function peopleDeleteGeneralMessage(
+  accountId,
+  messageId
+) {
+  const owner =
+    String(accountId);
+
+  const id =
+    peopleReplyId(messageId);
+
+  if (!id) return false;
+
+  if (peoplePool) {
+    await peopleEnsureReplyColumns();
+
+    if (!/^\d+$/.test(id)) {
+      return false;
+    }
+
+    const result =
+      await peoplePool.query(
+        "DELETE FROM people_general_messages " +
+        "WHERE id = $1 AND sender_id = $2 " +
+        "RETURNING id",
+        [id, owner]
+      );
+
+    return Boolean(
+      result.rows[0]
+    );
+  }
+
+  const messages =
+    peopleReadLocalGeneral();
+
+  const index =
+    messages.findIndex(
+      (item) =>
+        String(item.id) === id &&
+        String(item.senderId) === owner
+    );
+
+  if (index < 0) {
+    return false;
+  }
+
+  messages.splice(
+    index,
+    1
+  );
+
+  peopleWriteLocalGeneral(
+    messages
+  );
+
+  peopleDeleteLocalBoundMessageImage(
+    "general",
+    id
+  );
+
+  return true;
+}
+
+async function peopleDeleteDmMessage(
+  accountId,
+  messageId
+) {
+  const owner =
+    String(accountId);
+
+  const id =
+    peopleReplyId(messageId);
+
+  if (!id) return null;
+
+  if (peoplePool) {
+    await peopleEnsureReplyColumns();
+
+    if (!/^\d+$/.test(id)) {
+      return null;
+    }
+
+    const result =
+      await peoplePool.query(
+        "DELETE FROM people_direct_messages " +
+        "WHERE id = $1 AND sender_id = $2 " +
+        "RETURNING id, sender_id, recipient_id",
+        [id, owner]
+      );
+
+    const row =
+      result.rows[0];
+
+    if (!row) return null;
+
+    return {
+      id:
+        String(row.id),
+      senderId:
+        String(row.sender_id),
+      recipientId:
+        String(row.recipient_id)
+    };
+  }
+
+  const data =
+    peopleReadLocalSocial();
+
+  const index =
+    data.dms.findIndex(
+      (item) =>
+        String(item.id) === id &&
+        String(item.sender_id) === owner
+    );
+
+  if (index < 0) {
+    return null;
+  }
+
+  const message =
+    data.dms[index];
+
+  data.dms.splice(
+    index,
+    1
+  );
+
+  peopleWriteLocalSocial(
+    data
+  );
+
+  peopleDeleteLocalBoundMessageImage(
+    "dm",
+    id
+  );
+
+  return {
+    id,
+    senderId:
+      String(message.sender_id),
+    recipientId:
+      String(message.recipient_id)
+  };
+}
+
+function peopleDmReplyFromHistoryRow(
+  message
+) {
+  const replyId =
+    peopleReplyId(
+      message?.reply_to_id
+    );
+
+  if (!replyId) {
+    return null;
+  }
+
+  if (
+    !message.reply_sender_username
+  ) {
+    return peopleDeletedReply(
+      replyId
+    );
+  }
+
+  return {
+    id: replyId,
+    username:
+      message.reply_sender_username,
+    text:
+      message.reply_body || "",
+    imageId:
+      message.reply_image_id
+        ? String(
+            message.reply_image_id
+          )
+        : null,
+    deleted: false
+  };
+}
+// === PEOPLE_MESSAGE_REPLIES_DELETE_V1_END ===
+
 async function peopleSaveGeneralMessage(
   senderId,
   username,
-  text
+  text,
+  imageId = null,
+  replyToId = null
 ) {
   const cleanUsername =
     peopleUsername(username).slice(0, 24);
@@ -1285,88 +2057,358 @@ async function peopleSaveGeneralMessage(
       .trim()
       .slice(0, 1000);
 
-  if (!cleanUsername || !cleanText) {
+  const imageKey =
+    peopleNormalizeMessageImageId(
+      imageId
+    );
+
+  const replyKey =
+    peopleReplyId(
+      replyToId
+    );
+
+  if (
+    !cleanUsername ||
+    (
+      !cleanText &&
+      !imageKey
+    )
+  ) {
     return null;
   }
 
   if (peoplePool) {
-    const result = await peoplePool.query(
-      "INSERT INTO people_general_messages " +
-      "(sender_id, username, body) " +
-      "VALUES ($1, $2, $3) " +
-      "RETURNING id, username, body, created_at",
-      [
-        String(senderId),
-        cleanUsername,
-        cleanText
-      ]
-    );
+    await peopleEnsureReplyColumns();
 
-    const row = result.rows[0];
+    const client =
+      await peoplePool.connect();
 
-    return {
-      id: String(row.id),
-      username: row.username,
-      text: row.body,
-      time: new Date(row.created_at).getTime()
-    };
+    try {
+      await client.query("BEGIN");
+
+      const reply =
+        replyKey
+          ? await peopleGeneralReplyPreview(
+              replyKey,
+              client
+            )
+          : null;
+
+      if (
+        replyKey &&
+        !reply
+      ) {
+        const err =
+          new Error("REPLY_INVALID");
+
+        err.code =
+          "REPLY_INVALID";
+
+        throw err;
+      }
+
+      const result =
+        await client.query(
+          "INSERT INTO people_general_messages " +
+          "(sender_id, username, body, reply_to_id) " +
+          "VALUES ($1, $2, $3, $4) " +
+          "RETURNING id, username, body, reply_to_id, created_at",
+          [
+            String(senderId),
+            cleanUsername,
+            cleanText,
+            replyKey || null
+          ]
+        );
+
+      const row =
+        result.rows[0];
+
+      let boundImageId =
+        null;
+
+      if (imageKey) {
+        boundImageId =
+          await peopleBindGeneralMessageImage(
+            senderId,
+            imageKey,
+            row.id,
+            client
+          );
+
+        if (!boundImageId) {
+          const err =
+            new Error("IMAGE_INVALID");
+
+          err.code =
+            "IMAGE_INVALID";
+
+          throw err;
+        }
+      }
+
+      await client.query("COMMIT");
+
+      return {
+        id:
+          String(row.id),
+        username:
+          row.username,
+        text:
+          row.body,
+        imageId:
+          boundImageId,
+        replyTo:
+          reply,
+        time:
+          new Date(
+            row.created_at
+          ).getTime()
+      };
+    } catch (err) {
+      await client
+        .query("ROLLBACK")
+        .catch(() => {});
+
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
-  const messages = peopleReadLocalGeneral();
+  const messages =
+    peopleReadLocalGeneral();
+
+  const reply =
+    replyKey
+      ? await peopleGeneralReplyPreview(
+          replyKey
+        )
+      : null;
+
+  if (
+    replyKey &&
+    !reply
+  ) {
+    const err =
+      new Error("REPLY_INVALID");
+
+    err.code =
+      "REPLY_INVALID";
+
+    throw err;
+  }
 
   const message = {
-    id: cryptoAccounts.randomUUID(),
-    senderId: String(senderId),
-    username: cleanUsername,
-    text: cleanText,
-    time: Date.now()
+    id:
+      cryptoAccounts.randomUUID(),
+    senderId:
+      String(senderId),
+    username:
+      cleanUsername,
+    text:
+      cleanText,
+    imageId:
+      null,
+    replyToId:
+      replyKey || null,
+    time:
+      Date.now()
   };
 
-  messages.push(message);
-  peopleWriteLocalGeneral(messages);
+  if (imageKey) {
+    const bound =
+      await peopleBindGeneralMessageImage(
+        senderId,
+        imageKey,
+        message.id
+      );
 
-  return message;
+    if (!bound) {
+      const err =
+        new Error("IMAGE_INVALID");
+
+      err.code =
+        "IMAGE_INVALID";
+
+      throw err;
+    }
+
+    message.imageId =
+      bound;
+  }
+
+  messages.push(message);
+
+  peopleWriteLocalGeneral(
+    messages
+  );
+
+  return {
+    ...message,
+    replyTo: reply
+  };
 }
 
 async function peopleLoadGeneralMessages(
   limit = 100
 ) {
-  const safeLimit = Math.max(
-    1,
-    Math.min(200, Number(limit) || 100)
-  );
+  const safeLimit =
+    Math.max(
+      1,
+      Math.min(
+        200,
+        Number(limit) || 100
+      )
+    );
 
   if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT id, username, body, created_at " +
-      "FROM people_general_messages " +
-      "ORDER BY created_at DESC " +
-      "LIMIT $1",
-      [safeLimit]
-    );
+    await peopleEnsureReplyColumns();
+
+    const result =
+      await peoplePool.query(
+        "SELECT " +
+        "gm.id, gm.username, gm.body, gm.reply_to_id, gm.created_at, " +
+        "(SELECT i.id FROM people_message_images i " +
+        "WHERE i.general_message_id = gm.id LIMIT 1) AS image_id, " +
+        "rgm.username AS reply_username, " +
+        "rgm.body AS reply_body, " +
+        "(SELECT ri.id FROM people_message_images ri " +
+        "WHERE ri.general_message_id = rgm.id LIMIT 1) AS reply_image_id " +
+        "FROM people_general_messages gm " +
+        "LEFT JOIN people_general_messages rgm " +
+        "ON rgm.id = gm.reply_to_id " +
+        "ORDER BY gm.created_at DESC " +
+        "LIMIT $1",
+        [safeLimit]
+      );
 
     return result.rows
       .reverse()
       .map((row) => ({
-        id: String(row.id),
-        username: row.username,
-        text: row.body,
+        id:
+          String(row.id),
+        username:
+          row.username,
+        text:
+          row.body,
+        imageId:
+          row.image_id
+            ? String(row.image_id)
+            : null,
+        replyTo:
+          row.reply_to_id
+            ? (
+                row.reply_username
+                  ? {
+                      id:
+                        String(
+                          row.reply_to_id
+                        ),
+                      username:
+                        row.reply_username,
+                      text:
+                        row.reply_body || "",
+                      imageId:
+                        row.reply_image_id
+                          ? String(
+                              row.reply_image_id
+                            )
+                          : null,
+                      deleted:
+                        false
+                    }
+                  : peopleDeletedReply(
+                      row.reply_to_id
+                    )
+              )
+            : null,
         time:
-          new Date(row.created_at).getTime()
+          new Date(
+            row.created_at
+          ).getTime()
       }));
   }
 
-  return peopleReadLocalGeneral()
-    .slice(-safeLimit)
-    .map((message) => ({
-      id: String(message.id || ""),
-      username:
-        String(message.username || ""),
-      text: String(message.text || ""),
-      time: Number(
-        message.time || Date.now()
+  const all =
+    peopleReadLocalGeneral();
+
+  const byId =
+    new Map(
+      all.map(
+        (message) => [
+          String(message.id),
+          message
+        ]
       )
-    }));
+    );
+
+  return all
+    .slice(-safeLimit)
+    .map((message) => {
+      const replyId =
+        peopleReplyId(
+          message.replyToId
+        );
+
+      const target =
+        replyId
+          ? byId.get(replyId)
+          : null;
+
+      return {
+        id:
+          String(message.id || ""),
+        username:
+          String(
+            message.username || ""
+          ),
+        text:
+          String(
+            message.text || ""
+          ),
+        imageId:
+          message.imageId
+            ? String(
+                message.imageId
+              )
+            : null,
+        replyTo:
+          replyId
+            ? (
+                target
+                  ? {
+                      id:
+                        String(target.id),
+                      username:
+                        String(
+                          target.username || ""
+                        ),
+                      text:
+                        String(
+                          target.text || ""
+                        ),
+                      imageId:
+                        target.imageId
+                          ? String(
+                              target.imageId
+                            )
+                          : null,
+                      deleted:
+                        false
+                    }
+                  : peopleDeletedReply(
+                      replyId
+                    )
+              )
+            : null,
+        time:
+          Number(
+            message.time ||
+            Date.now()
+          )
+      };
+    });
 }
 // === PEOPLE_GENERAL_HISTORY_V1_END ===
 
@@ -1498,6 +2540,23 @@ async function peopleInitSocial() {
     "read_at TIMESTAMPTZ NULL" +
     ")"
   );
+  await peoplePool.query(
+    "CREATE TABLE IF NOT EXISTS people_message_images (" +
+    "id BIGSERIAL PRIMARY KEY, " +
+    "owner_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+    "mime_type VARCHAR(32) NOT NULL, " +
+    "data BYTEA NOT NULL, " +
+    "general_message_id BIGINT UNIQUE NULL REFERENCES people_general_messages(id) ON DELETE CASCADE, " +
+    "dm_message_id BIGINT UNIQUE NULL REFERENCES people_direct_messages(id) ON DELETE CASCADE, " +
+    "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+    "CHECK(NOT (general_message_id IS NOT NULL AND dm_message_id IS NOT NULL))" +
+    ")"
+  );
+
+  await peoplePool.query(
+    "CREATE INDEX IF NOT EXISTS people_message_images_owner_idx " +
+    "ON people_message_images(owner_id, created_at DESC)"
+  );
 
   await peoplePool.query(
     "CREATE INDEX IF NOT EXISTS people_dm_sender_recipient_idx " +
@@ -1511,6 +2570,380 @@ async function peopleInitSocial() {
 
   console.log("[People] Profils, amis et MP PostgreSQL actives.");
 }
+
+// === PEOPLE_PROFILE_AVATARS_V1_START ===
+const PEOPLE_LOCAL_AVATAR_DIR =
+  pathAccounts.join(__dirname, "people-avatars");
+
+const PEOPLE_LOCAL_AVATAR_META =
+  pathAccounts.join(
+    __dirname,
+    "people-avatar-meta.local.json"
+  );
+
+const PEOPLE_AVATAR_MAX_BYTES =
+  3 * 1024 * 1024;
+
+let peopleAvatarTablePromise = null;
+
+async function peopleEnsureAvatarTable() {
+  if (!peoplePool) return;
+
+  if (!peopleAvatarTablePromise) {
+    peopleAvatarTablePromise = peoplePool
+      .query(
+        "CREATE TABLE IF NOT EXISTS people_profile_avatars (" +
+        "account_id BIGINT PRIMARY KEY REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+        "mime_type VARCHAR(32) NOT NULL, " +
+        "data BYTEA NOT NULL, " +
+        "updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()" +
+        ")"
+      )
+      .catch((err) => {
+        peopleAvatarTablePromise = null;
+        throw err;
+      });
+  }
+
+  await peopleAvatarTablePromise;
+}
+
+function peopleAvatarMime(buffer) {
+  if (!Buffer.isBuffer(buffer)) return null;
+
+  if (
+    buffer.length >= 8 &&
+    buffer.subarray(0, 8).equals(
+      Buffer.from([
+        0x89, 0x50, 0x4e, 0x47,
+        0x0d, 0x0a, 0x1a, 0x0a
+      ])
+    )
+  ) {
+    return "image/png";
+  }
+
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
+    return "image/jpeg";
+  }
+
+  if (buffer.length >= 6) {
+    const sig = buffer.subarray(0, 6).toString("ascii");
+
+    if (sig === "GIF87a" || sig === "GIF89a") {
+      return "image/gif";
+    }
+  }
+
+  if (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+
+  return null;
+}
+
+function peopleAvatarExtension(mime) {
+  return {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif"
+  }[mime] || "";
+}
+
+function peopleReadAvatarMeta() {
+  try {
+    if (!fsAccounts.existsSync(PEOPLE_LOCAL_AVATAR_META)) {
+      return {};
+    }
+
+    const data = JSON.parse(
+      fsAccounts.readFileSync(PEOPLE_LOCAL_AVATAR_META, "utf8")
+    );
+
+    return data && typeof data === "object" && !Array.isArray(data)
+      ? data
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function peopleWriteAvatarMeta(meta) {
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_AVATAR_META,
+    JSON.stringify(meta || {}, null, 2) + "\n",
+    "utf8"
+  );
+}
+
+async function peopleSaveAvatar(accountId, buffer) {
+  const ownerId = String(accountId);
+
+  if (
+    !Buffer.isBuffer(buffer) ||
+    !buffer.length ||
+    buffer.length > PEOPLE_AVATAR_MAX_BYTES
+  ) {
+    const err = new Error("AVATAR_SIZE");
+    err.code = "AVATAR_SIZE";
+    throw err;
+  }
+
+  const mime = peopleAvatarMime(buffer);
+
+  if (!mime) {
+    const err = new Error("AVATAR_TYPE");
+    err.code = "AVATAR_TYPE";
+    throw err;
+  }
+
+  if (peoplePool) {
+    await peopleEnsureAvatarTable();
+
+    await peoplePool.query(
+      "INSERT INTO people_profile_avatars " +
+      "(account_id, mime_type, data, updated_at) " +
+      "VALUES ($1, $2, $3, NOW()) " +
+      "ON CONFLICT (account_id) DO UPDATE SET " +
+      "mime_type = EXCLUDED.mime_type, " +
+      "data = EXCLUDED.data, " +
+      "updated_at = NOW()",
+      [ownerId, mime, buffer]
+    );
+
+    return {
+      mime,
+      byteSize: buffer.length
+    };
+  }
+
+  fsAccounts.mkdirSync(
+    PEOPLE_LOCAL_AVATAR_DIR,
+    { recursive: true }
+  );
+
+  const meta = peopleReadAvatarMeta();
+  const previous = meta[ownerId];
+
+  if (previous?.file) {
+    try {
+      fsAccounts.unlinkSync(
+        pathAccounts.join(
+          PEOPLE_LOCAL_AVATAR_DIR,
+          previous.file
+        )
+      );
+    } catch {}
+  }
+
+  const file =
+    ownerId + peopleAvatarExtension(mime);
+
+  fsAccounts.writeFileSync(
+    pathAccounts.join(
+      PEOPLE_LOCAL_AVATAR_DIR,
+      file
+    ),
+    buffer
+  );
+
+  meta[ownerId] = {
+    file,
+    mime,
+    updatedAt: new Date().toISOString()
+  };
+
+  peopleWriteAvatarMeta(meta);
+
+  return {
+    mime,
+    byteSize: buffer.length
+  };
+}
+
+async function peopleLoadAvatar(accountId) {
+  const ownerId = String(accountId);
+
+  if (peoplePool) {
+    await peopleEnsureAvatarTable();
+
+    const result = await peoplePool.query(
+      "SELECT mime_type, data " +
+      "FROM people_profile_avatars " +
+      "WHERE account_id = $1 LIMIT 1",
+      [ownerId]
+    );
+
+    const row = result.rows[0];
+
+    if (!row) return null;
+
+    return {
+      mime: row.mime_type,
+      data: row.data
+    };
+  }
+
+  const meta = peopleReadAvatarMeta();
+  const item = meta[ownerId];
+
+  if (!item?.file) return null;
+
+  const filePath =
+    pathAccounts.join(
+      PEOPLE_LOCAL_AVATAR_DIR,
+      item.file
+    );
+
+  if (!fsAccounts.existsSync(filePath)) {
+    return null;
+  }
+
+  return {
+    mime: item.mime,
+    data: fsAccounts.readFileSync(filePath)
+  };
+}
+
+app.get(
+  "/api/profile/avatar/:username",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(req, res);
+
+      if (!session) return;
+
+      const account =
+        await peopleFindAccount(
+          req.params.username
+        );
+
+      if (!account) {
+        return res.status(404).end();
+      }
+
+      const avatar =
+        await peopleLoadAvatar(account.id);
+
+      if (!avatar) {
+        return res.status(404).end();
+      }
+
+      res.setHeader("Content-Type", avatar.mime);
+      res.setHeader(
+        "Content-Length",
+        String(avatar.data.length)
+      );
+      res.setHeader(
+        "X-Content-Type-Options",
+        "nosniff"
+      );
+      res.setHeader(
+        "Cache-Control",
+        "private, no-store"
+      );
+
+      res.end(avatar.data);
+    } catch (err) {
+      console.error(
+        "[People avatar/get]",
+        err
+      );
+
+      res.status(500).end();
+    }
+  }
+);
+
+app.put(
+  "/api/profile/avatar",
+  express.raw({
+    type: () => true,
+    limit: "3mb"
+  }),
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(req, res);
+
+      if (!session) return;
+
+      const saved =
+        await peopleSaveAvatar(
+          session.id,
+          req.body
+        );
+
+      const account =
+        await peopleFindAccountById(
+          session.id
+        );
+
+      if (!account) {
+        return res.status(404).json({
+          ok: false,
+          error: "Compte introuvable."
+        });
+      }
+
+      io.emit(
+        "profile-avatar-updated",
+        {
+          username: account.username
+        }
+      );
+
+      res.json({
+        ok: true,
+        username: account.username,
+        mime: saved.mime,
+        byteSize: saved.byteSize
+      });
+    } catch (err) {
+      if (
+        err?.type === "entity.too.large" ||
+        err?.code === "AVATAR_SIZE"
+      ) {
+        return res.status(413).json({
+          ok: false,
+          error:
+            "La photo de profil doit faire moins de 3 Mo."
+        });
+      }
+
+      if (err?.code === "AVATAR_TYPE") {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Format non accepte. JPEG, PNG, WebP ou GIF."
+        });
+      }
+
+      console.error(
+        "[People avatar/upload]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de changer la photo de profil."
+      });
+    }
+  }
+);
+// === PEOPLE_PROFILE_AVATARS_V1_END ===
 
 app.get("/api/profile/:username", async (req, res) => {
   try {
@@ -2016,6 +3449,73 @@ app.delete("/api/social/friends/:username", async (req, res) => {
   }
 });
 
+// === PEOPLE_MESSAGE_DELETE_ROUTES_V1_START ===
+app.delete(
+  "/api/dm/message/:id",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const removed =
+        await peopleDeleteDmMessage(
+          session.id,
+          req.params.id
+        );
+
+      if (!removed) {
+        return res.status(403).json({
+          ok: false,
+          error:
+            "Tu ne peux supprimer que tes propres messages."
+        });
+      }
+
+      const payload = {
+        id:
+          removed.id,
+        senderId:
+          removed.senderId,
+        recipientId:
+          removed.recipientId
+      };
+
+      peopleEmitToAccount(
+        removed.senderId,
+        "dm-message-deleted",
+        payload
+      );
+
+      peopleEmitToAccount(
+        removed.recipientId,
+        "dm-message-deleted",
+        payload
+      );
+
+      res.json({
+        ok: true
+      });
+    } catch (err) {
+      console.error(
+        "[People dm/delete]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de supprimer ce message."
+      });
+    }
+  }
+);
+// === PEOPLE_MESSAGE_DELETE_ROUTES_V1_END ===
+
 app.get("/api/dm/conversations", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res);
@@ -2043,56 +3543,107 @@ app.get("/api/dm/conversations", async (req, res) => {
 
 app.get("/api/dm/:username", async (req, res) => {
   try {
-    const session = peopleSessionForRequest(req, res);
-    if (!session) return;
+    const session =
+      peopleSessionForRequest(
+        req,
+        res
+      );
 
-    const target = await peopleFindAccount(
-      req.params.username
-    );
+    if (!session) {
+      return;
+    }
+
+    const target =
+      await peopleFindAccount(
+        req.params.username
+      );
 
     if (!target) {
       return res.status(404).json({
         ok: false,
-        error: "Utilisateur introuvable."
+        error:
+          "Utilisateur introuvable."
       });
     }
 
-    if (String(target.id) === String(session.id)) {
+    if (
+      String(target.id) ===
+      String(session.id)
+    ) {
       return res.status(400).json({
         ok: false,
-        error: "Tu ne peux pas ouvrir un MP avec toi-meme."
+        error:
+          "Tu ne peux pas ouvrir un MP avec toi-meme."
       });
     }
 
-    const messages = await peopleDmHistory(
-      session.id,
-      target.id
-    );
+    const messages =
+      await peopleDmHistory(
+        session.id,
+        target.id
+      );
 
     res.json({
       ok: true,
       user: {
-        ...peoplePublicAccount(target),
-        online: peopleAccountIsOnline(target.id),
-        isFriend: await peopleHasFriend(
-          session.id,
-          target.id
-        )
+        ...peoplePublicAccount(
+          target
+        ),
+        online:
+          peopleAccountIsOnline(
+            target.id
+          ),
+        isFriend:
+          await peopleHasFriend(
+            session.id,
+            target.id
+          )
       },
-      messages: messages.map((message) => ({
-        id: String(message.id),
-        senderId: String(message.sender_id),
-        recipientId: String(message.recipient_id),
-        body: message.body,
-        createdAt: message.created_at,
-        readAt: message.read_at || null
-      }))
+      messages:
+        messages.map(
+          (message) => ({
+            id:
+              String(
+                message.id
+              ),
+            senderId:
+              String(
+                message.sender_id
+              ),
+            recipientId:
+              String(
+                message.recipient_id
+              ),
+            body:
+              message.body,
+            imageId:
+              message.image_id
+                ? String(
+                    message.image_id
+                  )
+                : null,
+            replyTo:
+              peopleDmReplyFromHistoryRow(
+                message
+              ),
+            createdAt:
+              message.created_at,
+            readAt:
+              message.read_at ||
+              null
+          })
+        )
     });
   } catch (err) {
-    console.error("[People dm/history]", err);
+    console.error(
+      "[People dm/history]",
+      err
+    );
+
     res.status(500).json({
       ok: false,
-      error: "Impossible de charger cette conversation."
+      error:
+        "Impossible de charger cette conversation."
     });
   }
 });
@@ -2149,59 +3700,118 @@ function peopleDmRateAllowed(accountId) {
 
 app.post("/api/dm/:username", async (req, res) => {
   try {
-    const session = peopleSessionForRequest(req, res);
-    if (!session) return;
+    const session =
+      peopleSessionForRequest(
+        req,
+        res
+      );
 
-    if (!peopleDmRateAllowed(session.id)) {
+    if (!session) {
+      return;
+    }
+
+    if (
+      !peopleDmRateAllowed(
+        session.id
+      )
+    ) {
       return res.status(429).json({
         ok: false,
-        error: "Tu envoies trop de messages trop vite."
+        error:
+          "Tu envoies trop de messages trop vite."
       });
     }
 
-    const target = await peopleFindAccount(
-      req.params.username
-    );
+    const target =
+      await peopleFindAccount(
+        req.params.username
+      );
 
     if (!target) {
       return res.status(404).json({
         ok: false,
-        error: "Utilisateur introuvable."
+        error:
+          "Utilisateur introuvable."
       });
     }
 
-    if (String(target.id) === String(session.id)) {
+    if (
+      String(target.id) ===
+      String(session.id)
+    ) {
       return res.status(400).json({
         ok: false,
-        error: "Tu ne peux pas t'envoyer un MP."
+        error:
+          "Tu ne peux pas t'envoyer un MP."
       });
     }
 
-    const body = String(req.body?.body || "").trim();
+    const body =
+      String(
+        req.body?.body || ""
+      ).trim();
 
-    if (!body || body.length > 2000) {
+    const imageId =
+      peopleNormalizeMessageImageId(
+        req.body?.imageId
+      );
+
+    const replyToId =
+      peopleReplyId(
+        req.body?.replyToId
+      );
+
+    if (
+      (
+        !body &&
+        !imageId
+      ) ||
+      body.length > 2000
+    ) {
       return res.status(400).json({
         ok: false,
-        error: "Le message doit contenir entre 1 et 2000 caracteres."
+        error:
+          "Le MP doit contenir du texte ou une image."
       });
     }
 
-    const message = await peopleCreateDm(
-      session.id,
-      target.id,
-      body
-    );
+    const message =
+      await peopleCreateDm(
+        session.id,
+        target.id,
+        body,
+        imageId,
+        replyToId
+      );
 
-    const sender = await peopleFindAccountById(
-      session.id
-    );
+    const sender =
+      await peopleFindAccountById(
+        session.id
+      );
 
     const payload = {
-      id: String(message.id),
-      sender: peoplePublicAccount(sender),
-      recipient: peoplePublicAccount(target),
-      body: message.body,
-      createdAt: message.created_at
+      id:
+        String(message.id),
+      sender:
+        peoplePublicAccount(
+          sender
+        ),
+      recipient:
+        peoplePublicAccount(
+          target
+        ),
+      body:
+        message.body,
+      imageId:
+        message.image_id
+          ? String(
+              message.image_id
+            )
+          : null,
+      replyTo:
+        message.reply_to || null,
+      createdAt:
+        message.created_at
     };
 
     peopleEmitToAccount(
@@ -2221,14 +3831,757 @@ app.post("/api/dm/:username", async (req, res) => {
       message: payload
     });
   } catch (err) {
-    console.error("[People dm/send]", err);
+    if (
+      err?.code ===
+      "IMAGE_INVALID"
+    ) {
+      return res.status(400).json({
+        ok: false,
+        error:
+          "Cette image n'est plus disponible. Réessaie de la sélectionner."
+      });
+    }
+
+    console.error(
+      "[People dm/send]",
+      err
+    );
+
     res.status(500).json({
       ok: false,
-      error: "Impossible d'envoyer ce MP."
+      error:
+        "Impossible d'envoyer ce MP."
     });
   }
 });
 // === PEOPLE_SOCIAL_V2_END ===
+
+// === PEOPLE_MESSAGE_IMAGES_V1_START ===
+const PEOPLE_MESSAGE_IMAGE_MAX_BYTES =
+  5 * 1024 * 1024;
+
+const PEOPLE_LOCAL_MESSAGE_IMAGE_DIR =
+  pathAccounts.join(
+    __dirname,
+    "people-message-images"
+  );
+
+const PEOPLE_LOCAL_MESSAGE_IMAGE_META =
+  pathAccounts.join(
+    __dirname,
+    "people-message-images.local.json"
+  );
+
+const peopleMessageImageRate =
+  new Map();
+
+function peopleMessageImageMime(
+  buffer
+) {
+  if (!Buffer.isBuffer(buffer)) {
+    return null;
+  }
+
+  if (
+    buffer.length >= 8 &&
+    buffer.subarray(0, 8).equals(
+      Buffer.from([
+        0x89, 0x50, 0x4e, 0x47,
+        0x0d, 0x0a, 0x1a, 0x0a
+      ])
+    )
+  ) {
+    return "image/png";
+  }
+
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
+    return "image/jpeg";
+  }
+
+  if (buffer.length >= 6) {
+    const sig =
+      buffer
+        .subarray(0, 6)
+        .toString("ascii");
+
+    if (
+      sig === "GIF87a" ||
+      sig === "GIF89a"
+    ) {
+      return "image/gif";
+    }
+  }
+
+  if (
+    buffer.length >= 12 &&
+    buffer
+      .subarray(0, 4)
+      .toString("ascii") === "RIFF" &&
+    buffer
+      .subarray(8, 12)
+      .toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+
+  return null;
+}
+
+function peopleMessageImageExtension(
+  mime
+) {
+  return {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif"
+  }[mime] || "";
+}
+
+function peopleNormalizeMessageImageId(
+  value
+) {
+  return String(
+    value || ""
+  )
+    .trim()
+    .slice(0, 100);
+}
+
+function peopleMessageImageUploadAllowed(
+  accountId
+) {
+  const key =
+    String(accountId);
+
+  const now =
+    Date.now();
+
+  const recent =
+    (
+      peopleMessageImageRate
+        .get(key) || []
+    ).filter(
+      (time) =>
+        now - time <
+        60 * 1000
+    );
+
+  if (recent.length >= 12) {
+    peopleMessageImageRate.set(
+      key,
+      recent
+    );
+
+    return false;
+  }
+
+  recent.push(now);
+
+  peopleMessageImageRate.set(
+    key,
+    recent
+  );
+
+  return true;
+}
+
+function peopleReadLocalMessageImageMeta() {
+  try {
+    if (
+      !fsAccounts.existsSync(
+        PEOPLE_LOCAL_MESSAGE_IMAGE_META
+      )
+    ) {
+      return {};
+    }
+
+    const raw =
+      JSON.parse(
+        fsAccounts.readFileSync(
+          PEOPLE_LOCAL_MESSAGE_IMAGE_META,
+          "utf8"
+        )
+      );
+
+    return (
+      raw &&
+      typeof raw === "object" &&
+      !Array.isArray(raw)
+    )
+      ? raw
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function peopleWriteLocalMessageImageMeta(
+  meta
+) {
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_MESSAGE_IMAGE_META,
+    JSON.stringify(
+      meta || {},
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+}
+
+async function peopleCreatePendingMessageImage(
+  ownerId,
+  buffer
+) {
+  if (
+    !Buffer.isBuffer(buffer) ||
+    !buffer.length ||
+    buffer.length >
+      PEOPLE_MESSAGE_IMAGE_MAX_BYTES
+  ) {
+    const err =
+      new Error("IMAGE_SIZE");
+
+    err.code =
+      "IMAGE_SIZE";
+
+    throw err;
+  }
+
+  const mime =
+    peopleMessageImageMime(
+      buffer
+    );
+
+  if (!mime) {
+    const err =
+      new Error("IMAGE_TYPE");
+
+    err.code =
+      "IMAGE_TYPE";
+
+    throw err;
+  }
+
+  const owner =
+    String(ownerId);
+
+  if (peoplePool) {
+    await peoplePool.query(
+      "DELETE FROM people_message_images " +
+      "WHERE general_message_id IS NULL " +
+      "AND dm_message_id IS NULL " +
+      "AND created_at < NOW() - INTERVAL '1 day'"
+    );
+
+    const result =
+      await peoplePool.query(
+        "INSERT INTO people_message_images " +
+        "(owner_id, mime_type, data) " +
+        "VALUES ($1, $2, $3) " +
+        "RETURNING id",
+        [
+          owner,
+          mime,
+          buffer
+        ]
+      );
+
+    return {
+      id: String(
+        result.rows[0].id
+      ),
+      mime
+    };
+  }
+
+  fsAccounts.mkdirSync(
+    PEOPLE_LOCAL_MESSAGE_IMAGE_DIR,
+    { recursive: true }
+  );
+
+  const id =
+    cryptoAccounts.randomUUID();
+
+  const file =
+    id +
+    peopleMessageImageExtension(
+      mime
+    );
+
+  fsAccounts.writeFileSync(
+    pathAccounts.join(
+      PEOPLE_LOCAL_MESSAGE_IMAGE_DIR,
+      file
+    ),
+    buffer
+  );
+
+  const meta =
+    peopleReadLocalMessageImageMeta();
+
+  meta[id] = {
+    id,
+    ownerId: owner,
+    mime,
+    file,
+    scope: null,
+    messageId: null,
+    senderId: null,
+    recipientId: null,
+    createdAt:
+      new Date().toISOString()
+  };
+
+  peopleWriteLocalMessageImageMeta(
+    meta
+  );
+
+  return {
+    id,
+    mime
+  };
+}
+
+async function peopleBindGeneralMessageImage(
+  ownerId,
+  imageId,
+  messageId,
+  client = peoplePool
+) {
+  const imageKey =
+    peopleNormalizeMessageImageId(
+      imageId
+    );
+
+  if (!imageKey) {
+    return null;
+  }
+
+  const owner =
+    String(ownerId);
+
+  const message =
+    String(messageId);
+
+  if (peoplePool) {
+    if (
+      !/^\d+$/.test(
+        imageKey
+      )
+    ) {
+      return null;
+    }
+
+    const result =
+      await client.query(
+        "UPDATE people_message_images " +
+        "SET general_message_id = $3 " +
+        "WHERE id = $1 " +
+        "AND owner_id = $2 " +
+        "AND general_message_id IS NULL " +
+        "AND dm_message_id IS NULL " +
+        "RETURNING id",
+        [
+          imageKey,
+          owner,
+          message
+        ]
+      );
+
+    return result.rows[0]
+      ? String(
+          result.rows[0].id
+        )
+      : null;
+  }
+
+  const meta =
+    peopleReadLocalMessageImageMeta();
+
+  const item =
+    meta[imageKey];
+
+  if (
+    !item ||
+    String(item.ownerId) !== owner ||
+    item.scope
+  ) {
+    return null;
+  }
+
+  item.scope =
+    "general";
+
+  item.messageId =
+    message;
+
+  meta[imageKey] =
+    item;
+
+  peopleWriteLocalMessageImageMeta(
+    meta
+  );
+
+  return imageKey;
+}
+
+async function peopleBindDmMessageImage(
+  ownerId,
+  imageId,
+  messageId,
+  senderId,
+  recipientId,
+  client = peoplePool
+) {
+  const imageKey =
+    peopleNormalizeMessageImageId(
+      imageId
+    );
+
+  if (!imageKey) {
+    return null;
+  }
+
+  const owner =
+    String(ownerId);
+
+  const message =
+    String(messageId);
+
+  if (peoplePool) {
+    if (
+      !/^\d+$/.test(
+        imageKey
+      )
+    ) {
+      return null;
+    }
+
+    const result =
+      await client.query(
+        "UPDATE people_message_images " +
+        "SET dm_message_id = $3 " +
+        "WHERE id = $1 " +
+        "AND owner_id = $2 " +
+        "AND general_message_id IS NULL " +
+        "AND dm_message_id IS NULL " +
+        "RETURNING id",
+        [
+          imageKey,
+          owner,
+          message
+        ]
+      );
+
+    return result.rows[0]
+      ? String(
+          result.rows[0].id
+        )
+      : null;
+  }
+
+  const meta =
+    peopleReadLocalMessageImageMeta();
+
+  const item =
+    meta[imageKey];
+
+  if (
+    !item ||
+    String(item.ownerId) !== owner ||
+    item.scope
+  ) {
+    return null;
+  }
+
+  item.scope =
+    "dm";
+
+  item.messageId =
+    message;
+
+  item.senderId =
+    String(senderId);
+
+  item.recipientId =
+    String(recipientId);
+
+  meta[imageKey] =
+    item;
+
+  peopleWriteLocalMessageImageMeta(
+    meta
+  );
+
+  return imageKey;
+}
+
+app.post(
+  "/api/chat/image",
+  express.raw({
+    type: () => true,
+    limit: "5mb"
+  }),
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) {
+        return;
+      }
+
+      if (
+        !peopleMessageImageUploadAllowed(
+          session.id
+        )
+      ) {
+        return res.status(429).json({
+          ok: false,
+          error:
+            "Tu envoies trop d'images trop vite."
+        });
+      }
+
+      const image =
+        await peopleCreatePendingMessageImage(
+          session.id,
+          req.body
+        );
+
+      res.json({
+        ok: true,
+        imageId: image.id
+      });
+    } catch (err) {
+      if (
+        err?.type ===
+          "entity.too.large" ||
+        err?.code ===
+          "IMAGE_SIZE"
+      ) {
+        return res.status(413).json({
+          ok: false,
+          error:
+            "L'image doit faire moins de 5 Mo."
+        });
+      }
+
+      if (
+        err?.code ===
+        "IMAGE_TYPE"
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Format non accepte. JPEG, PNG, WebP ou GIF."
+        });
+      }
+
+      console.error(
+        "[People chat/image upload]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible d'envoyer l'image."
+      });
+    }
+  }
+);
+
+app.get(
+  "/api/chat/image/:id",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) {
+        return;
+      }
+
+      const imageId =
+        peopleNormalizeMessageImageId(
+          req.params.id
+        );
+
+      if (!imageId) {
+        return res.status(404).end();
+      }
+
+      if (peoplePool) {
+        if (
+          !/^\d+$/.test(
+            imageId
+          )
+        ) {
+          return res.status(404).end();
+        }
+
+        const result =
+          await peoplePool.query(
+            "SELECT " +
+            "i.owner_id, i.mime_type, i.data, " +
+            "i.general_message_id, i.dm_message_id, " +
+            "dm.sender_id, dm.recipient_id " +
+            "FROM people_message_images i " +
+            "LEFT JOIN people_direct_messages dm " +
+            "ON dm.id = i.dm_message_id " +
+            "WHERE i.id = $1 LIMIT 1",
+            [imageId]
+          );
+
+        const row =
+          result.rows[0];
+
+        if (!row) {
+          return res.status(404).end();
+        }
+
+        const me =
+          String(session.id);
+
+        const allowed =
+          Boolean(
+            row.general_message_id
+          ) ||
+          String(row.owner_id) === me ||
+          (
+            row.dm_message_id &&
+            (
+              String(row.sender_id) === me ||
+              String(row.recipient_id) === me
+            )
+          );
+
+        if (!allowed) {
+          return res.status(403).end();
+        }
+
+        res.setHeader(
+          "Content-Type",
+          row.mime_type
+        );
+
+        res.setHeader(
+          "Content-Length",
+          String(
+            row.data.length
+          )
+        );
+
+        res.setHeader(
+          "X-Content-Type-Options",
+          "nosniff"
+        );
+
+        res.setHeader(
+          "Cache-Control",
+          "private, max-age=86400"
+        );
+
+        return res.end(
+          row.data
+        );
+      }
+
+      const meta =
+        peopleReadLocalMessageImageMeta();
+
+      const item =
+        meta[imageId];
+
+      if (!item) {
+        return res.status(404).end();
+      }
+
+      const me =
+        String(session.id);
+
+      const allowed =
+        item.scope ===
+          "general" ||
+        String(item.ownerId) ===
+          me ||
+        (
+          item.scope === "dm" &&
+          (
+            String(item.senderId) === me ||
+            String(item.recipientId) === me
+          )
+        );
+
+      if (!allowed) {
+        return res.status(403).end();
+      }
+
+      const filePath =
+        pathAccounts.join(
+          PEOPLE_LOCAL_MESSAGE_IMAGE_DIR,
+          item.file
+        );
+
+      if (
+        !fsAccounts.existsSync(
+          filePath
+        )
+      ) {
+        return res.status(404).end();
+      }
+
+      const data =
+        fsAccounts.readFileSync(
+          filePath
+        );
+
+      res.setHeader(
+        "Content-Type",
+        item.mime
+      );
+
+      res.setHeader(
+        "Content-Length",
+        String(data.length)
+      );
+
+      res.setHeader(
+        "X-Content-Type-Options",
+        "nosniff"
+      );
+
+      res.setHeader(
+        "Cache-Control",
+        "private, max-age=86400"
+      );
+
+      res.end(data);
+    } catch (err) {
+      console.error(
+        "[People chat/image get]",
+        err
+      );
+
+      res.status(500).end();
+    }
+  }
+);
+// === PEOPLE_MESSAGE_IMAGES_V1_END ===
 
 app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, app: "People" });
@@ -2318,52 +4671,146 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("chat-message", async ({ text } = {}) => {
-    const username =
-      users.get(socket.id);
-
-    const senderId =
-      userIds.get(socket.id);
-
-    if (!username || !senderId) return;
-
-    const cleanText =
-      String(text || "")
-        .trim()
-        .slice(0, 1000);
-
-    if (!cleanText) return;
-
-    try {
-      const saved =
-        await peopleSaveGeneralMessage(
-          senderId,
-          username,
-          cleanText
+  socket.on(
+    "chat-message",
+    async ({
+      text,
+      imageId,
+      replyToId
+    } = {}) => {
+      const username =
+        users.get(
+          socket.id
         );
 
-      if (!saved) return;
+      const senderId =
+        userIds.get(
+          socket.id
+        );
 
-      io.emit(
-        "chat-message",
-        saved
-      );
-    } catch (err) {
-      console.error(
-        "[People general/save]",
-        err
-      );
+      if (
+        !username ||
+        !senderId
+      ) {
+        return;
+      }
 
-      socket.emit(
-        "system-message",
-        {
-          text:
-            "Le message n'a pas pu etre sauvegarde.",
-          time: Date.now()
+      const cleanText =
+        String(text || "")
+          .trim()
+          .slice(0, 1000);
+
+      const imageKey =
+        peopleNormalizeMessageImageId(
+          imageId
+        );
+
+      if (
+        !cleanText &&
+        !imageKey
+      ) {
+        return;
+      }
+
+      try {
+        const saved =
+          await peopleSaveGeneralMessage(
+            senderId,
+            username,
+            cleanText,
+            imageKey,
+            replyToId
+          );
+
+        if (!saved) {
+          return;
         }
-      );
+
+        io.emit(
+          "chat-message",
+          saved
+        );
+      } catch (err) {
+        console.error(
+          "[People general/save]",
+          err
+        );
+
+        socket.emit(
+          "system-message",
+          {
+            text:
+              err?.code ===
+                "IMAGE_INVALID"
+                ? "Cette image n'est plus disponible. Réessaie de la sélectionner."
+                : "Le message n'a pas pu être sauvegardé.",
+            time:
+              Date.now()
+          }
+        );
+      }
     }
-  });
+  );
+
+// === PEOPLE_GENERAL_DELETE_SOCKET_V1_START ===
+  socket.on(
+    "chat-message-delete",
+    async (
+      { id } = {},
+      ack = () => {}
+    ) => {
+      try {
+        const senderId =
+          userIds.get(socket.id);
+
+        if (!senderId) {
+          return ack({
+            ok: false,
+            error:
+              "Session invalide."
+          });
+        }
+
+        const removed =
+          await peopleDeleteGeneralMessage(
+            senderId,
+            id
+          );
+
+        if (!removed) {
+          return ack({
+            ok: false,
+            error:
+              "Tu ne peux supprimer que tes propres messages."
+          });
+        }
+
+        io.emit(
+          "chat-message-deleted",
+          {
+            id:
+              String(id)
+          }
+        );
+
+        ack({
+          ok: true
+        });
+      } catch (err) {
+        console.error(
+          "[People general/delete]",
+          err
+        );
+
+        ack({
+          ok: false,
+          error:
+            "Impossible de supprimer ce message."
+        });
+      }
+    }
+  );
+  // === PEOPLE_GENERAL_DELETE_SOCKET_V1_END ===
 
   socket.on("voice-join", ({ muted, camera } = {}) => {
     const username = users.get(socket.id);

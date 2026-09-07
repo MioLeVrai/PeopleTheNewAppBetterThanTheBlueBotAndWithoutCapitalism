@@ -37,10 +37,73 @@
   const dmWelcomeTitle = document.getElementById("dmWelcomeTitle");
   const dmForm = document.getElementById("dmForm");
   const dmInput = document.getElementById("dmInput");
+  const dmImageButton =
+    document.getElementById(
+      "dmImageButton"
+    );
+
+  const dmImageInput =
+    document.getElementById(
+      "dmImageInput"
+    );
+
+  const dmImagePreview =
+    document.getElementById(
+      "dmImagePreview"
+    );
+
+  const peopleDmImagePicker =
+    window.PeopleRichContent
+      ?.createImagePicker({
+        button:
+          dmImageButton,
+        input:
+          dmImageInput,
+        preview:
+          dmImagePreview
+      });
+
+// === PEOPLE_DM_MESSAGE_ACTIONS_V1_START ===
+  const peopleDmReplyController =
+    window.PeopleMessageActions
+      ?.createReplyController({
+        form:
+          dmForm,
+        input:
+          dmInput
+      });
+
+  async function peopleDeleteDmMessage(
+    id
+  ) {
+    await api(
+      "/api/dm/message/" +
+        encodeURIComponent(id),
+      {
+        method:
+          "DELETE"
+      }
+    );
+  }
+  // === PEOPLE_DM_MESSAGE_ACTIONS_V1_END ===
 
   const profileModal = document.getElementById("profileModal");
   const profileModalClose = document.getElementById("profileModalClose");
   const profileModalAvatar = document.getElementById("profileModalAvatar");
+  const profileAvatarEditWrap =
+    document.getElementById(
+      "profileAvatarEditWrap"
+    );
+
+  const profileAvatarUploadButton =
+    document.getElementById(
+      "profileAvatarUploadButton"
+    );
+
+  const profileAvatarInput =
+    document.getElementById(
+      "profileAvatarInput"
+    );
   const profileModalName = document.getElementById("profileModalName");
   const profileModalOnline = document.getElementById("profileModalOnline");
   const profileDescriptionText = document.getElementById("profileDescriptionText");
@@ -187,7 +250,10 @@
     const av = document.createElement("button");
     av.type = "button";
     av.className = "people-card-avatar";
-    av.textContent = initialsSocial(person.username);
+    window.PeopleAvatars?.apply(
+      av,
+      person.username
+    );
     av.title = "Ouvrir le profil";
 
     const copy = document.createElement("button");
@@ -306,8 +372,10 @@
     const av = document.createElement("button");
     av.type = "button";
     av.className = "friend-request-avatar";
-    av.textContent =
-      initialsSocial(request.user.username);
+    window.PeopleAvatars?.apply(
+      av,
+      request.user.username
+    );
 
     const copy = document.createElement("button");
     copy.type = "button";
@@ -597,8 +665,10 @@
 
       const av = document.createElement("span");
       av.className = "dm-sidebar-avatar";
-      av.textContent =
-        initialsSocial(conversation.user.username);
+      window.PeopleAvatars?.apply(
+        av,
+        conversation.user.username
+      );
 
       const copy = document.createElement("span");
       copy.className = "dm-sidebar-copy";
@@ -650,59 +720,290 @@
     } catch {}
   }
 
+// === PEOPLE_DM_GROUPING_V1_START ===
+  const PEOPLE_DM_GROUP_MAX_MESSAGES = 10;
+  const PEOPLE_DM_GROUP_MAX_GAP_MS =
+    10 * 60 * 1000;
+
+  function dmMessageTimestamp(message) {
+    const time =
+      new Date(
+        message?.createdAt ||
+        Date.now()
+      ).getTime();
+
+    return Number.isFinite(time)
+      ? time
+      : Date.now();
+  }
+
+function dmTextLine(
+    message,
+    grouped = false
+  ) {
+    const unit =
+      document.createElement("div");
+
+    unit.className =
+      "people-message-unit";
+
+    const messageId =
+      String(
+        message?.id || ""
+      );
+
+    if (messageId) {
+      unit.dataset.messageId =
+        messageId;
+    }
+
+    const replyPreview =
+      window.PeopleMessageActions
+        ?.createReplyPreview(
+          message?.replyTo
+        );
+
+    if (replyPreview) {
+      unit.appendChild(
+        replyPreview
+      );
+    }
+
+    const text =
+      document.createElement("div");
+
+    text.className =
+      grouped
+        ? "message-text people-grouped-message-line"
+        : "message-text";
+
+    if (window.PeopleRichContent) {
+      window.PeopleRichContent.render(
+        text,
+        {
+          text:
+            message.body,
+          imageId:
+            message.imageId
+        }
+      );
+    } else {
+      text.textContent =
+        String(message.body || "");
+    }
+
+    if (grouped) {
+      text.title =
+        formatDate(
+          message.createdAt,
+          true
+        );
+    }
+
+    unit.appendChild(text);
+
+    const mine =
+      me &&
+      String(message.senderId) ===
+        String(me.id);
+
+    const author =
+      mine
+        ? me
+        : activeDmUser;
+
+    if (messageId) {
+      window.PeopleMessageActions
+        ?.bindContext(
+          unit,
+          {
+            message: {
+              id:
+                messageId,
+              username:
+                author?.username ||
+                "Utilisateur",
+              body:
+                message.body,
+              imageId:
+                message.imageId
+            },
+            canDelete:
+              Boolean(mine),
+            onReply:
+              () =>
+                peopleDmReplyController
+                  ?.set({
+                    id:
+                      messageId,
+                    username:
+                      author?.username ||
+                      "Utilisateur",
+                    body:
+                      message.body,
+                    imageId:
+                      message.imageId
+                  }),
+            onDelete:
+              () =>
+                peopleDeleteDmMessage(
+                  messageId
+                )
+          }
+        );
+    }
+
+    return unit;
+  }
+
   function dmMessageElement(message) {
     const mine =
       me &&
-      String(message.senderId) === String(me.id);
+      String(message.senderId) ===
+        String(me.id);
 
-    const row = document.createElement("div");
-    row.className = "dm-message";
-    row.classList.toggle("mine", Boolean(mine));
+    const row =
+      document.createElement("div");
 
-    const av = document.createElement("button");
+    row.className =
+      "dm-message";
+
+    row.classList.toggle(
+      "mine",
+      Boolean(mine)
+    );
+
+    const av =
+      document.createElement("button");
+
     av.type = "button";
-    av.className = "avatar dm-message-avatar";
+    av.className =
+      "avatar dm-message-avatar";
 
-    const author = mine
-      ? me
-      : activeDmUser;
+    const author =
+      mine
+        ? me
+        : activeDmUser;
 
-    av.textContent =
-      initialsSocial(author?.username || "?");
+    window.PeopleAvatars?.apply(
+      av,
+      author?.username || "?"
+    );
 
     if (author?.username) {
       av.addEventListener(
         "click",
-        () => openProfile(author.username)
+        () =>
+          openProfile(
+            author.username
+          )
       );
     }
 
-    const body = document.createElement("div");
+    const body =
+      document.createElement("div");
 
-    const head = document.createElement("div");
-    head.className = "message-head";
+    body.className =
+      "people-message-group-body";
 
-    const strong = document.createElement("strong");
+    const head =
+      document.createElement("div");
+
+    head.className =
+      "message-head";
+
+    const strong =
+      document.createElement("strong");
+
     strong.textContent =
-      author?.username || "Utilisateur";
+      author?.username ||
+      "Utilisateur";
 
-    const time = document.createElement("time");
-    time.textContent = formatDate(
-      message.createdAt,
-      true
+    const time =
+      document.createElement("time");
+
+    time.textContent =
+      formatDate(
+        message.createdAt,
+        true
+      );
+
+    head.append(
+      strong,
+      time
     );
 
-    head.append(strong, time);
+    body.append(
+      head,
+      dmTextLine(
+        message,
+        false
+      )
+    );
 
-    const text = document.createElement("div");
-    text.className = "message-text";
-    text.textContent = message.body;
+    row.append(
+      av,
+      body
+    );
 
-    body.append(head, text);
-    row.append(av, body);
-
-    return row;
+    return {
+      row,
+      body
+    };
   }
+
+  function renderDmMessageGroups(list) {
+    const messagesList =
+      Array.isArray(list)
+        ? list
+        : [];
+
+    let group = null;
+
+    for (const message of messagesList) {
+      const senderId =
+        String(message.senderId || "");
+
+      const time =
+        dmMessageTimestamp(message);
+
+      const sameGroup =
+        group &&
+        group.senderId === senderId &&
+        group.count <
+          PEOPLE_DM_GROUP_MAX_MESSAGES &&
+        time - group.lastTime <
+          PEOPLE_DM_GROUP_MAX_GAP_MS;
+
+      if (sameGroup) {
+        group.body.appendChild(
+          dmTextLine(
+            message,
+            true
+          )
+        );
+
+        group.lastTime = time;
+        group.count += 1;
+        continue;
+      }
+
+      const built =
+        dmMessageElement(message);
+
+      dmMessages.appendChild(
+        built.row
+      );
+
+      group = {
+        senderId,
+        lastTime: time,
+        count: 1,
+        body: built.body
+      };
+    }
+  }
+  // === PEOPLE_DM_GROUPING_V1_END ===
 
   async function loadActiveDm() {
     if (!activeDmUser || !dmMessages) return;
@@ -721,8 +1022,10 @@
       }
 
       if (dmHeaderAvatar) {
-        dmHeaderAvatar.textContent =
-          initialsSocial(activeDmUser.username);
+        window.PeopleAvatars?.apply(
+          dmHeaderAvatar,
+          activeDmUser.username
+        );
       }
 
       if (dmHeaderStatus) {
@@ -754,11 +1057,9 @@
       welcome.append(title, subtitle);
       dmMessages.appendChild(welcome);
 
-      for (const message of data.messages || []) {
-        dmMessages.appendChild(
-          dmMessageElement(message)
-        );
-      }
+      renderDmMessageGroups(
+        data.messages || []
+      );
 
       dmMessages.scrollTop = dmMessages.scrollHeight;
 
@@ -829,8 +1130,10 @@
 
       currentProfile = data.profile;
 
-      profileModalAvatar.textContent =
-        initialsSocial(currentProfile.username);
+      window.PeopleAvatars?.apply(
+        profileModalAvatar,
+        currentProfile.username
+      );
 
       profileModalName.textContent =
         currentProfile.username;
@@ -850,6 +1153,11 @@
         description || "Aucune description.";
 
       profileEditWrap.classList.toggle(
+        "hidden",
+        !currentProfile.isSelf
+      );
+
+      profileAvatarEditWrap?.classList.toggle(
         "hidden",
         !currentProfile.isSelf
       );
@@ -963,35 +1271,110 @@
     }
   );
 
-  dmForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
+    dmForm?.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
 
-    if (!activeDmUser?.username) return;
+      if (
+        !activeDmUser?.username
+      ) {
+        return;
+      }
 
-    const body = String(dmInput?.value || "").trim();
-    if (!body) return;
+      const body =
+        String(
+          dmInput?.value || ""
+        ).trim();
 
-    dmInput.disabled = true;
+      const file =
+        peopleDmImagePicker
+          ?.getFile();
 
-    try {
-      await api(
-        "/api/dm/" +
-          encodeURIComponent(activeDmUser.username),
-        {
-          method: "POST",
-          body: JSON.stringify({ body })
+      if (
+        !body &&
+        !file
+      ) {
+        return;
+      }
+
+      const submitButton =
+        dmForm.querySelector(
+          'button[type="submit"]'
+        );
+
+      dmInput.disabled =
+        true;
+
+      if (submitButton) {
+        submitButton.disabled =
+          true;
+      }
+
+      peopleDmImagePicker
+        ?.setBusy(true);
+
+      try {
+        let imageId =
+          null;
+
+        if (file) {
+          imageId =
+            await window
+              .PeopleRichContent
+              .uploadImage(
+                file
+              );
         }
-      );
 
-      dmInput.value = "";
-      await loadActiveDm();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      dmInput.disabled = false;
-      dmInput.focus();
+        await api(
+          "/api/dm/" +
+            encodeURIComponent(
+              activeDmUser.username
+            ),
+          {
+            method: "POST",
+            body:
+              JSON.stringify({
+                body,
+                imageId,
+                replyToId:
+                  peopleDmReplyController
+                    ?.get()?.id || null
+              })
+          }
+        );
+
+        dmInput.value =
+          "";
+
+        peopleDmImagePicker
+          ?.clear();
+
+        peopleDmReplyController
+          ?.clear();
+
+        await loadActiveDm();
+      } catch (err) {
+        alert(
+          err.message
+        );
+      } finally {
+        dmInput.disabled =
+          false;
+
+        if (submitButton) {
+          submitButton.disabled =
+            false;
+        }
+
+        peopleDmImagePicker
+          ?.setBusy(false);
+
+        dmInput.focus();
+      }
     }
-  });
+  );
 
   peopleSearchInput?.addEventListener(
     "input",
@@ -1020,6 +1403,141 @@
         event.target?.dataset?.profileClose === "1"
       ) {
         closeProfile();
+      }
+    }
+  );
+
+  profileAvatarUploadButton?.addEventListener(
+    "click",
+    () => {
+      if (currentProfile?.isSelf) {
+        profileAvatarInput?.click();
+      }
+    }
+  );
+
+  profileAvatarInput?.addEventListener(
+    "change",
+    async () => {
+      const file =
+        profileAvatarInput.files?.[0];
+
+      if (!file) return;
+
+      const accepted =
+        new Set([
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "image/gif"
+        ]);
+
+      if (!accepted.has(file.type)) {
+        alert(
+          "Format non accepté. JPEG, PNG, WebP ou GIF uniquement."
+        );
+
+        profileAvatarInput.value = "";
+        return;
+      }
+
+      if (
+        file.size <= 0 ||
+        file.size >
+          25 * 1024 * 1024
+      ) {
+        alert(
+          "L’image source doit faire moins de 25 Mo."
+        );
+
+        profileAvatarInput.value = "";
+        return;
+      }
+
+      try {
+        profileAvatarUploadButton.disabled = true;
+        profileAvatarUploadButton.textContent =
+          "Recadrage...";
+
+        const compressed =
+          await window
+            .PeopleAvatarCropper
+            ?.open(file);
+
+        if (!compressed) {
+          profileAvatarUploadButton.textContent =
+            "Changer la photo";
+
+          return;
+        }
+
+        profileAvatarUploadButton.textContent =
+          "Envoi...";
+
+        const response =
+          await fetch(
+            "/api/profile/avatar",
+            {
+              method: "PUT",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type":
+                  compressed.type ||
+                  "image/webp"
+              },
+              body: compressed
+            }
+          );
+
+        let data = null;
+
+        try {
+          data =
+            await response.json();
+        } catch {}
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error ||
+            "Impossible de changer la photo."
+          );
+        }
+
+        window.PeopleAvatars?.refresh(
+          currentProfile.username
+        );
+
+        const kb =
+          Math.max(
+            1,
+            Math.round(
+              compressed.size / 1024
+            )
+          );
+
+        profileAvatarUploadButton.textContent =
+          "Photo enregistrée • " +
+          kb +
+          " Ko";
+
+        setTimeout(
+          () => {
+            profileAvatarUploadButton.textContent =
+              "Changer la photo";
+          },
+          1500
+        );
+      } catch (err) {
+        alert(
+          err?.message ||
+          "Impossible de traiter cette photo."
+        );
+
+        profileAvatarUploadButton.textContent =
+          "Changer la photo";
+      } finally {
+        profileAvatarUploadButton.disabled = false;
+        profileAvatarInput.value = "";
       }
     }
   );
@@ -1326,6 +1844,52 @@
   );
   // === PEOPLE_DM_MENTION_PING_V2_END ===
 
+// === PEOPLE_DM_DELETE_CLIENT_V1_START ===
+  socket.on(
+    "dm-message-deleted",
+    async (payload) => {
+      if (!socialReady || !me) {
+        return;
+      }
+
+      peopleDmReplyController
+        ?.clearIfId(
+          payload?.id
+        );
+
+      window.PeopleMessageActions
+        ?.markDeleted(
+          payload?.id
+        );
+
+      const ids = [
+        String(
+          payload?.senderId || ""
+        ),
+        String(
+          payload?.recipientId || ""
+        )
+      ];
+
+      if (
+        activeDmUser &&
+        ids.includes(
+          String(me.id)
+        ) &&
+        ids.includes(
+          String(
+            activeDmUser.id
+          )
+        )
+      ) {
+        await loadActiveDm();
+      }
+
+      await refreshConversations();
+    }
+  );
+  // === PEOPLE_DM_DELETE_CLIENT_V1_END ===
+
   socket.on("dm-message", async (payload) => {
     const senderName =
       payload?.sender?.username;
@@ -1352,7 +1916,7 @@
         new Notification(
           "People — MP de " + senderName,
           {
-            body: String(payload.body || "").slice(0, 180),
+            body: String(payload.body || (payload.imageId ? "🖼️ Image" : "")).slice(0, 180),
             tag: "people-dm-" + senderName
           }
         );

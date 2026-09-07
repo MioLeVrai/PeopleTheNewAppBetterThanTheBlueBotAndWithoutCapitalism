@@ -8,3 +8,7 @@ people-accounts.local.json
 people-social.local.json
 people-general.local.json
 backup/
+people-avatars/
+people-avatar-meta.local.json
+people-message-images/
+people-message-images.local.json

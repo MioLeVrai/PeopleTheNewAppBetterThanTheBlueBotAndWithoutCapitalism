@@ -202,6 +202,23 @@
       </section>
 
       <form id="messageForm" class="composer">
+        <button
+          id="messageImageButton"
+          class="composer-image-button"
+          type="button"
+          title="Envoyer une image"
+          aria-label="Envoyer une image"
+        >🖼️</button>
+        <input
+          id="messageImageInput"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          hidden
+        />
+        <div
+          id="messageImagePreview"
+          class="composer-image-preview hidden"
+        ></div>
         <input
           id="messageInput"
           maxlength="1000"
@@ -323,6 +340,23 @@
         </div>
 
         <form id="dmForm" class="composer dm-composer">
+          <button
+            id="dmImageButton"
+            class="composer-image-button"
+            type="button"
+            title="Envoyer une image"
+            aria-label="Envoyer une image"
+          >🖼️</button>
+          <input
+            id="dmImageInput"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            hidden
+          />
+          <div
+            id="dmImagePreview"
+            class="composer-image-preview hidden"
+          ></div>
           <input
             id="dmInput"
             maxlength="2000"
@@ -378,7 +412,32 @@
       >✕</button>
 
       <div class="profile-card-head">
-        <div id="profileModalAvatar" class="profile-large-avatar">?</div>
+        <div class="profile-avatar-stack">
+          <div
+            id="profileModalAvatar"
+            class="profile-large-avatar"
+          >?</div>
+
+          <div
+            id="profileAvatarEditWrap"
+            class="profile-avatar-edit-wrap hidden"
+          >
+            <button
+              id="profileAvatarUploadButton"
+              class="profile-avatar-upload-button"
+              type="button"
+            >
+              Changer la photo
+            </button>
+
+            <input
+              id="profileAvatarInput"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              hidden
+            />
+          </div>
+        </div>
         <div>
           <h2 id="profileModalName">Profil</h2>
           <span id="profileModalOnline" class="profile-online-state"></span>
@@ -423,8 +482,12 @@
   <div id="audioContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
+<script src="people-avatars.js"></script>
+<script src="people-rich-content.js"></script>
+<script src="people-message-actions.js"></script>
 <script src="app.js"></script>
-  <script src="people-social.js"></script>
+  <script src="people-avatar-cropper.js"></script>
+<script src="people-social.js"></script>
 <script src="people-local-controls.js"></script>
 </body>
 </html>

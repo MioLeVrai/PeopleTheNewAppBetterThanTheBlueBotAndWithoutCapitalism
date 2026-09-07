@@ -1,0 +1,20 @@
+PEOPLE - DECONNEXION VRAI COIN BAS DROIT
+
+Ce patch corrige uniquement la position de la porte de déconnexion.
+
+Avant :
+bottom: environ 78px
+
+Après :
+right: 14px
+bottom: 14px
+
+Sur mobile :
+right: 10px
+bottom: 10px
+
+Un seul fichier modifié :
+public/style.css
+
+Backup uniquement dans :
+D:\crack\Discord 2\backup
