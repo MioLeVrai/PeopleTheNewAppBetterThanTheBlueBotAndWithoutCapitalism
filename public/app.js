@@ -1239,7 +1239,139 @@ async function ensureLocalAudio() {
   return localStream;
 }
 
+// === PEOPLE_UNIFIED_CALL_CONTROLS_V3_START ===
+function peopleDmCallStateForControls() {
+  try {
+    const state =
+      window.PeopleDmCalls
+        ?.getState?.();
+
+    return (
+      state?.exists
+        ? state
+        : null
+    );
+  } catch {
+    return null;
+  }
+}
+
+function peopleSyncUnifiedCallControls() {
+  const dmCall =
+    peopleDmCallStateForControls();
+
+  const inDmCall =
+    Boolean(
+      dmCall
+    );
+
+  muteButton.classList.toggle(
+    "people-current-call-control",
+    inDmCall
+  );
+
+  cameraButton.classList.toggle(
+    "people-current-call-control",
+    inDmCall
+  );
+
+  leaveVoiceQuickButton
+    ?.classList.toggle(
+      "people-current-call-danger",
+      inDmCall
+    );
+
+  if (dmCall) {
+    muteButton.textContent =
+      dmCall.muted
+        ? "🔇"
+        : "🎙️";
+
+    muteButton.title =
+      dmCall.muted
+        ? "Réactiver le micro de l'appel MP"
+        : "Couper le micro de l'appel MP";
+
+    micState.textContent =
+      dmCall.muted
+        ? "appel MP • micro coupé"
+        : "appel MP";
+
+    cameraButton.textContent =
+      dmCall.camera
+        ? "📹"
+        : "📷";
+
+    cameraButton.classList.toggle(
+      "active",
+      dmCall.camera
+    );
+
+    cameraButton.disabled =
+      false;
+
+    cameraButton.setAttribute(
+      "aria-disabled",
+      "false"
+    );
+
+    cameraButton.title =
+      dmCall.camera
+        ? "Couper la caméra de l'appel MP"
+        : "Activer la caméra de l'appel MP";
+
+    if (
+      leaveVoiceQuickButton
+    ) {
+      leaveVoiceQuickButton.disabled =
+        false;
+
+      leaveVoiceQuickButton.title =
+        dmCall.phase ===
+          "incoming"
+          ? "Refuser l'appel MP"
+          : (
+              dmCall.phase ===
+                "outgoing"
+                ? "Annuler l'appel MP"
+                : "Raccrocher l'appel MP"
+            );
+    }
+
+    return true;
+  }
+
+  if (
+    leaveVoiceQuickButton
+  ) {
+    leaveVoiceQuickButton.disabled =
+      !voiceJoined;
+
+    leaveVoiceQuickButton.title =
+      voiceJoined
+        ? "Quitter le vocal"
+        : "Aucun appel/vocal en cours";
+  }
+
+  return false;
+}
+
+window.addEventListener(
+  "people-dm-call-state",
+  () => {
+    peopleSyncUnifiedCallControls();
+  }
+);
+// === PEOPLE_UNIFIED_CALL_CONTROLS_V3_END ===
+
 function updateMicUi() {
+  if (
+    peopleDmCallStateForControls()
+  ) {
+    peopleSyncUnifiedCallControls();
+    return;
+  }
+
   if (!voiceJoined || !localStream) {
     muteButton.textContent = micMuted ? "🔇" : "🎙️";
     micState.textContent = micMuted
@@ -1248,6 +1380,8 @@ function updateMicUi() {
     muteButton.title = micMuted
       ? "Réactiver le micro avant de rejoindre"
       : "Couper le micro avant de rejoindre";
+
+    peopleSyncUnifiedCallControls();
     return;
   }
 
@@ -1259,9 +1393,18 @@ function updateMicUi() {
   micState.textContent = micMuted ? "micro coupé" : "micro activé";
 
   socket.emit("voice-mute", { muted: micMuted });
+
+  peopleSyncUnifiedCallControls();
 }
 
 function updateCameraUi() {
+  if (
+    peopleDmCallStateForControls()
+  ) {
+    peopleSyncUnifiedCallControls();
+    return;
+  }
+
   cameraButton.textContent = cameraEnabled ? "📹" : "📷";
   cameraButton.classList.toggle("active", cameraEnabled);
 
@@ -1279,6 +1422,8 @@ function updateCameraUi() {
       ? "Couper la caméra"
       : "Activer la caméra";
   }
+
+  peopleSyncUnifiedCallControls();
 }
 
 async function joinVoice() {
@@ -1438,36 +1583,66 @@ voiceButton.addEventListener("click", () => {
 leaveVoiceQuickButton?.addEventListener(
   "click",
   () => {
+    const dmCall =
+      peopleDmCallStateForControls();
+
+    if (dmCall) {
+      window.PeopleDmCalls
+        ?.end?.();
+
+      return;
+    }
+
     if (voiceJoined) {
       leaveVoice();
     }
   }
 );
 
-leaveVoiceQuickButton?.addEventListener(
+muteButton.addEventListener(
   "click",
   () => {
-    if (voiceJoined) {
-      leaveVoice();
+    const dmCall =
+      peopleDmCallStateForControls();
+
+    if (dmCall) {
+      void window.PeopleDmCalls
+        ?.toggleMute?.();
+
+      return;
     }
+
+    micMuted = !micMuted;
+    updateMicUi();
   }
 );
 
-muteButton.addEventListener("click", () => {
-  micMuted = !micMuted;
-  updateMicUi();
-});
+cameraButton.addEventListener(
+  "click",
+  async () => {
+    const dmCall =
+      peopleDmCallStateForControls();
 
-cameraButton.addEventListener("click", async () => {
-  if (!voiceJoined && !cameraEnabled) {
-    voiceStatus.textContent = "Rejoins le vocal pour activer la caméra";
-    updateCameraUi();
-    return;
+    if (dmCall) {
+      await window.PeopleDmCalls
+        ?.toggleCamera?.();
+
+      return;
+    }
+
+    if (!voiceJoined && !cameraEnabled) {
+      voiceStatus.textContent = "Rejoins le vocal pour activer la caméra";
+      updateCameraUi();
+      return;
+    }
+
+    if (cameraEnabled) {
+      await disableCamera();
+    } else {
+      await enableCamera();
+    }
   }
-
-  if (cameraEnabled) await disableCamera();
-  else await enableCamera();
-});
+);
 
 function queueCandidate(peerId, candidate) {
   if (!pendingCandidates.has(peerId)) {

@@ -552,6 +552,42 @@
       );
   }
 
+  // === PEOPLE_DM_CALL_GLOBAL_BRIDGE_V3 ===
+  function peopleDmCallPublicState() {
+    return {
+      exists:
+        Boolean(call),
+      phase:
+        call?.phase ||
+        "none",
+      username:
+        String(
+          call?.username ||
+          ""
+        ),
+      muted:
+        Boolean(
+          micMuted
+        ),
+      camera:
+        Boolean(
+          cameraEnabled
+        )
+    };
+  }
+
+  function peopleDmCallPublishState() {
+    window.dispatchEvent(
+      new CustomEvent(
+        "people-dm-call-state",
+        {
+          detail:
+            peopleDmCallPublicState()
+        }
+      )
+    );
+  }
+
   function showMode(
     mode
   ) {
@@ -579,6 +615,13 @@
       !remoteVideo.classList
         .contains("hidden")
     );
+
+    if (call) {
+      call.phase =
+        mode;
+    }
+
+    peopleDmCallPublishState();
   }
 
   function currentDmUsername() {
@@ -657,6 +700,8 @@
       cameraEnabled
         ? "Couper la caméra"
         : "Activer la caméra";
+
+    peopleDmCallPublishState();
   }
 
   function syncLocalPreview() {
@@ -1951,7 +1996,88 @@
     }
   );
 
+  window.PeopleDmCalls = {
+    getState() {
+      return peopleDmCallPublicState();
+    },
+
+    async toggleMute() {
+      if (!call) {
+        return false;
+      }
+
+      await toggleMute();
+
+      return true;
+    },
+
+    async toggleCamera() {
+      if (!call) {
+        return false;
+      }
+
+      if (cameraEnabled) {
+        await disableCamera();
+      } else {
+        await enableCamera();
+      }
+
+      return true;
+    },
+
+    end() {
+      if (!call?.id) {
+        return false;
+      }
+
+      const phase =
+        call.phase ||
+        "active";
+
+      if (
+        phase ===
+        "incoming"
+      ) {
+        socket.emit(
+          "dm-call-decline",
+          {
+            callId:
+              call.id
+          }
+        );
+
+        return true;
+      }
+
+      if (
+        phase ===
+        "outgoing"
+      ) {
+        socket.emit(
+          "dm-call-cancel",
+          {
+            callId:
+              call.id
+          }
+        );
+
+        return true;
+      }
+
+      socket.emit(
+        "dm-call-hangup",
+        {
+          callId:
+            call.id
+        }
+      );
+
+      return true;
+    }
+  };
+
   updateMediaButtons();
+  peopleDmCallPublishState();
 
   // === PEOPLE_DM_CALLS_V1_END ===
 })();
