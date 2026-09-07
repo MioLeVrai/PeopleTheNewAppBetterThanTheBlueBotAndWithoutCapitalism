@@ -44,7 +44,9 @@ const peopleGeneralImagePicker =
       input:
         messageImageInput,
       preview:
-        messageImagePreview
+        messageImagePreview,
+      pasteTarget:
+        messageInput
     });
 const messages = document.getElementById("messages");
 

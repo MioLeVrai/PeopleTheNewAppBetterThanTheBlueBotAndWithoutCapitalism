@@ -64,7 +64,9 @@
         input:
           dmImageInput,
         preview:
-          dmImagePreview
+          dmImagePreview,
+        pasteTarget:
+          dmInput
       });
 
 // === PEOPLE_DM_MESSAGE_ACTIONS_V1_START ===

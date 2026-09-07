@@ -372,7 +372,8 @@
   function createImagePicker({
     button,
     input,
-    preview
+    preview,
+    pasteTarget
   }) {
     let selectedFile =
       null;
@@ -485,6 +486,77 @@
           show(file);
         } catch (err) {
           alert(err.message);
+          clear();
+        }
+      }
+    );
+
+    /*
+      PEOPLE_CLIPBOARD_IMAGES_V1
+
+      Permet notamment :
+      Win + Shift + S
+      puis Ctrl + V dans le champ de message.
+
+      Le collage texte normal n'est jamais bloqué
+      s'il n'y a aucune image dans le presse-papiers.
+    */
+    pasteTarget?.addEventListener(
+      "paste",
+      (event) => {
+        const clipboard =
+          event.clipboardData;
+
+        if (!clipboard) {
+          return;
+        }
+
+        let file =
+          Array.from(
+            clipboard.files || []
+          ).find(
+            (candidate) =>
+              String(
+                candidate?.type || ""
+              ).startsWith(
+                "image/"
+              )
+          ) || null;
+
+        if (!file) {
+          const imageItem =
+            Array.from(
+              clipboard.items || []
+            ).find(
+              (item) =>
+                item.kind === "file" &&
+                String(
+                  item.type || ""
+                ).startsWith(
+                  "image/"
+                )
+            );
+
+          file =
+            imageItem?.getAsFile?.() ||
+            null;
+        }
+
+        if (!file) {
+          return;
+        }
+
+        try {
+          show(file);
+          event.preventDefault();
+        } catch (err) {
+          event.preventDefault();
+
+          alert(
+            err?.message ||
+            "Impossible de coller cette image."
+          );
+
           clear();
         }
       }
