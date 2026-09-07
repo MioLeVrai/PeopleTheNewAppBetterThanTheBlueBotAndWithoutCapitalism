@@ -3298,9 +3298,10 @@ app.get("/api/social/people", async (req, res) => {
     const session = peopleSessionForRequest(req, res);
     if (!session) return;
 
-    const accounts = await peopleListAccounts(
-      String(req.query.q || "").slice(0, 50)
-    );
+    const query =
+      String(req.query.q || "")
+        .trim()
+        .slice(0, 50);
 
     const friendIds = new Set(
       await peopleFriendIds(session.id)
@@ -3327,28 +3328,114 @@ app.get("/api/social/people", async (req, res) => {
       });
     }
 
+    let accounts = [];
+
+    if (query) {
+      /*
+        Recherche volontaire :
+        on peut retrouver un nouveau compte
+        uniquement quand l'utilisateur tape
+        réellement un pseudo.
+      */
+      accounts =
+        await peopleListAccounts(
+          query
+        );
+    } else {
+      /*
+        Aucun annuaire global au repos.
+        On ne montre ici que les comptes
+        avec lesquels un MP existe déjà.
+
+        Les amis et demandes sont exclus
+        car ils sont déjà affichés juste
+        au-dessus dans leurs propres zones.
+      */
+      const conversations =
+        await peopleDmConversations(
+          session.id
+        );
+
+      for (
+        const conversation
+        of conversations
+      ) {
+        const account =
+          conversation?.user;
+
+        if (
+          !account?.id
+        ) {
+          continue;
+        }
+
+        const id =
+          String(account.id);
+
+        if (
+          friendIds.has(id) ||
+          requestByOther.has(id)
+        ) {
+          continue;
+        }
+
+        accounts.push(
+          account
+        );
+      }
+    }
+
+    const seen =
+      new Set();
+
     res.json({
       ok: true,
       people: accounts
         .filter(
-          (account) =>
-            String(account.id) !==
-            String(session.id)
+          (account) => {
+            const id =
+              String(
+                account?.id || ""
+              );
+
+            if (
+              !id ||
+              id ===
+                String(session.id) ||
+              seen.has(id)
+            ) {
+              return false;
+            }
+
+            seen.add(id);
+
+            return true;
+          }
         )
         .map((account) => {
-          const id = String(account.id);
+          const id =
+            String(account.id);
+
           const pending =
-            requestByOther.get(id) || {};
+            requestByOther.get(id) ||
+            {};
 
           return {
-            ...peoplePublicAccount(account),
+            ...peoplePublicAccount(
+              account
+            ),
             online:
-              peopleAccountIsOnline(account.id),
-            isFriend: friendIds.has(id),
+              peopleAccountIsOnline(
+                account.id
+              ),
+            isFriend:
+              friendIds.has(id),
             friendRequest:
-              pending.friendRequest || null,
+              pending.friendRequest ||
+              null,
             friendRequestId:
-              pending.friendRequestId || null
+              pending.friendRequestId ||
+              null
           };
         })
     });
@@ -6794,6 +6881,127 @@ app.get(
   }
 );
 // === PEOPLE_SERVERS_V1_END ===
+
+// === PEOPLE_DESKTOP_APP_VERSION_V1_START ===
+const PEOPLE_DESKTOP_PACKAGE_FILE =
+  pathAccounts.join(
+    __dirname,
+    "desktop",
+    "package.json"
+  );
+
+const PEOPLE_DESKTOP_RELEASE_FILE =
+  pathAccounts.join(
+    __dirname,
+    "desktop",
+    "release.json"
+  );
+
+const PEOPLE_DESKTOP_DEFAULT_INSTALLER_URL =
+  "https://github.com/MioLeVrai/PeopleTheNewAppBetterThanTheBlueBotAndWithoutCapitalism/releases/latest/download/People-Setup.exe";
+
+function peopleDesktopReleaseInfo() {
+  let packageVersion =
+    "1.0.0";
+
+  let release = {};
+
+  try {
+    const desktopPackage =
+      JSON.parse(
+        fsAccounts.readFileSync(
+          PEOPLE_DESKTOP_PACKAGE_FILE,
+          "utf8"
+        )
+      );
+
+    if (desktopPackage?.version) {
+      packageVersion =
+        String(
+          desktopPackage.version
+        ).trim();
+    }
+  } catch (err) {
+    console.warn(
+      "[People desktop/package]",
+      err?.message || err
+    );
+  }
+
+  try {
+    if (
+      fsAccounts.existsSync(
+        PEOPLE_DESKTOP_RELEASE_FILE
+      )
+    ) {
+      release =
+        JSON.parse(
+          fsAccounts.readFileSync(
+            PEOPLE_DESKTOP_RELEASE_FILE,
+            "utf8"
+          )
+        );
+    }
+  } catch (err) {
+    console.warn(
+      "[People desktop/release]",
+      err?.message || err
+    );
+  }
+
+  const version =
+    String(
+      release?.version ||
+      packageVersion
+    ).trim() ||
+    packageVersion;
+
+  const installerUrl =
+    String(
+      process.env.PEOPLE_DESKTOP_INSTALLER_URL ||
+      release?.installerUrl ||
+      PEOPLE_DESKTOP_DEFAULT_INSTALLER_URL
+    ).trim();
+
+  const sha256 =
+    String(
+      process.env.PEOPLE_DESKTOP_SHA256 ||
+      release?.sha256 ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const message =
+    String(
+      process.env.PEOPLE_DESKTOP_UPDATE_MESSAGE ||
+      release?.message ||
+      "Une nouvelle version de People est disponible."
+    ).trim();
+
+  return {
+    version,
+    installerUrl,
+    sha256,
+    message
+  };
+}
+
+app.get(
+  "/api/desktop/version",
+  (req, res) => {
+    res.set(
+      "Cache-Control",
+      "no-store, max-age=0"
+    );
+
+    res.status(200).json({
+      ok: true,
+      ...peopleDesktopReleaseInfo()
+    });
+  }
+);
+// === PEOPLE_DESKTOP_APP_VERSION_V1_END ===
 
 app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, app: "People" });

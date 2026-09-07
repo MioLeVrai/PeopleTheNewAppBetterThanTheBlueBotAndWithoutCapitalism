@@ -1,0 +1,58 @@
+{
+  "name": "people-desktop",
+  "productName": "People",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Application Windows officielle de People avec mise à jour automatique",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64",
+    "release:finalize": "node scripts/finalize-release.js"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.people.desktop",
+    "productName": "People",
+    "artifactName": "People-Setup-${version}.exe",
+    "asar": true,
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "update-preload.js",
+      "update-window.html",
+      "update-window.js",
+      "release.json",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/people.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "People",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "uninstallDisplayName": "People"
+    }
+  }
+}

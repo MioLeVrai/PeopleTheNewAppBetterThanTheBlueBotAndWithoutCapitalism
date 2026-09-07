@@ -8,9 +8,10 @@
     <link rel="shortcut icon" href="people-favicon.ico">
     <!-- PEOPLE_FAVICON_TAB_V1_END -->
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>People</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="people-mobile.css" />
 </head>
 <body>
 <div id="joinScreen" class="overlay">
@@ -333,12 +334,15 @@
           </div>
         </div>
 
-        <div class="home-section">
-          <div class="home-section-title">
-            <strong>Personnes</strong>
-            <span>Comptes People</span>
-          </div>
-          <div id="peopleDirectory" class="people-card-list"></div>
+        <div
+          id="peopleDirectorySection"
+          class="home-section"
+          style="display:none"
+        >
+          <div
+            id="peopleDirectory"
+            class="people-card-list"
+          ></div>
         </div>
       </section>
 
@@ -631,5 +635,6 @@
 <script src="people-servers.js"></script>
 <script src="people-local-controls.js"></script>
   <script src="people-page-title.js"></script>
+  <script src="people-mobile.js"></script>
 </body>
 </html>

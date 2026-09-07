@@ -25,6 +25,10 @@
     document.getElementById("outgoingFriendRequests");
   // === PEOPLE_FRIEND_REQUESTS_CLIENT_V2_END ===
   const peopleDirectory = document.getElementById("peopleDirectory");
+  const peopleDirectorySection =
+    document.getElementById(
+      "peopleDirectorySection"
+    );
   const homeMainTitle = document.getElementById("homeMainTitle");
   const homeMainSubtitle = document.getElementById("homeMainSubtitle");
 
@@ -605,40 +609,118 @@
   async function refreshDirectory(query = "") {
     if (!socialReady || !peopleDirectory) return;
 
+    const cleanQuery =
+      String(query || "")
+        .trim()
+        .slice(0, 50);
+
     try {
       const data = await api(
         "/api/social/people?q=" +
-          encodeURIComponent(query)
+          encodeURIComponent(
+            cleanQuery
+          )
       );
 
-      const list = Array.isArray(data.people)
-        ? data.people
-        : [];
+      const list =
+        Array.isArray(data.people)
+          ? data.people
+          : [];
 
-      peopleDirectory.innerHTML = "";
+      peopleDirectory.innerHTML =
+        "";
 
       if (!list.length) {
-        const empty = document.createElement("div");
-        empty.className = "home-empty";
+        if (
+          !cleanQuery
+        ) {
+          if (
+            peopleDirectorySection
+          ) {
+            peopleDirectorySection
+              .style.display =
+              "none";
+          }
+
+          return;
+        }
+
+        if (
+          peopleDirectorySection
+        ) {
+          peopleDirectorySection
+            .style.display =
+            "";
+        }
+
+        const empty =
+          document.createElement(
+            "div"
+          );
+
+        empty.className =
+          "home-empty";
+
         empty.textContent =
-          query
-            ? "Aucun compte trouvé."
-            : "Aucun autre compte People.";
-        peopleDirectory.appendChild(empty);
+          "Aucun compte trouvé.";
+
+        peopleDirectory.appendChild(
+          empty
+        );
+
         return;
       }
 
-      for (const person of list) {
+      if (
+        peopleDirectorySection
+      ) {
+        peopleDirectorySection
+          .style.display =
+          "";
+      }
+
+      for (
+        const person
+        of list
+      ) {
         peopleDirectory.appendChild(
-          makePersonCard(person)
+          makePersonCard(
+            person
+          )
         );
       }
     } catch (err) {
-      peopleDirectory.innerHTML = "";
-      const empty = document.createElement("div");
-      empty.className = "home-empty";
-      empty.textContent = err.message;
-      peopleDirectory.appendChild(empty);
+      peopleDirectory.innerHTML =
+        "";
+
+      if (
+        peopleDirectorySection
+      ) {
+        peopleDirectorySection
+          .style.display =
+          cleanQuery
+            ? ""
+            : "none";
+      }
+
+      if (!cleanQuery) {
+        return;
+      }
+
+      const empty =
+        document.createElement(
+          "div"
+        );
+
+      empty.className =
+        "home-empty";
+
+      empty.textContent =
+        err.message;
+
+      peopleDirectory.appendChild(
+        empty
+      );
     }
   }
 

@@ -1,0 +1,35 @@
+name: Build People Windows Setup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install
+        working-directory: desktop
+        run: npm install
+
+      - name: Build setup
+        working-directory: desktop
+        run: npm run dist
+
+      - name: Finalize release descriptor
+        working-directory: desktop
+        run: node scripts/finalize-release.js
+
+      - name: Upload setup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: People-Setup
+          path: desktop/dist/People-Setup-*.exe
