@@ -6336,6 +6336,58 @@ app.get(
   }
 );
 
+// === PEOPLE_SERVER_MEMBERSHIP_MESSAGES_V1_START ===
+async function peopleEmitServerMembershipMessage(
+  serverId,
+  accountId,
+  action
+) {
+  const sid =
+    String(serverId || "");
+
+  const uid =
+    String(accountId || "");
+
+  if (
+    !sid ||
+    !uid
+  ) {
+    return;
+  }
+
+  const account =
+    await peopleFindAccountById(
+      uid
+    );
+
+  const username =
+    peopleUsername(
+      account?.username ||
+      "Quelqu'un"
+    );
+
+  const text =
+    action === "leave"
+      ? `${username} a quitté le serveur`
+      : `${username} a rejoint le serveur`;
+
+  io.to(
+    peopleServerRoom(
+      sid
+    )
+  ).emit(
+    "system-message",
+    {
+      text,
+      serverId:
+        sid,
+      time:
+        Date.now()
+    }
+  );
+}
+// === PEOPLE_SERVER_MEMBERSHIP_MESSAGES_V1_END ===
+
 app.post(
   "/api/servers/invite/:code/join",
   async (req, res) => {
@@ -6361,10 +6413,24 @@ app.post(
         });
       }
 
+      const wasAlreadyMember =
+        await peopleIsServerMember(
+          session.id,
+          server.id
+        );
+
       await peopleJoinServer(
         session.id,
         server.id
       );
+
+      if (!wasAlreadyMember) {
+        await peopleEmitServerMembershipMessage(
+          server.id,
+          session.id,
+          "join"
+        );
+      }
 
       res.json({
         ok: true,
@@ -6517,6 +6583,12 @@ app.delete(
 
       emitOnlineUsers(
         server.id
+      );
+
+      await peopleEmitServerMembershipMessage(
+        server.id,
+        session.id,
+        "leave"
       );
 
       res.json({

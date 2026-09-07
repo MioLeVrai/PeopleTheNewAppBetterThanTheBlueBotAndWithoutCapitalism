@@ -2593,3 +2593,1707 @@ button, input { font: inherit; }
 }
 
 /* === PEOPLE_SERVER_CONTEXT_MENU_V1_UI_END === */
+
+/* === PEOPLE_PURPLE_PALETTE_V1_START === */
+
+/*
+  Palette fournie :
+  #060014  noir violet
+  #09001C  nuit
+  #160045  violet profond
+  #260078  violet sombre
+  #4606A1  violet principal
+  #562070  prune
+*/
+
+:root {
+  --people-ink: #060014;
+  --people-night: #09001C;
+  --people-deep: #160045;
+  --people-violet-dark: #260078;
+  --people-violet: #4606A1;
+  --people-plum: #562070;
+
+  --bg: var(--people-night) !important;
+  --panel: var(--people-deep) !important;
+  --panel-dark: var(--people-ink) !important;
+  --input: var(--people-ink) !important;
+  --brand: var(--people-violet) !important;
+  --hover: var(--people-violet-dark) !important;
+
+  --text: #f7f3ff !important;
+  --muted: #bfb0d3 !important;
+
+  /*
+    Couleurs fonctionnelles conservées volontairement.
+  */
+  --green: #23a55a !important;
+
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--people-ink) !important;
+  color: var(--text) !important;
+}
+
+/* =========================================================
+   STRUCTURE PRINCIPALE
+   ========================================================= */
+
+.app,
+.main,
+.home-main,
+.messages,
+.dm-view,
+.dm-messages {
+  background: var(--people-night) !important;
+}
+
+.sidebar {
+  background: var(--people-deep) !important;
+}
+
+.server-rail {
+  background: var(--people-ink) !important;
+  border-color: var(--people-deep) !important;
+}
+
+.online-panel {
+  background: var(--people-deep) !important;
+  border-color: var(--people-ink) !important;
+}
+
+.topbar,
+.home-topbar,
+.dm-header {
+  background: var(--people-night) !important;
+  border-color: var(--people-deep) !important;
+}
+
+.server-title {
+  background: var(--people-deep) !important;
+  border-color: var(--people-ink) !important;
+}
+
+.profile {
+  background: var(--people-ink) !important;
+  border-color: var(--people-deep) !important;
+}
+
+/* =========================================================
+   BARRE DES SERVEURS
+   ========================================================= */
+
+.rail-button,
+.dynamic-server-button,
+.server-create-button {
+  background: var(--people-deep) !important;
+  color: var(--text) !important;
+}
+
+.rail-button:hover,
+.dynamic-server-button:hover,
+.server-create-button:hover {
+  background: var(--people-violet-dark) !important;
+  color: white !important;
+}
+
+.rail-button.active,
+.dynamic-server-button.active {
+  background: var(--people-violet) !important;
+  color: white !important;
+}
+
+.server-create-button {
+  color: #cdb8ff !important;
+}
+
+.server-create-button:hover {
+  background: var(--people-violet) !important;
+}
+
+.server-icon,
+.logo,
+.avatar,
+.dm-sidebar-avatar,
+.dm-header-avatar,
+.people-card-avatar,
+.profile-large-avatar,
+.people-invite-icon {
+  background: var(--people-violet) !important;
+  color: white !important;
+}
+
+.server-rail-empty {
+  color: var(--people-plum) !important;
+}
+
+/* =========================================================
+   SALONS / NAVIGATION
+   ========================================================= */
+
+.channel,
+.dm-conversation-row,
+.dm-back-button {
+  color: var(--muted) !important;
+}
+
+.channel:hover,
+.channel.active,
+.dm-conversation-row:hover,
+.dm-conversation-row.active,
+.dm-back-button:hover,
+.icon-btn:hover {
+  background: var(--people-violet-dark) !important;
+  color: var(--text) !important;
+}
+
+.group-label,
+.home-section-title,
+.voice-empty,
+.system-message,
+.message-head time,
+.profile-online-state {
+  color: #aa98c2 !important;
+}
+
+.voice-user:hover,
+.online-user-row:hover,
+.people-card:hover {
+  background: rgba(38, 0, 120, 0.62) !important;
+}
+
+/* =========================================================
+   BOUTONS
+   ========================================================= */
+
+.composer button,
+.join-card button,
+.people-card-action,
+.profile-edit-wrap button,
+.profile-modal-actions button,
+.people-server-primary {
+  background: var(--people-violet) !important;
+  color: white !important;
+}
+
+.composer button:hover,
+.join-card button:hover,
+.people-card-action:hover,
+.profile-edit-wrap button:hover,
+.profile-modal-actions button:hover,
+.people-server-primary:hover {
+  background: #5208ba !important;
+  filter: none !important;
+}
+
+.people-card-action.secondary,
+.profile-modal-actions button:last-child,
+.people-composer-reply-close,
+.server-invite-button,
+.profile-avatar-upload-button {
+  background: var(--people-violet-dark) !important;
+  color: var(--text) !important;
+}
+
+.people-card-action.secondary:hover,
+.profile-modal-actions button:last-child:hover,
+.people-composer-reply-close:hover,
+.server-invite-button:hover,
+.profile-avatar-upload-button:hover {
+  background: var(--people-plum) !important;
+  color: white !important;
+}
+
+.icon-btn.active {
+  /*
+    Vert conservé pour micro/cam actifs.
+  */
+  background: var(--green) !important;
+}
+
+/* =========================================================
+   CHAMPS / COMPOSERS
+   ========================================================= */
+
+.composer input,
+.join-card input,
+.friends-search-card input,
+.profile-edit-wrap textarea,
+.people-server-form input {
+  background: var(--people-ink) !important;
+  color: var(--text) !important;
+  border: 1px solid rgba(86, 32, 112, 0.78) !important;
+}
+
+.composer input:focus,
+.join-card input:focus,
+.friends-search-card input:focus,
+.profile-edit-wrap textarea:focus,
+.people-server-form input:focus {
+  border-color: var(--people-violet) !important;
+  box-shadow:
+    0 0 0 2px
+    rgba(70, 6, 161, 0.20) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #8d7ba7 !important;
+}
+
+/* =========================================================
+   CARTES / ACCUEIL / PROFILS
+   ========================================================= */
+
+.friends-search-card,
+.profile-card-section {
+  background: var(--people-deep) !important;
+}
+
+.people-card {
+  border-color: rgba(86, 32, 112, 0.42) !important;
+}
+
+.profile-card-modal,
+.join-card,
+.people-server-modal-card {
+  background: var(--people-deep) !important;
+  color: var(--text) !important;
+  border-color: rgba(86, 32, 112, 0.52) !important;
+}
+
+.profile-modal-backdrop,
+.people-server-modal,
+.overlay {
+  background: rgba(6, 0, 20, 0.88) !important;
+}
+
+.profile-modal-close {
+  background: var(--people-ink) !important;
+  color: var(--muted) !important;
+}
+
+.profile-modal-close:hover,
+.people-server-modal-close:hover {
+  background: var(--people-violet-dark) !important;
+  color: white !important;
+}
+
+/* =========================================================
+   MESSAGES
+   ========================================================= */
+
+.message-text {
+  color: #eee8f7 !important;
+}
+
+.message:hover,
+.dm-message:hover,
+.people-message-unit:hover {
+  background: rgba(38, 0, 120, 0.20) !important;
+}
+
+.people-composer-reply {
+  background: var(--people-deep) !important;
+  border-left-color: var(--people-violet) !important;
+}
+
+.people-message-reply-preview {
+  background: rgba(38, 0, 120, 0.34) !important;
+  border-left-color: var(--people-violet) !important;
+  color: var(--muted) !important;
+}
+
+.people-message-reply-preview strong {
+  color: var(--text) !important;
+}
+
+.people-message-flash {
+  background: transparent;
+}
+
+@keyframes people-message-flash {
+  0%,
+  100% {
+    background: transparent;
+  }
+
+  35% {
+    background: rgba(70, 6, 161, 0.40);
+  }
+}
+
+/* =========================================================
+   MENUS CLIC DROIT
+   ========================================================= */
+
+.people-message-context-menu,
+.people-server-context-menu {
+  background: var(--people-ink) !important;
+  border-color: rgba(86, 32, 112, 0.70) !important;
+  box-shadow:
+    0 14px 40px
+    rgba(0, 0, 0, 0.56) !important;
+}
+
+.people-message-menu-item,
+.people-server-context-item {
+  color: var(--text) !important;
+}
+
+.people-message-menu-item:hover,
+.people-server-context-item:hover {
+  background: var(--people-violet-dark) !important;
+}
+
+/*
+  Rouge conservé pour suppression / danger.
+*/
+.people-message-menu-item.delete,
+.people-server-context-item.danger {
+  color: #ff777c !important;
+}
+
+.people-message-menu-item.delete:hover,
+.people-server-context-item.danger:hover,
+.composer-image-remove {
+  background: #da373c !important;
+  color: white !important;
+}
+
+/* =========================================================
+   IMAGES / VIDEO / CONTENU RICHE
+   ========================================================= */
+
+.video-stage {
+  background: var(--people-ink) !important;
+  border-color: var(--people-deep) !important;
+}
+
+.video-tile,
+.people-youtube-preview,
+.people-message-image {
+  background: var(--people-ink) !important;
+}
+
+.video-placeholder {
+  background:
+    radial-gradient(
+      circle at center,
+      var(--people-violet-dark),
+      var(--people-ink)
+    ) !important;
+  color: #d8ccef !important;
+}
+
+.video-placeholder .big-avatar {
+  background: var(--people-violet) !important;
+}
+
+.video-label {
+  background: rgba(6, 0, 20, 0.76) !important;
+}
+
+.people-message-link {
+  color: #b99cff !important;
+}
+
+.people-message-link:hover {
+  color: #d3c3ff !important;
+}
+
+/* =========================================================
+   ONLINE / VOCAL
+   ========================================================= */
+
+.voice-user-avatar {
+  background: var(--people-violet-dark) !important;
+}
+
+.voice-status.connected,
+.voice-user.you .voice-user-name {
+  color: var(--green) !important;
+}
+
+/* =========================================================
+   MODALE SERVEUR / INVITATIONS
+   ========================================================= */
+
+.people-server-form input {
+  border-color: var(--people-violet-dark) !important;
+}
+
+.people-server-error {
+  color: #ff8b90 !important;
+}
+
+/* =========================================================
+   SCROLLBARS
+   ========================================================= */
+
+* {
+  scrollbar-color:
+    var(--people-violet-dark)
+    transparent !important;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background:
+    var(--people-violet-dark) !important;
+  border-color:
+    transparent !important;
+  background-clip:
+    padding-box !important;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background:
+    var(--people-violet) !important;
+  background-clip:
+    padding-box !important;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background:
+    var(--people-plum) !important;
+  background-clip:
+    padding-box !important;
+}
+
+*::-webkit-scrollbar-corner {
+  background:
+    var(--people-ink) !important;
+}
+
+/* =========================================================
+   DECONNEXION
+   On ne touche PAS à sa position.
+   ========================================================= */
+
+.people-fixed-logout {
+  background:
+    var(--people-deep) !important;
+  border-color:
+    rgba(86, 32, 112, 0.58) !important;
+  color:
+    var(--text) !important;
+}
+
+.people-fixed-logout:hover {
+  /*
+    Danger = rouge conservé.
+  */
+  background:
+    #da373c !important;
+}
+
+/* === PEOPLE_PURPLE_PALETTE_V1_END === */
+
+/* === PEOPLE_PURPLE_SOFT_FIX_V1_START === */
+
+/*
+  Ajustement doux par-dessus la refonte violette précédente :
+  - violet un peu moins agressif
+  - suppression des derniers blocs gris visibles
+*/
+
+:root {
+  --people-ink: #060014 !important;
+  --people-night: #0c001f !important;
+  --people-deep: #140036 !important;
+  --people-violet-dark: #2b0a5c !important;
+  --people-violet: #6b38b6 !important;
+  --people-plum: #5a2d78 !important;
+
+  --bg: var(--people-night) !important;
+  --panel: var(--people-deep) !important;
+  --panel-dark: var(--people-ink) !important;
+  --input: #09001a !important;
+  --brand: var(--people-violet) !important;
+  --hover: rgba(90, 45, 120, 0.42) !important;
+
+  --text: #f5f1ff !important;
+  --muted: #c3b4dd !important;
+}
+
+html,
+body,
+.app,
+.main,
+.home-main,
+.messages,
+.dm-view,
+.dm-messages {
+  background: var(--bg) !important;
+}
+
+.sidebar,
+.online-panel,
+.server-title,
+.friends-search-card,
+.profile-card-section,
+.profile-card-modal,
+.join-card,
+.people-server-modal-card,
+.people-invite-card,
+.video-stage,
+.profile,
+.topbar,
+.home-topbar,
+.dm-header {
+  background: var(--panel) !important;
+}
+
+.server-rail,
+.people-message-context-menu,
+.people-server-context-menu,
+.composer input,
+.join-card input,
+.friends-search-card input,
+.profile-edit-wrap textarea,
+.people-server-form input {
+  background: var(--input) !important;
+}
+
+/* Derniers éléments gris repérés */
+.friend-request-column,
+.friend-request-refuse,
+.hash,
+.voice-user-avatar,
+.video-placeholder .big-avatar,
+.welcome .hash,
+.welcome-icon,
+.channel-hero-icon,
+.server-empty-icon,
+.empty-state-icon {
+  background: var(--people-violet-dark) !important;
+  color: var(--text) !important;
+}
+
+.friend-request-column {
+  border: 1px solid rgba(107, 56, 182, 0.24) !important;
+}
+
+.friend-request-refuse {
+  background: var(--people-plum) !important;
+}
+
+.friend-request-refuse:hover,
+.people-card-action.secondary:hover,
+.profile-modal-actions button:last-child:hover,
+.people-composer-reply-close:hover,
+.server-invite-button:hover,
+.profile-avatar-upload-button:hover,
+.channel:hover,
+.channel.active,
+.dm-conversation-row:hover,
+.dm-conversation-row.active,
+.dm-back-button:hover,
+.icon-btn:hover,
+.voice-user:hover,
+.online-user-row:hover,
+.people-card:hover,
+.friend-request-row:hover,
+.message:hover,
+.dm-message:hover,
+.people-message-unit:hover {
+  background: rgba(90, 45, 120, 0.32) !important;
+}
+
+.rail-button,
+.dynamic-server-button,
+.server-create-button,
+.people-card-action.secondary,
+.profile-modal-actions button:last-child,
+.people-composer-reply-close,
+.server-invite-button,
+.profile-avatar-upload-button {
+  background: var(--people-violet-dark) !important;
+  color: var(--text) !important;
+}
+
+.rail-button.active,
+.dynamic-server-button.active,
+.composer button,
+.join-card button,
+.people-card-action,
+.profile-edit-wrap button,
+.profile-modal-actions button,
+.people-server-primary,
+.friend-request-actions button.friend-request-accept {
+  background: var(--people-plum) !important;
+  color: white !important;
+}
+
+.rail-button:hover,
+.dynamic-server-button:hover,
+.server-create-button:hover,
+.composer button:hover,
+.join-card button:hover,
+.people-card-action:hover,
+.profile-edit-wrap button:hover,
+.profile-modal-actions button:hover,
+.people-server-primary:hover,
+.friend-request-actions button.friend-request-accept:hover {
+  background: var(--people-violet) !important;
+  color: white !important;
+}
+
+.server-icon,
+.logo,
+.avatar,
+.dm-sidebar-avatar,
+.dm-header-avatar,
+.people-card-avatar,
+.profile-large-avatar,
+.people-invite-icon,
+.friend-request-avatar {
+  background: var(--people-plum) !important;
+  color: white !important;
+}
+
+.server-rail {
+  border-color: rgba(107, 56, 182, 0.12) !important;
+}
+
+.sidebar,
+.online-panel,
+.server-title,
+.topbar,
+.home-topbar,
+.dm-header,
+.profile,
+.video-stage {
+  border-color: rgba(107, 56, 182, 0.14) !important;
+}
+
+.people-message-link {
+  color: #d2beff !important;
+}
+
+.people-message-link:hover {
+  color: #e2d5ff !important;
+}
+
+* {
+  scrollbar-color: var(--people-plum) transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--people-plum) !important;
+  background-clip: padding-box !important;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--people-violet) !important;
+}
+
+/* === PEOPLE_PURPLE_SOFT_FIX_V1_END === */
+
+/* === PEOPLE_DARK_NEUTRAL_THEME_V1_START === */
+
+/*
+  Thème volontairement beaucoup moins violet :
+  ~80% noir / gris prune neutre
+  ~20% violet doux en accent seulement
+*/
+
+:root {
+  --people-ink: #09080c !important;
+  --people-night: #0f0d12 !important;
+  --people-deep: #17141b !important;
+  --people-surface: #201b24 !important;
+  --people-hover: #2a2430 !important;
+
+  --people-accent: #665873 !important;
+  --people-accent-strong: #78688a !important;
+  --people-accent-soft: #53475f !important;
+
+  --bg: var(--people-night) !important;
+  --panel: var(--people-deep) !important;
+  --panel-dark: var(--people-ink) !important;
+  --input: #121015 !important;
+  --brand: var(--people-accent) !important;
+  --hover: var(--people-hover) !important;
+
+  --text: #f2eff5 !important;
+  --muted: #aaa2b0 !important;
+
+  --green: #23a55a !important;
+}
+
+html,
+body {
+  background: var(--people-ink) !important;
+  color: var(--text) !important;
+}
+
+/* =========================================================
+   FONDS PRINCIPAUX
+   ========================================================= */
+
+.app,
+.main,
+.home-main,
+.messages,
+.dm-view,
+.dm-messages {
+  background: var(--people-night) !important;
+}
+
+.sidebar,
+.online-panel,
+.server-title,
+.topbar,
+.home-topbar,
+.dm-header,
+.friends-search-card,
+.profile-card-section,
+.profile-card-modal,
+.join-card,
+.people-server-modal-card,
+.people-invite-card,
+.profile {
+  background: var(--people-deep) !important;
+}
+
+.server-rail,
+.people-message-context-menu,
+.people-server-context-menu {
+  background: var(--people-ink) !important;
+}
+
+.video-stage {
+  background: #111014 !important;
+}
+
+/* =========================================================
+   SUPPRESSION DES ZONES ENCORE TROP VIOLETTES / GRISES
+   ========================================================= */
+
+.friend-request-column,
+.hash,
+.welcome .hash,
+.voice-user-avatar,
+.video-placeholder .big-avatar,
+.welcome-icon,
+.channel-hero-icon,
+.server-empty-icon,
+.empty-state-icon {
+  background: var(--people-surface) !important;
+  color: var(--text) !important;
+}
+
+.friend-request-column {
+  border: 1px solid #2b2630 !important;
+}
+
+.friend-request-refuse {
+  background: #342e39 !important;
+  color: var(--text) !important;
+}
+
+/* =========================================================
+   SERVEURS / ICONES
+   ========================================================= */
+
+.rail-button,
+.dynamic-server-button,
+.server-create-button {
+  background: var(--people-surface) !important;
+  color: #d8d2dc !important;
+}
+
+.rail-button:hover,
+.dynamic-server-button:hover,
+.server-create-button:hover {
+  background: var(--people-hover) !important;
+  color: white !important;
+}
+
+.rail-button.active,
+.dynamic-server-button.active {
+  background: var(--people-accent-soft) !important;
+  color: white !important;
+}
+
+.server-icon,
+.logo,
+.avatar,
+.dm-sidebar-avatar,
+.dm-header-avatar,
+.people-card-avatar,
+.profile-large-avatar,
+.people-invite-icon,
+.friend-request-avatar {
+  background: var(--people-accent-soft) !important;
+  color: white !important;
+}
+
+/* =========================================================
+   NAVIGATION / HOVERS
+   ========================================================= */
+
+.channel,
+.dm-conversation-row,
+.dm-back-button {
+  color: var(--muted) !important;
+}
+
+.channel:hover,
+.channel.active,
+.dm-conversation-row:hover,
+.dm-conversation-row.active,
+.dm-back-button:hover,
+.icon-btn:hover,
+.voice-user:hover,
+.online-user-row:hover,
+.people-card:hover,
+.friend-request-row:hover {
+  background: var(--people-hover) !important;
+  color: var(--text) !important;
+}
+
+.message:hover,
+.dm-message:hover,
+.people-message-unit:hover {
+  background: rgba(255, 255, 255, 0.025) !important;
+}
+
+/* =========================================================
+   BOUTONS
+   ========================================================= */
+
+.composer button,
+.join-card button,
+.people-card-action,
+.profile-edit-wrap button,
+.profile-modal-actions button,
+.people-server-primary,
+.friend-request-accept {
+  background: var(--people-accent) !important;
+  color: white !important;
+}
+
+.composer button:hover,
+.join-card button:hover,
+.people-card-action:hover,
+.profile-edit-wrap button:hover,
+.profile-modal-actions button:hover,
+.people-server-primary:hover,
+.friend-request-accept:hover {
+  background: var(--people-accent-strong) !important;
+  color: white !important;
+}
+
+.people-card-action.secondary,
+.profile-modal-actions button:last-child,
+.people-composer-reply-close,
+.server-invite-button,
+.profile-avatar-upload-button {
+  background: #302a35 !important;
+  color: var(--text) !important;
+}
+
+.people-card-action.secondary:hover,
+.profile-modal-actions button:last-child:hover,
+.people-composer-reply-close:hover,
+.server-invite-button:hover,
+.profile-avatar-upload-button:hover {
+  background: #3b3441 !important;
+}
+
+/* =========================================================
+   INPUTS
+   ========================================================= */
+
+.composer input,
+.join-card input,
+.friends-search-card input,
+.profile-edit-wrap textarea,
+.people-server-form input {
+  background: var(--input) !important;
+  color: var(--text) !important;
+  border: 1px solid #302a35 !important;
+}
+
+.composer input:focus,
+.join-card input:focus,
+.friends-search-card input:focus,
+.profile-edit-wrap textarea:focus,
+.people-server-form input:focus {
+  border-color: var(--people-accent) !important;
+  box-shadow:
+    0 0 0 2px
+    rgba(102, 88, 115, 0.14) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #817987 !important;
+}
+
+/* =========================================================
+   MESSAGES / REPONSES
+   ========================================================= */
+
+.message-text {
+  color: #ebe7ee !important;
+}
+
+.people-composer-reply,
+.people-message-reply-preview {
+  background: #19161d !important;
+  border-left-color: var(--people-accent) !important;
+}
+
+.people-message-link {
+  color: #b7a7c6 !important;
+}
+
+.people-message-link:hover {
+  color: #d0c2dc !important;
+}
+
+/* =========================================================
+   MODALES / OVERLAYS
+   ========================================================= */
+
+.profile-modal-backdrop,
+.people-server-modal,
+.overlay {
+  background: rgba(5, 4, 7, 0.88) !important;
+}
+
+.profile-modal-close,
+.people-server-modal-close {
+  background: #28232d !important;
+  color: #c8c1cd !important;
+}
+
+.profile-modal-close:hover,
+.people-server-modal-close:hover {
+  background: #37303d !important;
+  color: white !important;
+}
+
+/* =========================================================
+   VIDEO / VOCAL
+   ========================================================= */
+
+.video-placeholder {
+  background:
+    radial-gradient(
+      circle at center,
+      #25202b,
+      #0c0a0f
+    ) !important;
+  color: #cbc5cf !important;
+}
+
+.video-label {
+  background: rgba(7, 6, 9, 0.78) !important;
+}
+
+/* =========================================================
+   MENUS CLIC DROIT
+   ========================================================= */
+
+.people-message-context-menu,
+.people-server-context-menu {
+  border-color: #2f2934 !important;
+  box-shadow:
+    0 14px 40px
+    rgba(0, 0, 0, 0.62) !important;
+}
+
+.people-message-menu-item,
+.people-server-context-item {
+  color: #e8e3eb !important;
+}
+
+.people-message-menu-item:hover,
+.people-server-context-item:hover {
+  background: var(--people-hover) !important;
+}
+
+/* danger = rouge conservé */
+.people-message-menu-item.delete,
+.people-server-context-item.danger {
+  color: #ff777c !important;
+}
+
+.people-message-menu-item.delete:hover,
+.people-server-context-item.danger:hover,
+.composer-image-remove {
+  background: #da373c !important;
+  color: white !important;
+}
+
+/* connecté = vert conservé */
+.icon-btn.active,
+.voice-status.connected,
+.voice-user.you .voice-user-name {
+  color: white !important;
+}
+
+.icon-btn.active {
+  background: var(--green) !important;
+}
+
+/* =========================================================
+   BORDURES
+   ========================================================= */
+
+.sidebar,
+.online-panel,
+.server-title,
+.topbar,
+.home-topbar,
+.dm-header,
+.profile,
+.video-stage,
+.people-card,
+.profile-card-modal,
+.join-card,
+.people-server-modal-card {
+  border-color: #29242e !important;
+}
+
+/* =========================================================
+   SCROLLBARS
+   ========================================================= */
+
+* {
+  scrollbar-color:
+    #403747
+    transparent !important;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #403747 !important;
+  background-clip: padding-box !important;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #55485f !important;
+}
+
+/* =========================================================
+   LOGOUT
+   ========================================================= */
+
+.people-fixed-logout {
+  background: #211c26 !important;
+  border-color: #332c39 !important;
+  color: var(--text) !important;
+}
+
+.people-fixed-logout:hover {
+  background: #da373c !important;
+}
+
+/* === PEOPLE_DARK_NEUTRAL_THEME_V1_END === */
+
+/* === PEOPLE_BLUE_PURPLE_THEME_V1_START === */
+
+/*
+  Variante violet-bleu :
+  - sombre et calme
+  - accents indigo / violet bleuté
+  - pas de violet flashy
+*/
+
+:root {
+  --people-ink: #080910 !important;
+  --people-night: #0d0f18 !important;
+  --people-deep: #151824 !important;
+  --people-surface: #1d2130 !important;
+  --people-hover: #272c3f !important;
+
+  --people-accent: #5d5f92 !important;
+  --people-accent-strong: #6967a8 !important;
+  --people-accent-soft: #4c507c !important;
+  --people-accent-light: #7772bd !important;
+
+  --bg: var(--people-night) !important;
+  --panel: var(--people-deep) !important;
+  --panel-dark: var(--people-ink) !important;
+  --input: #10121b !important;
+  --brand: var(--people-accent) !important;
+  --hover: var(--people-hover) !important;
+
+  --text: #f0f1f7 !important;
+  --muted: #a9adbd !important;
+
+  --green: #23a55a !important;
+}
+
+html,
+body,
+.app,
+.main,
+.home-main,
+.messages,
+.dm-view,
+.dm-messages {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+.sidebar,
+.online-panel,
+.server-title,
+.topbar,
+.home-topbar,
+.dm-header,
+.friends-search-card,
+.profile-card-section,
+.profile-card-modal,
+.join-card,
+.people-server-modal-card,
+.people-invite-card,
+.profile {
+  background: var(--panel) !important;
+}
+
+.server-rail,
+.people-message-context-menu,
+.people-server-context-menu {
+  background: var(--people-ink) !important;
+}
+
+.friend-request-column,
+.hash,
+.welcome .hash,
+.voice-user-avatar,
+.video-placeholder .big-avatar,
+.welcome-icon,
+.channel-hero-icon,
+.server-empty-icon,
+.empty-state-icon {
+  background: var(--people-surface) !important;
+  color: var(--text) !important;
+}
+
+.friend-request-column {
+  border-color: #2b3042 !important;
+}
+
+.friend-request-refuse {
+  background: #323747 !important;
+}
+
+.rail-button,
+.dynamic-server-button,
+.server-create-button,
+.people-card-action.secondary,
+.profile-modal-actions button:last-child,
+.people-composer-reply-close,
+.server-invite-button,
+.profile-avatar-upload-button {
+  background: var(--people-surface) !important;
+  color: #d9dced !important;
+}
+
+.rail-button:hover,
+.dynamic-server-button:hover,
+.server-create-button:hover,
+.channel:hover,
+.channel.active,
+.dm-conversation-row:hover,
+.dm-conversation-row.active,
+.dm-back-button:hover,
+.icon-btn:hover,
+.voice-user:hover,
+.online-user-row:hover,
+.people-card:hover,
+.friend-request-row:hover {
+  background: var(--people-hover) !important;
+  color: white !important;
+}
+
+.rail-button.active,
+.dynamic-server-button.active {
+  background: var(--people-accent-soft) !important;
+  color: white !important;
+}
+
+.server-icon,
+.logo,
+.avatar,
+.dm-sidebar-avatar,
+.dm-header-avatar,
+.people-card-avatar,
+.profile-large-avatar,
+.people-invite-icon,
+.friend-request-avatar {
+  background: var(--people-accent-soft) !important;
+  color: white !important;
+}
+
+.composer button,
+.join-card button,
+.people-card-action,
+.profile-edit-wrap button,
+.profile-modal-actions button,
+.people-server-primary,
+.friend-request-accept {
+  background: var(--people-accent) !important;
+  color: white !important;
+}
+
+.composer button:hover,
+.join-card button:hover,
+.people-card-action:hover,
+.profile-edit-wrap button:hover,
+.profile-modal-actions button:hover,
+.people-server-primary:hover,
+.friend-request-accept:hover {
+  background: var(--people-accent-strong) !important;
+}
+
+.composer input,
+.join-card input,
+.friends-search-card input,
+.profile-edit-wrap textarea,
+.people-server-form input {
+  background: var(--input) !important;
+  color: var(--text) !important;
+  border-color: #30364a !important;
+}
+
+.composer input:focus,
+.join-card input:focus,
+.friends-search-card input:focus,
+.profile-edit-wrap textarea:focus,
+.people-server-form input:focus {
+  border-color: var(--people-accent-light) !important;
+  box-shadow:
+    0 0 0 2px
+    rgba(119, 114, 189, 0.13) !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #7f8496 !important;
+}
+
+.people-composer-reply,
+.people-message-reply-preview {
+  background: #171a26 !important;
+  border-left-color: var(--people-accent) !important;
+}
+
+.people-message-link {
+  color: #aeb2e1 !important;
+}
+
+.people-message-link:hover {
+  color: #c7caf3 !important;
+}
+
+.message:hover,
+.dm-message:hover,
+.people-message-unit:hover {
+  background: rgba(105, 103, 168, 0.045) !important;
+}
+
+.profile-modal-backdrop,
+.people-server-modal,
+.overlay {
+  background: rgba(5, 6, 10, 0.88) !important;
+}
+
+.profile-modal-close,
+.people-server-modal-close {
+  background: #252a38 !important;
+  color: #c5c8d5 !important;
+}
+
+.profile-modal-close:hover,
+.people-server-modal-close:hover {
+  background: #33394b !important;
+  color: white !important;
+}
+
+.video-stage {
+  background: #10131c !important;
+}
+
+.video-placeholder {
+  background:
+    radial-gradient(
+      circle at center,
+      #252b3f,
+      #0b0d14
+    ) !important;
+  color: #c8cbd6 !important;
+}
+
+.people-message-context-menu,
+.people-server-context-menu {
+  border-color: #30364a !important;
+}
+
+.people-message-menu-item:hover,
+.people-server-context-item:hover {
+  background: var(--people-hover) !important;
+}
+
+/* danger */
+.people-message-menu-item.delete,
+.people-server-context-item.danger {
+  color: #ff777c !important;
+}
+
+.people-message-menu-item.delete:hover,
+.people-server-context-item.danger:hover,
+.composer-image-remove {
+  background: #da373c !important;
+  color: white !important;
+}
+
+/* status */
+.icon-btn.active {
+  background: var(--green) !important;
+  color: white !important;
+}
+
+.sidebar,
+.online-panel,
+.server-title,
+.topbar,
+.home-topbar,
+.dm-header,
+.profile,
+.video-stage,
+.people-card,
+.profile-card-modal,
+.join-card,
+.people-server-modal-card {
+  border-color: #292e40 !important;
+}
+
+* {
+  scrollbar-color:
+    #41475f
+    transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #41475f !important;
+  background-clip: padding-box !important;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #555d7c !important;
+}
+
+.people-fixed-logout {
+  background: #202431 !important;
+  border-color: #33384b !important;
+  color: var(--text) !important;
+}
+
+.people-fixed-logout:hover {
+  background: #da373c !important;
+}
+
+/* === PEOPLE_BLUE_PURPLE_THEME_V1_END === */
+
+/* === PEOPLE_BLUE_PURPLE_PLUS_V1_START === */
+
+/*
+  Ajustement par-dessus le thème violet-bleu :
+  un peu plus violet, sans devenir flashy.
+*/
+
+:root {
+  --people-ink: #090811 !important;
+  --people-night: #100e1a !important;
+  --people-deep: #181524 !important;
+  --people-surface: #211d30 !important;
+  --people-hover: #2b253f !important;
+
+  --people-accent: #67589d !important;
+  --people-accent-strong: #7767b4 !important;
+  --people-accent-soft: #574985 !important;
+  --people-accent-light: #8a79ca !important;
+
+  --bg: var(--people-night) !important;
+  --panel: var(--people-deep) !important;
+  --panel-dark: var(--people-ink) !important;
+  --input: #12101b !important;
+  --brand: var(--people-accent) !important;
+  --hover: var(--people-hover) !important;
+
+  --text: #f2eff8 !important;
+  --muted: #aea7bc !important;
+}
+
+html,
+body,
+.app,
+.main,
+.home-main,
+.messages,
+.dm-view,
+.dm-messages {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+.sidebar,
+.online-panel,
+.server-title,
+.topbar,
+.home-topbar,
+.dm-header,
+.friends-search-card,
+.profile-card-section,
+.profile-card-modal,
+.join-card,
+.people-server-modal-card,
+.people-invite-card,
+.profile {
+  background: var(--panel) !important;
+}
+
+.server-rail,
+.people-message-context-menu,
+.people-server-context-menu {
+  background: var(--people-ink) !important;
+}
+
+.friend-request-column,
+.hash,
+.welcome .hash,
+.voice-user-avatar,
+.video-placeholder .big-avatar,
+.welcome-icon,
+.channel-hero-icon,
+.server-empty-icon,
+.empty-state-icon {
+  background: var(--people-surface) !important;
+  color: var(--text) !important;
+}
+
+.friend-request-column {
+  border-color: #332c48 !important;
+}
+
+.friend-request-refuse {
+  background: #393143 !important;
+}
+
+.rail-button,
+.dynamic-server-button,
+.server-create-button,
+.people-card-action.secondary,
+.profile-modal-actions button:last-child,
+.people-composer-reply-close,
+.server-invite-button,
+.profile-avatar-upload-button {
+  background: var(--people-surface) !important;
+  color: #ddd7ea !important;
+}
+
+.rail-button:hover,
+.dynamic-server-button:hover,
+.server-create-button:hover,
+.channel:hover,
+.channel.active,
+.dm-conversation-row:hover,
+.dm-conversation-row.active,
+.dm-back-button:hover,
+.icon-btn:hover,
+.voice-user:hover,
+.online-user-row:hover,
+.people-card:hover,
+.friend-request-row:hover {
+  background: var(--people-hover) !important;
+  color: white !important;
+}
+
+.rail-button.active,
+.dynamic-server-button.active {
+  background: var(--people-accent-soft) !important;
+  color: white !important;
+}
+
+.server-icon,
+.logo,
+.avatar,
+.dm-sidebar-avatar,
+.dm-header-avatar,
+.people-card-avatar,
+.profile-large-avatar,
+.people-invite-icon,
+.friend-request-avatar {
+  background: var(--people-accent-soft) !important;
+  color: white !important;
+}
+
+.composer button,
+.join-card button,
+.people-card-action,
+.profile-edit-wrap button,
+.profile-modal-actions button,
+.people-server-primary,
+.friend-request-accept {
+  background: var(--people-accent) !important;
+  color: white !important;
+}
+
+.composer button:hover,
+.join-card button:hover,
+.people-card-action:hover,
+.profile-edit-wrap button:hover,
+.profile-modal-actions button:hover,
+.people-server-primary:hover,
+.friend-request-accept:hover {
+  background: var(--people-accent-strong) !important;
+}
+
+.composer input,
+.join-card input,
+.friends-search-card input,
+.profile-edit-wrap textarea,
+.people-server-form input {
+  background: var(--input) !important;
+  color: var(--text) !important;
+  border-color: #39304d !important;
+}
+
+.composer input:focus,
+.join-card input:focus,
+.friends-search-card input:focus,
+.profile-edit-wrap textarea:focus,
+.people-server-form input:focus {
+  border-color: var(--people-accent-light) !important;
+  box-shadow:
+    0 0 0 2px
+    rgba(138, 121, 202, 0.14) !important;
+}
+
+.people-composer-reply,
+.people-message-reply-preview {
+  background: #191622 !important;
+  border-left-color: var(--people-accent) !important;
+}
+
+.people-message-link {
+  color: #c1b4e1 !important;
+}
+
+.people-message-link:hover {
+  color: #d7cbef !important;
+}
+
+.message:hover,
+.dm-message:hover,
+.people-message-unit:hover {
+  background: rgba(119, 103, 180, 0.055) !important;
+}
+
+.profile-modal-close,
+.people-server-modal-close {
+  background: #292335 !important;
+  color: #cbc4d4 !important;
+}
+
+.profile-modal-close:hover,
+.people-server-modal-close:hover {
+  background: #3a3049 !important;
+}
+
+.video-placeholder {
+  background:
+    radial-gradient(
+      circle at center,
+      #2b253f,
+      #0d0b14
+    ) !important;
+}
+
+.people-message-context-menu,
+.people-server-context-menu {
+  border-color: #39304d !important;
+}
+
+.people-message-menu-item:hover,
+.people-server-context-item:hover {
+  background: var(--people-hover) !important;
+}
+
+.sidebar,
+.online-panel,
+.server-title,
+.topbar,
+.home-topbar,
+.dm-header,
+.profile,
+.video-stage,
+.people-card,
+.profile-card-modal,
+.join-card,
+.people-server-modal-card {
+  border-color: #322b43 !important;
+}
+
+* {
+  scrollbar-color:
+    #4e4469
+    transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #4e4469 !important;
+  background-clip: padding-box !important;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #655785 !important;
+}
+
+/* danger/status restent inchangés */
+.people-message-menu-item.delete,
+.people-server-context-item.danger {
+  color: #ff777c !important;
+}
+
+.people-message-menu-item.delete:hover,
+.people-server-context-item.danger:hover,
+.composer-image-remove {
+  background: #da373c !important;
+  color: white !important;
+}
+
+.icon-btn.active {
+  background: var(--green) !important;
+  color: white !important;
+}
+
+.people-fixed-logout {
+  background: #241f2d !important;
+  border-color: #393044 !important;
+  color: var(--text) !important;
+}
+
+.people-fixed-logout:hover {
+  background: #da373c !important;
+}
+
+/* === PEOPLE_BLUE_PURPLE_PLUS_V1_END === */
