@@ -4297,3 +4297,35 @@ body,
 }
 
 /* === PEOPLE_BLUE_PURPLE_PLUS_V1_END === */
+
+/* === PEOPLE_MEMBER_PRESENCE_V2_UI_START === */
+
+.online-users-section-title {
+  padding: 12px 7px 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+
+.online-user-row.offline {
+  opacity: 0.52;
+}
+
+.online-user-row.offline:hover {
+  opacity: 0.78;
+}
+
+.online-user-row.offline .online-user-avatar {
+  filter: saturate(0.28);
+}
+
+.online-user-dot.offline {
+  background: #706a78 !important;
+}
+
+.online-user-row.offline .online-user-info span {
+  color: #89838e !important;
+}
+
+/* === PEOPLE_MEMBER_PRESENCE_V2_UI_END === */

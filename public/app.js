@@ -216,7 +216,15 @@ function renderChatHistory(history) {
     );
 
   for (const item of items) {
-    addChatMessage(item);
+    if (item?.system) {
+      addSystemMessage(
+        item
+      );
+    } else {
+      addChatMessage(
+        item
+      );
+    }
   }
 
   scrollBottom();
@@ -695,6 +703,10 @@ function peopleApplySelectedServerPayload(
       (
         payload?.online ||
         []
+      ).filter(
+        (user) =>
+          user?.online !==
+          false
       ).length
     );
 
@@ -1780,76 +1792,251 @@ function peopleOnlineUserIsSelf(
 // === PEOPLE_UNIQUE_PRESENCE_CLIENT_V1_END ===
 
 function peopleRenderOnlineUsers(roster) {
-  peopleOnlineRoster = Array.isArray(roster) ? roster : [];
+  peopleOnlineRoster =
+    Array.isArray(roster)
+      ? roster.map(
+          (user) => ({
+            ...user,
+            online:
+              user?.online !==
+              false
+          })
+        )
+      : [];
 
-  const count = peopleOnlineRoster.length;
+  const online =
+    peopleOnlineRoster.filter(
+      (user) =>
+        user.online
+    );
+
+  const offline =
+    peopleOnlineRoster.filter(
+      (user) =>
+        !user.online
+    );
 
   if (onlinePanelCount) {
     onlinePanelCount.textContent =
-      count === 1 ? "1 personne" : count + " personnes";
+      `${online.length} en ligne • ${offline.length} hors ligne`;
   }
 
   if (onlinePanelToggleCount) {
-    onlinePanelToggleCount.textContent = String(count);
+    onlinePanelToggleCount.textContent =
+      String(
+        online.length
+      );
   }
 
-  if (!onlineUsersList) return;
-
-  onlineUsersList.innerHTML = "";
-
-  if (!count) {
-    const empty = document.createElement("div");
-    empty.className = "online-users-empty";
-    empty.textContent = "Personne en ligne";
-    onlineUsersList.appendChild(empty);
+  if (!onlineUsersList) {
     return;
   }
 
-  const sorted = [...peopleOnlineRoster].sort((a, b) => {
-    if (peopleOnlineUserIsSelf(a)) return -1;
-    if (peopleOnlineUserIsSelf(b)) return 1;
+  onlineUsersList.innerHTML =
+    "";
 
-    return String(a.username || "").localeCompare(
-      String(b.username || ""),
-      "fr",
-      { sensitivity: "base" }
-    );
-  });
+  if (
+    !peopleOnlineRoster.length
+  ) {
+    const empty =
+      document.createElement(
+        "div"
+      );
 
-  for (const user of sorted) {
-    const row = document.createElement("div");
-    row.className = "online-user-row";
-    row.dataset.username = user.username;
+    empty.className =
+      "online-users-empty";
 
-    const av = document.createElement("div");
-    av.className = "online-user-avatar";
-    window.PeopleAvatars?.apply(
-      av,
-      user.username || "?"
+    empty.textContent =
+      "Aucun membre";
+
+    onlineUsersList.appendChild(
+      empty
     );
 
-    const info = document.createElement("div");
-    info.className = "online-user-info";
-
-    const name = document.createElement("strong");
-    name.textContent =
-      peopleOnlineUserIsSelf(
-        user
-      )
-        ? (user.username || "Invité") + " (toi)"
-        : (user.username || "Invité");
-
-    const status = document.createElement("span");
-    status.textContent = "En ligne";
-
-    const dot = document.createElement("span");
-    dot.className = "online-user-dot";
-    dot.setAttribute("aria-label", "En ligne");
-
-    info.append(name, status);
-    row.append(av, info, dot);
-    onlineUsersList.appendChild(row);
+    return;
   }
+
+  function sortMembers(list) {
+    return [...list].sort(
+      (a, b) => {
+        if (
+          peopleOnlineUserIsSelf(
+            a
+          )
+        ) {
+          return -1;
+        }
+
+        if (
+          peopleOnlineUserIsSelf(
+            b
+          )
+        ) {
+          return 1;
+        }
+
+        return String(
+          a.username || ""
+        ).localeCompare(
+          String(
+            b.username || ""
+          ),
+          "fr",
+          {
+            sensitivity:
+              "base"
+          }
+        );
+      }
+    );
+  }
+
+  function appendSection(
+    label,
+    list,
+    isOnline
+  ) {
+    if (!list.length) {
+      return;
+    }
+
+    const title =
+      document.createElement(
+        "div"
+      );
+
+    title.className =
+      "online-users-section-title";
+
+    title.textContent =
+      `${label} — ${list.length}`;
+
+    onlineUsersList.appendChild(
+      title
+    );
+
+    for (
+      const user
+      of sortMembers(list)
+    ) {
+      const row =
+        document.createElement(
+          "div"
+        );
+
+      row.className =
+        "online-user-row";
+
+      if (!isOnline) {
+        row.classList.add(
+          "offline"
+        );
+      }
+
+      row.dataset.username =
+        user.username;
+
+      const av =
+        document.createElement(
+          "div"
+        );
+
+      av.className =
+        "online-user-avatar";
+
+      window.PeopleAvatars
+        ?.apply(
+          av,
+          user.username ||
+            "?"
+        );
+
+      const info =
+        document.createElement(
+          "div"
+        );
+
+      info.className =
+        "online-user-info";
+
+      const name =
+        document.createElement(
+          "strong"
+        );
+
+      name.textContent =
+        peopleOnlineUserIsSelf(
+          user
+        )
+          ? (
+              user.username ||
+              "Invité"
+            ) +
+            " (toi)"
+          : (
+              user.username ||
+              "Invité"
+            );
+
+      const status =
+        document.createElement(
+          "span"
+        );
+
+      status.textContent =
+        isOnline
+          ? "En ligne"
+          : "Hors ligne";
+
+      const dot =
+        document.createElement(
+          "span"
+        );
+
+      dot.className =
+        "online-user-dot";
+
+      if (!isOnline) {
+        dot.classList.add(
+          "offline"
+        );
+      }
+
+      dot.setAttribute(
+        "aria-label",
+        isOnline
+          ? "En ligne"
+          : "Hors ligne"
+      );
+
+      info.append(
+        name,
+        status
+      );
+
+      row.append(
+        av,
+        info,
+        dot
+      );
+
+      onlineUsersList.appendChild(
+        row
+      );
+    }
+  }
+
+  appendSection(
+    "EN LIGNE",
+    online,
+    true
+  );
+
+  appendSection(
+    "HORS LIGNE",
+    offline,
+    false
+  );
 }
 
 onlinePanelToggle?.addEventListener("click", () => {

@@ -5731,7 +5731,7 @@ async function peopleServerLoadMessages(
     const result =
       await peoplePool.query(
         "SELECT " +
-        "gm.id, gm.username, gm.body, gm.reply_to_id, gm.created_at, " +
+        "gm.id, gm.username, gm.body, gm.reply_to_id, gm.is_system, gm.created_at, " +
         "(SELECT i.id FROM people_message_images i " +
         "WHERE i.general_message_id = gm.id LIMIT 1) AS image_id, " +
         "rgm.username AS reply_username, " +
@@ -5757,6 +5757,8 @@ async function peopleServerLoadMessages(
             String(row.id),
           serverId:
             sid,
+          system:
+            Boolean(row.is_system),
           username:
             row.username,
           text:
@@ -5837,6 +5839,11 @@ async function peopleServerLoadMessages(
             String(message.id || ""),
           serverId:
             sid,
+          system:
+            Boolean(
+              message.system ||
+              message.isSystem
+            ),
           username:
             String(
               message.username || ""
@@ -6058,6 +6065,11 @@ async function peopleInitServersV1() {
       "ALTER TABLE people_general_messages " +
       "ADD COLUMN IF NOT EXISTS server_id BIGINT NULL " +
       "REFERENCES people_servers(id) ON DELETE CASCADE"
+    );
+
+    await peoplePool.query(
+      "ALTER TABLE people_general_messages " +
+      "ADD COLUMN IF NOT EXISTS is_system BOOLEAN NOT NULL DEFAULT FALSE"
     );
 
     await peoplePool.query(
@@ -6337,6 +6349,95 @@ app.get(
 );
 
 // === PEOPLE_SERVER_MEMBERSHIP_MESSAGES_V1_START ===
+async function peopleSaveServerSystemMessage(
+  serverId,
+  text
+) {
+  const sid =
+    String(serverId || "");
+
+  const cleanText =
+    String(text || "")
+      .trim()
+      .slice(0, 1000);
+
+  if (
+    !sid ||
+    !cleanText
+  ) {
+    return null;
+  }
+
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "INSERT INTO people_general_messages " +
+        "(server_id, sender_id, username, body, is_system) " +
+        "VALUES ($1, NULL, $2, $3, TRUE) " +
+        "RETURNING id, body, created_at",
+        [
+          sid,
+          "Système",
+          cleanText
+        ]
+      );
+
+    const row =
+      result.rows[0];
+
+    return {
+      id:
+        String(row.id),
+      serverId:
+        sid,
+      username:
+        "Système",
+      text:
+        row.body,
+      system:
+        true,
+      time:
+        new Date(
+          row.created_at
+        ).getTime()
+    };
+  }
+
+  const messages =
+    peopleReadLocalGeneral();
+
+  const message = {
+    id:
+      cryptoAccounts.randomUUID(),
+    serverId:
+      sid,
+    senderId:
+      null,
+    username:
+      "Système",
+    text:
+      cleanText,
+    imageId:
+      null,
+    replyToId:
+      null,
+    system:
+      true,
+    time:
+      Date.now()
+  };
+
+  messages.push(
+    message
+  );
+
+  peopleWriteLocalGeneral(
+    messages
+  );
+
+  return message;
+}
+
 async function peopleEmitServerMembershipMessage(
   serverId,
   accountId,
@@ -6371,19 +6472,23 @@ async function peopleEmitServerMembershipMessage(
       ? `${username} a quitté le serveur`
       : `${username} a rejoint le serveur`;
 
+  const saved =
+    await peopleSaveServerSystemMessage(
+      sid,
+      text
+    );
+
+  if (!saved) {
+    return;
+  }
+
   io.to(
     peopleServerRoom(
       sid
     )
   ).emit(
     "system-message",
-    {
-      text,
-      serverId:
-        sid,
-      time:
-        Date.now()
-    }
+    saved
   );
 }
 // === PEOPLE_SERVER_MEMBERSHIP_MESSAGES_V1_END ===
@@ -6429,6 +6534,10 @@ app.post(
           server.id,
           session.id,
           "join"
+        );
+
+        await emitOnlineUsers(
+          server.id
         );
       }
 
@@ -6701,94 +6810,305 @@ function cleanUsername(value) {
     .slice(0, 24) || "Invité";
 }
 
-function peopleOnlineRosterForServer(
+function peopleAccountConnectionCount(
+  accountId
+) {
+  const wanted =
+    String(accountId || "");
+
+  if (!wanted) {
+    return 0;
+  }
+
+  let count = 0;
+
+  for (
+    const id
+    of userIds.values()
+  ) {
+    if (
+      String(id) ===
+      wanted
+    ) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+async function peopleServerPresenceRoster(
   serverId
 ) {
   const sid =
     String(serverId || "");
 
-  const byAccount =
-    new Map();
+  if (!sid) {
+    return [];
+  }
 
-  for (
-    const [socketId, currentServerId]
-    of socketServerIds.entries()
-  ) {
-    if (
-      String(currentServerId) !==
-      sid
-    ) {
-      continue;
-    }
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "SELECT a.id, a.username, m.joined_at " +
+        "FROM people_server_members m " +
+        "JOIN people_accounts a ON a.id = m.user_id " +
+        "WHERE m.server_id = $1 " +
+        "ORDER BY LOWER(a.username) ASC, a.id ASC",
+        [sid]
+      );
 
-    const accountId =
-      userIds.get(socketId);
+    return result.rows.map(
+      (row) => {
+        const accountId =
+          String(row.id);
 
-    const username =
-      users.get(socketId);
-
-    if (
-      !accountId ||
-      !username
-    ) {
-      continue;
-    }
-
-    const key =
-      String(accountId);
-
-    const existing =
-      byAccount.get(key);
-
-    if (existing) {
-      existing.connections += 1;
-      continue;
-    }
-
-    byAccount.set(
-      key,
-      {
-        id:
-          key,
-        accountId:
-          key,
-        username,
-        connections:
-          1
+        return {
+          id:
+            accountId,
+          accountId,
+          username:
+            row.username,
+          online:
+            peopleAccountIsOnline(
+              accountId
+            ),
+          connections:
+            peopleAccountConnectionCount(
+              accountId
+            )
+        };
       }
     );
   }
 
-  return [
-    ...byAccount.values()
-  ];
+  const serverData =
+    peopleReadLocalServers();
+
+  const accounts =
+    peopleReadLocalAccounts();
+
+  return serverData.members
+    .filter(
+      (member) =>
+        String(
+          member.serverId
+        ) === sid
+    )
+    .map(
+      (member) => {
+        const accountId =
+          String(
+            member.userId
+          );
+
+        const account =
+          accounts.find(
+            (item) =>
+              String(
+                item.id
+              ) ===
+              accountId
+          );
+
+        if (!account) {
+          return null;
+        }
+
+        return {
+          id:
+            accountId,
+          accountId,
+          username:
+            account.username,
+          online:
+            peopleAccountIsOnline(
+              accountId
+            ),
+          connections:
+            peopleAccountConnectionCount(
+              accountId
+            )
+        };
+      }
+    )
+    .filter(Boolean)
+    .sort(
+      (a, b) =>
+        String(
+          a.username || ""
+        ).localeCompare(
+          String(
+            b.username || ""
+          ),
+          "fr",
+          {
+            sensitivity:
+              "base"
+          }
+        )
+    );
 }
 
-function emitOnlineUsers(
-  serverId
+async function emitOnlineUsers(
+  serverId,
+  knownRoster = null
 ) {
   const sid =
     String(serverId || "");
 
-  if (!sid) return;
+  if (!sid) {
+    return;
+  }
 
-  const roster =
-    peopleOnlineRosterForServer(
-      sid
+  try {
+    const roster =
+      Array.isArray(
+        knownRoster
+      )
+        ? knownRoster
+        : await peopleServerPresenceRoster(
+            sid
+          );
+
+    const onlineCount =
+      roster.filter(
+        (user) =>
+          user?.online ===
+          true
+      ).length;
+
+    io.to(
+      peopleServerRoom(
+        sid
+      )
+    ).emit(
+      "user-count",
+      onlineCount
     );
 
-  io.to(
-    peopleServerRoom(sid)
-  ).emit(
-    "user-count",
-    roster.length
+    io.to(
+      peopleServerRoom(
+        sid
+      )
+    ).emit(
+      "online-users",
+      roster
+    );
+  } catch (err) {
+    console.error(
+      "[People presence/server]",
+      sid,
+      err
+    );
+  }
+}
+
+async function peopleRefreshPresenceForAccount(
+  accountId
+) {
+  const uid =
+    String(accountId || "");
+
+  if (!uid) {
+    return;
+  }
+
+  try {
+    const servers =
+      await peopleListServersForUser(
+        uid
+      );
+
+    await Promise.all(
+      servers.map(
+        (server) =>
+          emitOnlineUsers(
+            server.id
+          )
+      )
+    );
+  } catch (err) {
+    console.error(
+      "[People presence/account]",
+      uid,
+      err
+    );
+  }
+}
+
+/*
+  Une petite grâce évite le clignotement "hors ligne"
+  pendant un simple F5 / reconnect Socket.IO.
+  Changer d'onglet navigateur ne ferme pas la socket,
+  donc ça ne touche jamais au statut.
+*/
+const peoplePresenceOfflineTimers =
+  new Map();
+
+function peopleCancelPresenceOffline(
+  accountId
+) {
+  const uid =
+    String(accountId || "");
+
+  const timer =
+    peoplePresenceOfflineTimers.get(
+      uid
+    );
+
+  if (!timer) {
+    return false;
+  }
+
+  clearTimeout(timer);
+
+  peoplePresenceOfflineTimers.delete(
+    uid
   );
 
-  io.to(
-    peopleServerRoom(sid)
-  ).emit(
-    "online-users",
-    roster
+  return true;
+}
+
+function peopleSchedulePresenceOffline(
+  accountId
+) {
+  const uid =
+    String(accountId || "");
+
+  if (!uid) {
+    return;
+  }
+
+  peopleCancelPresenceOffline(
+    uid
+  );
+
+  const timer =
+    setTimeout(
+      async () => {
+        peoplePresenceOfflineTimers.delete(
+          uid
+        );
+
+        if (
+          peopleAccountIsOnline(
+            uid
+          )
+        ) {
+          return;
+        }
+
+        await peopleRefreshPresenceForAccount(
+          uid
+        );
+      },
+      1200
+    );
+
+  peoplePresenceOfflineTimers.set(
+    uid,
+    timer
   );
 }
 
@@ -6887,6 +7207,19 @@ io.on("connection", (socket) => {
         return;
       }
 
+      const accountId =
+        String(account.id);
+
+      const wasAlreadyOnline =
+        peopleAccountIsOnline(
+          accountId
+        );
+
+      const hadPendingOffline =
+        peopleCancelPresenceOffline(
+          accountId
+        );
+
       users.set(
         socket.id,
         cleanUsername(
@@ -6896,8 +7229,17 @@ io.on("connection", (socket) => {
 
       userIds.set(
         socket.id,
-        String(account.id)
+        accountId
       );
+
+      if (
+        !wasAlreadyOnline &&
+        !hadPendingOffline
+      ) {
+        void peopleRefreshPresenceForAccount(
+          accountId
+        );
+      }
 
       socket.emit(
         "people-ready",
@@ -7000,7 +7342,7 @@ io.on("connection", (socket) => {
           );
 
         const online =
-          peopleOnlineRosterForServer(
+          await peopleServerPresenceRoster(
             server.id
           );
 
@@ -7475,12 +7817,14 @@ io.on("connection", (socket) => {
   socket.on(
     "disconnect",
     () => {
-      const oldServerId =
-        socketServerIds.get(
+      const accountId =
+        userIds.get(
           socket.id
         );
 
-      leaveVoice(socket);
+      leaveVoice(
+        socket
+      );
 
       users.delete(
         socket.id
@@ -7494,9 +7838,14 @@ io.on("connection", (socket) => {
         socket.id
       );
 
-      if (oldServerId) {
-        emitOnlineUsers(
-          oldServerId
+      if (
+        accountId &&
+        !peopleAccountIsOnline(
+          accountId
+        )
+      ) {
+        peopleSchedulePresenceOffline(
+          accountId
         );
       }
     }
