@@ -1,0 +1,375 @@
+/* === PEOPLE_DM_CALLS_V2_UI_START === */
+
+/*
+  Le panneau V1 n'est plus un modal :
+  aucun fond sombre, aucun blocage du reste de People.
+*/
+.people-dm-call-overlay {
+  inset: auto !important;
+  padding: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  opacity: 1 !important;
+  display: block !important;
+  transition: none !important;
+  pointer-events: none !important;
+}
+
+.people-dm-call-overlay.hidden {
+  display: none !important;
+}
+
+.people-dm-call-overlay.visible {
+  opacity: 1 !important;
+}
+
+.people-dm-call-overlay
+.people-dm-call-card {
+  pointer-events: auto !important;
+}
+
+/* ==========================================================
+   APPEL DANS LE MP
+   ========================================================== */
+
+.people-dm-call-inline-dock {
+  grid-area: dm-call;
+  min-width: 0;
+  padding: 8px 12px 2px;
+  border-bottom:
+    1px solid
+    rgba(255,255,255,.04);
+}
+
+.people-dm-call-inline-dock.hidden {
+  display: none;
+}
+
+.home-main.dm-open
+.dm-view.people-dm-call-inline {
+  grid-template-rows:
+    56px
+    auto
+    minmax(0, 1fr)
+    auto !important;
+
+  grid-template-areas:
+    "dm-header"
+    "dm-call"
+    "dm-messages"
+    "dm-composer"
+    !important;
+}
+
+.people-dm-call-docked {
+  position: static !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.people-dm-call-docked
+.people-dm-call-card {
+  width: 100% !important;
+  max-width: none !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 9px 28px
+    rgba(0,0,0,.22) !important;
+}
+
+.people-dm-call-docked
+.people-dm-call-stage {
+  min-height: 138px !important;
+  max-height: 265px !important;
+}
+
+.people-dm-call-docked
+.people-dm-call-avatar {
+  width: 62px !important;
+  height: 62px !important;
+  font-size: 18px !important;
+}
+
+.people-dm-call-docked
+.people-dm-call-identity strong {
+  margin-top: 9px !important;
+  font-size: 17px !important;
+}
+
+.people-dm-call-docked
+.people-dm-call-identity span {
+  margin-top: 3px !important;
+}
+
+.people-dm-call-docked
+.people-dm-call-incoming-actions,
+.people-dm-call-docked
+.people-dm-call-outgoing-actions,
+.people-dm-call-docked
+.people-dm-call-active-actions {
+  min-height: 66px !important;
+  padding: 8px 12px 10px !important;
+  gap: 10px !important;
+}
+
+.people-dm-call-docked
+.people-dm-call-big-action > span {
+  width: 42px !important;
+  height: 42px !important;
+  font-size: 17px !important;
+}
+
+.people-dm-call-docked
+.people-dm-call-local-video {
+  width: 104px !important;
+  height: 68px !important;
+}
+
+/* ==========================================================
+   QUAND ON NAVIGUE AILLEURS : PETITE FENETRE FLOTTANTE
+   ========================================================== */
+
+.people-dm-call-floating-dock {
+  position: fixed;
+  z-index: 2800;
+  right: 16px;
+  bottom: 16px;
+  width:
+    min(
+      340px,
+      calc(
+        100vw -
+        32px
+      )
+    );
+  pointer-events: none;
+}
+
+.people-dm-call-floating {
+  position: static !important;
+  width: 100% !important;
+}
+
+.people-dm-call-floating
+.people-dm-call-card {
+  width: 100% !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 18px 55px
+    rgba(0,0,0,.48) !important;
+}
+
+.people-dm-call-floating
+.people-dm-call-stage {
+  min-height: 145px !important;
+  max-height: 210px !important;
+}
+
+.people-dm-call-floating
+.people-dm-call-avatar {
+  width: 64px !important;
+  height: 64px !important;
+  font-size: 18px !important;
+}
+
+.people-dm-call-floating
+.people-dm-call-identity strong {
+  margin-top: 9px !important;
+  font-size: 17px !important;
+}
+
+.people-dm-call-floating
+.people-dm-call-identity span {
+  margin-top: 3px !important;
+  font-size: 11px !important;
+}
+
+.people-dm-call-floating
+.people-dm-call-incoming-actions,
+.people-dm-call-floating
+.people-dm-call-outgoing-actions,
+.people-dm-call-floating
+.people-dm-call-active-actions {
+  min-height: 66px !important;
+  padding: 8px !important;
+  gap: 7px !important;
+}
+
+.people-dm-call-floating
+.people-dm-call-big-action > span {
+  width: 42px !important;
+  height: 42px !important;
+  font-size: 17px !important;
+}
+
+.people-dm-call-floating
+.people-dm-call-control {
+  min-width: 58px !important;
+  padding: 7px !important;
+}
+
+.people-dm-call-floating
+.people-dm-call-local-video {
+  width: 94px !important;
+  height: 62px !important;
+  right: 9px !important;
+  bottom: 9px !important;
+}
+
+/* ==========================================================
+   VOLUME LOCAL DE L'INTERLOCUTEUR
+   ========================================================== */
+
+.people-dm-call-volume-wrap {
+  min-width: 150px;
+  display: grid;
+  grid-template-columns:
+    30px
+    minmax(64px, 1fr)
+    38px;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 11px;
+  background: #211d29;
+}
+
+.people-dm-call-volume-mute {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.people-dm-call-volume-mute:hover {
+  background: #342d42;
+}
+
+.people-dm-call-volume-mute.is-muted {
+  background:
+    rgba(
+      218,
+      55,
+      60,
+      .18
+    );
+}
+
+.people-dm-call-volume {
+  width: 100%;
+  min-width: 0;
+  accent-color: #7767b4;
+  cursor: pointer;
+}
+
+.people-dm-call-volume-value {
+  color: #aaa2b6;
+  font-size: 10px;
+  text-align: right;
+  font-variant-numeric:
+    tabular-nums;
+}
+
+/* ==========================================================
+   EVENEMENTS D'APPEL DANS L'HISTORIQUE MP
+   ========================================================== */
+
+.people-dm-call-history {
+  width: 100%;
+  margin: 7px 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #aaa3b4;
+  font-size: 12px;
+}
+
+.people-dm-call-history::before,
+.people-dm-call-history::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      .055
+    );
+}
+
+.people-dm-call-history-content {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  text-align: center;
+}
+
+.people-dm-call-history-content strong {
+  color: #cfc8df;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.people-dm-call-history-content time {
+  color: #746e7d;
+  font-size: 10px;
+}
+
+@media (max-width: 780px) {
+  .people-dm-call-inline-dock {
+    padding:
+      6px
+      7px
+      2px;
+  }
+
+  .people-dm-call-docked
+  .people-dm-call-stage {
+    min-height: 118px !important;
+    max-height: 220px !important;
+  }
+
+  .people-dm-call-floating-dock {
+    right: 8px;
+    bottom:
+      calc(
+        8px +
+        env(
+          safe-area-inset-bottom
+        )
+      );
+    width:
+      min(
+        320px,
+        calc(
+          100vw -
+          16px
+        )
+      );
+  }
+
+  .people-dm-call-volume-wrap {
+    min-width: 112px;
+    grid-template-columns:
+      28px
+      minmax(48px, 1fr);
+  }
+
+  .people-dm-call-volume-value {
+    display: none;
+  }
+
+  .people-dm-call-active-actions {
+    flex-wrap: wrap !important;
+  }
+}
+
+/* === PEOPLE_DM_CALLS_V2_UI_END === */

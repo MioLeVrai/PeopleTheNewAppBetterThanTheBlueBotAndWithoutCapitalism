@@ -1486,11 +1486,9 @@ async function peopleDmConversations(accountId) {
         {
           otherId,
           lastMessage:
-            message.body ||
-            (
+            peopleDmCallConversationPreview(
+              message.body,
               message.image_id
-                ? "🖼️ Image"
-                : ""
             ),
           lastAt:
             message.created_at,
@@ -7185,6 +7183,32 @@ function peopleDmCallFinish(
     id
   );
 
+  const durationSeconds =
+    call.acceptedAt
+      ? Math.max(
+          0,
+          Math.round(
+            (
+              Date.now() -
+              Number(
+                call.acceptedAt
+              )
+            ) /
+            1000
+          )
+        )
+      : 0;
+
+  peopleDmCallSaveTimeline(
+    call,
+    "ended",
+    String(
+      reason ||
+      "hangup"
+    ),
+    durationSeconds
+  );
+
   const recipients = [
     call.callerSocketId
   ];
@@ -7351,35 +7375,383 @@ function peopleDmCallDisconnect(
       continue;
     }
 
-    if (
-      call.status ===
-        "ringing" &&
-      String(
-        call.calleeAccountId
-      ) === accountId
-    ) {
-      const otherSockets =
-        peopleDmCallAccountSocketIds(
-          accountId
-        ).filter(
-          (id) =>
-            String(id) !==
-            socketId
-        );
-
-      if (
-        otherSockets.length ===
-        0
-      ) {
-        peopleDmCallFinish(
-          call.id,
-          "unavailable"
-        );
-      }
-    }
+    /*
+      V2 : si l'appelé ferme son dernier onglet pendant
+      que ça sonne, l'appel continue jusqu'au timeout.
+      S'il rouvre People avant, il reçoit l'appel.
+    */
   }
 }
 // === PEOPLE_DM_CALLS_V1_END ===
+
+// === PEOPLE_DM_CALLS_V2_START ===
+const PEOPLE_DM_CALL_EVENT_PREFIX =
+  "[[PEOPLE_CALL_V1|";
+
+function peopleDmCallEventBody(
+  type,
+  callId,
+  reason = "",
+  durationSeconds = 0
+) {
+  const cleanType =
+    type === "ended"
+      ? "ended"
+      : "started";
+
+  const cleanId =
+    String(
+      callId ||
+      ""
+    ).replace(
+      /[^a-zA-Z0-9-]/g,
+      ""
+    );
+
+  const cleanReason =
+    String(
+      reason ||
+      ""
+    ).replace(
+      /[^a-zA-Z0-9-]/g,
+      ""
+    );
+
+  const duration =
+    Math.max(
+      0,
+      Math.min(
+        24 * 60 * 60,
+        Math.round(
+          Number(
+            durationSeconds
+          ) || 0
+        )
+      )
+    );
+
+  return (
+    PEOPLE_DM_CALL_EVENT_PREFIX +
+    cleanType +
+    "|" +
+    cleanId +
+    "|" +
+    cleanReason +
+    "|" +
+    duration +
+    "]]"
+  );
+}
+
+function peopleDmCallParseEventBody(
+  body
+) {
+  const match =
+    String(
+      body ||
+      ""
+    ).match(
+      /^\[\[PEOPLE_CALL_V1\|(started|ended)\|([a-zA-Z0-9-]+)\|([a-zA-Z0-9-]*)\|(\d+)\]\]$/
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    type:
+      match[1],
+    callId:
+      match[2],
+    reason:
+      match[3] || "",
+    durationSeconds:
+      Math.max(
+        0,
+        Number(
+          match[4]
+        ) || 0
+      )
+  };
+}
+
+function peopleDmCallConversationPreview(
+  body,
+  imageId
+) {
+  const event =
+    peopleDmCallParseEventBody(
+      body
+    );
+
+  if (!event) {
+    return (
+      body ||
+      (
+        imageId
+          ? "🖼️ Image"
+          : ""
+      )
+    );
+  }
+
+  if (
+    event.type ===
+    "started"
+  ) {
+    return "📞 Appel lancé";
+  }
+
+  const labels = {
+    declined:
+      "📞 Appel refusé",
+    cancelled:
+      "📞 Appel annulé",
+    timeout:
+      "📞 Appel manqué",
+    disconnected:
+      "📞 Appel interrompu",
+    hangup:
+      "📞 Appel terminé"
+  };
+
+  return (
+    labels[
+      event.reason
+    ] ||
+    "📞 Appel terminé"
+  );
+}
+
+function peopleDmCallEmitHistory(
+  call,
+  type,
+  reason,
+  durationSeconds,
+  createdAt
+) {
+  const payload = {
+    callId:
+      call.id,
+    callerId:
+      String(
+        call.callerAccountId
+      ),
+    calleeId:
+      String(
+        call.calleeAccountId
+      ),
+    type,
+    reason:
+      String(
+        reason ||
+        ""
+      ),
+    durationSeconds:
+      Number(
+        durationSeconds ||
+        0
+      ),
+    createdAt
+  };
+
+  peopleEmitToAccount(
+    call.callerAccountId,
+    "dm-call-history",
+    payload
+  );
+
+  peopleEmitToAccount(
+    call.calleeAccountId,
+    "dm-call-history",
+    payload
+  );
+}
+
+function peopleDmCallSaveTimeline(
+  call,
+  type,
+  reason = "",
+  durationSeconds = 0
+) {
+  if (!call) {
+    return;
+  }
+
+  const body =
+    peopleDmCallEventBody(
+      type,
+      call.id,
+      reason,
+      durationSeconds
+    );
+
+  const createdAt =
+    new Date()
+      .toISOString();
+
+  /*
+    L'événement de fin ne crée pas un deuxième badge non lu.
+    Il reste bien visible dans l'historique.
+  */
+  const readAt =
+    type === "ended"
+      ? createdAt
+      : null;
+
+  if (peoplePool) {
+    void peoplePool.query(
+      "INSERT INTO people_direct_messages " +
+      "(sender_id, recipient_id, body, read_at) " +
+      "VALUES ($1, $2, $3, $4) " +
+      "RETURNING id",
+      [
+        String(
+          call.callerAccountId
+        ),
+        String(
+          call.calleeAccountId
+        ),
+        body,
+        readAt
+      ]
+    )
+      .then(
+        () => {
+          peopleDmCallEmitHistory(
+            call,
+            type,
+            reason,
+            durationSeconds,
+            createdAt
+          );
+        }
+      )
+      .catch(
+        (err) => {
+          console.error(
+            "[People dm-call/history]",
+            err
+          );
+        }
+      );
+
+    return;
+  }
+
+  try {
+    const data =
+      peopleReadLocalSocial();
+
+    data.dms.push({
+      id:
+        cryptoAccounts
+          .randomUUID(),
+      sender_id:
+        String(
+          call.callerAccountId
+        ),
+      recipient_id:
+        String(
+          call.calleeAccountId
+        ),
+      body,
+      image_id:
+        null,
+      reply_to_id:
+        null,
+      created_at:
+        createdAt,
+      read_at:
+        readAt
+    });
+
+    if (
+      data.dms.length >
+      10000
+    ) {
+      data.dms =
+        data.dms.slice(
+          -10000
+        );
+    }
+
+    peopleWriteLocalSocial(
+      data
+    );
+
+    peopleDmCallEmitHistory(
+      call,
+      type,
+      reason,
+      durationSeconds,
+      createdAt
+    );
+  } catch (err) {
+    console.error(
+      "[People dm-call/history local]",
+      err
+    );
+  }
+}
+
+function peopleDmCallDeliverPendingForAccount(
+  accountId,
+  socketId
+) {
+  const wanted =
+    String(
+      accountId ||
+      ""
+    );
+
+  const targetSocket =
+    String(
+      socketId ||
+      ""
+    );
+
+  if (
+    !wanted ||
+    !targetSocket
+  ) {
+    return;
+  }
+
+  for (
+    const call of
+    peopleDmCalls.values()
+  ) {
+    if (
+      call.status !==
+        "ringing" ||
+      String(
+        call.calleeAccountId
+      ) !== wanted
+    ) {
+      continue;
+    }
+
+    io.to(
+      targetSocket
+    ).emit(
+      "dm-call-incoming",
+      {
+        callId:
+          call.id,
+        caller: {
+          id:
+            String(
+              call.callerAccountId
+            ),
+          username:
+            call.callerUsername
+        }
+      }
+    );
+  }
+}
+// === PEOPLE_DM_CALLS_V2_END ===
 
 function cleanUsername(value) {
   return String(value || "Invité")
@@ -7809,6 +8181,11 @@ io.on("connection", (socket) => {
         accountId
       );
 
+      peopleDmCallDeliverPendingForAccount(
+        String(account.id),
+        socket.id
+      );
+
       if (
         !wasAlreadyOnline &&
         !hadPendingOffline
@@ -7920,17 +8297,6 @@ io.on("connection", (socket) => {
           );
 
         if (
-          targetSockets.length ===
-          0
-        ) {
-          return ack({
-            ok: false,
-            error:
-              "Cette personne est hors ligne."
-          });
-        }
-
-        if (
           peopleDmCallAccountBusy(
             callerAccountId
           )
@@ -7992,6 +8358,11 @@ io.on("connection", (socket) => {
         peopleDmCalls.set(
           callId,
           call
+        );
+
+        peopleDmCallSaveTimeline(
+          call,
+          "started"
         );
 
         const timer =
@@ -8104,6 +8475,9 @@ io.on("connection", (socket) => {
 
       call.status =
         "active";
+
+      call.acceptedAt =
+        Date.now();
 
       call.calleeSocketId =
         String(

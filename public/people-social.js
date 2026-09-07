@@ -1041,6 +1041,224 @@ function dmTextLine(
     };
   }
 
+
+  // === PEOPLE_DM_CALL_HISTORY_V2_START ===
+  function peopleParseDmCallEvent(
+    body
+  ) {
+    const match =
+      String(
+        body ||
+        ""
+      ).match(
+        /^\[\[PEOPLE_CALL_V1\|(started|ended)\|([a-zA-Z0-9-]+)\|([a-zA-Z0-9-]*)\|(\d+)\]\]$/
+      );
+
+    if (!match) {
+      return null;
+    }
+
+    return {
+      type:
+        match[1],
+      callId:
+        match[2],
+      reason:
+        match[3] || "",
+      durationSeconds:
+        Math.max(
+          0,
+          Number(
+            match[4]
+          ) || 0
+        )
+    };
+  }
+
+  function peopleFormatCallDuration(
+    seconds
+  ) {
+    const total =
+      Math.max(
+        0,
+        Math.round(
+          Number(
+            seconds
+          ) || 0
+        )
+      );
+
+    if (!total) {
+      return "";
+    }
+
+    const minutes =
+      Math.floor(
+        total / 60
+      );
+
+    const rest =
+      total % 60;
+
+    if (!minutes) {
+      return (
+        rest +
+        " s"
+      );
+    }
+
+    return (
+      minutes +
+      " min " +
+      String(
+        rest
+      ).padStart(
+        2,
+        "0"
+      ) +
+      " s"
+    );
+  }
+
+  function peopleDmCallHistoryText(
+    message,
+    event
+  ) {
+    const callerName =
+      me &&
+      String(
+        message.senderId
+      ) ===
+      String(
+        me.id
+      )
+        ? (
+            me.username ||
+            "Tu"
+          )
+        : (
+            activeDmUser?.username ||
+            "Utilisateur"
+          );
+
+    if (
+      event.type ===
+      "started"
+    ) {
+      return (
+        callerName +
+        " a lancé un appel"
+      );
+    }
+
+    const labels = {
+      declined:
+        "Appel refusé",
+      cancelled:
+        "Appel annulé",
+      timeout:
+        "Appel manqué — pas de réponse",
+      disconnected:
+        "Appel interrompu",
+      hangup:
+        "Appel terminé"
+    };
+
+    let text =
+      labels[
+        event.reason
+      ] ||
+      "Appel terminé";
+
+    const duration =
+      peopleFormatCallDuration(
+        event.durationSeconds
+      );
+
+    if (
+      duration &&
+      (
+        event.reason ===
+          "hangup" ||
+        event.reason ===
+          "disconnected"
+      )
+    ) {
+      text +=
+        " • " +
+        duration;
+    }
+
+    return text;
+  }
+
+  function peopleDmCallHistoryElement(
+    message,
+    event
+  ) {
+    const row =
+      document.createElement(
+        "div"
+      );
+
+    row.className =
+      "people-dm-call-history";
+
+    const content =
+      document.createElement(
+        "div"
+      );
+
+    content.className =
+      "people-dm-call-history-content";
+
+    const icon =
+      document.createElement(
+        "span"
+      );
+
+    icon.textContent =
+      event.type ===
+        "started"
+        ? "📞"
+        : "☎️";
+
+    const label =
+      document.createElement(
+        "strong"
+      );
+
+    label.textContent =
+      peopleDmCallHistoryText(
+        message,
+        event
+      );
+
+    const time =
+      document.createElement(
+        "time"
+      );
+
+    time.textContent =
+      formatDate(
+        message.createdAt,
+        true
+      );
+
+    content.append(
+      icon,
+      label,
+      time
+    );
+
+    row.appendChild(
+      content
+    );
+
+    return row;
+  }
+  // === PEOPLE_DM_CALL_HISTORY_V2_END ===
+
   function renderDmMessageGroups(list) {
     const messagesList =
       Array.isArray(list)
@@ -1050,6 +1268,23 @@ function dmTextLine(
     let group = null;
 
     for (const message of messagesList) {
+      const callEvent =
+        peopleParseDmCallEvent(
+          message.body
+        );
+
+      if (callEvent) {
+        dmMessages.appendChild(
+          peopleDmCallHistoryElement(
+            message,
+            callEvent
+          )
+        );
+
+        group = null;
+        continue;
+      }
+
       const senderId =
         String(message.senderId || "");
 
@@ -2179,6 +2414,51 @@ function dmTextLine(
   socket.on(
     "dm-message-sent",
     () => refreshConversations()
+  );
+
+  socket.on(
+    "dm-call-history",
+    async (payload) => {
+      if (
+        !socialReady ||
+        !me
+      ) {
+        return;
+      }
+
+      const ids = [
+        String(
+          payload?.callerId ||
+          ""
+        ),
+        String(
+          payload?.calleeId ||
+          ""
+        )
+      ];
+
+      if (
+        activeDmUser &&
+        ids.includes(
+          String(
+            me.id
+          )
+        ) &&
+        ids.includes(
+          String(
+            activeDmUser.id
+          )
+        ) &&
+        !dmView.classList
+          .contains(
+            "hidden"
+          )
+      ) {
+        await loadActiveDm();
+      } else {
+        await refreshConversations();
+      }
+    }
   );
 
   socket.on("friend-state-changed", () => {
