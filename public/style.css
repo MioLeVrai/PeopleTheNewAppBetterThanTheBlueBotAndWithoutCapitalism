@@ -614,6 +614,30 @@ button, input { font: inherit; }
   }
 }
 
+
+/* === PEOPLE_DM_NOTIFICATION_V1_START === */
+
+/*
+  MP normal :
+  notification violette People,
+  distincte du jaune des vrais @pings.
+*/
+.people-ping-toast.people-dm-notification-toast {
+  border-left-color: #7767b4;
+  background:
+    linear-gradient(
+      135deg,
+      #171421,
+      #121019
+    );
+}
+
+.people-ping-toast.people-dm-notification-toast strong {
+  color: #d9d2f2;
+}
+
+/* === PEOPLE_DM_NOTIFICATION_V1_END === */
+
 /* === PEOPLE_LOCAL_AUDIO_AND_PING_END === */
 
 /* === PEOPLE_ACCOUNTS_V1_START === */

@@ -1950,7 +1950,7 @@ function dmTextLine(
 
   function peopleDmHandleMention(payload) {
     if (!peopleDmMentionsMe(payload?.body)) {
-      return;
+      return false;
     }
 
     const sender =
@@ -1962,7 +1962,130 @@ function dmTextLine(
       sender,
       payload.body
     );
+
+    return true;
   }
+
+  // === PEOPLE_DM_NOTIFICATION_V1_START ===
+  function peopleDmShowMessageToast(
+    sender,
+    body,
+    hasImage
+  ) {
+    let host =
+      document.getElementById(
+        "peoplePingToasts"
+      );
+
+    if (!host) {
+      host =
+        document.createElement(
+          "div"
+        );
+
+      host.id =
+        "peoplePingToasts";
+
+      host.className =
+        "people-ping-toasts";
+
+      document.body.appendChild(
+        host
+      );
+    }
+
+    const toast =
+      document.createElement(
+        "div"
+      );
+
+    toast.className =
+      "people-ping-toast people-dm-notification-toast";
+
+    const title =
+      document.createElement(
+        "strong"
+      );
+
+    title.textContent =
+      "MP de " +
+      sender;
+
+    const text =
+      document.createElement(
+        "span"
+      );
+
+    text.textContent =
+      String(
+        body ||
+        (
+          hasImage
+            ? "🖼️ Image"
+            : "Nouveau message"
+        )
+      ).slice(0, 180);
+
+    toast.append(
+      title,
+      text
+    );
+
+    host.appendChild(
+      toast
+    );
+
+    requestAnimationFrame(
+      () =>
+        toast.classList.add(
+          "show"
+        )
+    );
+
+    setTimeout(
+      () => {
+        toast.classList.remove(
+          "show"
+        );
+
+        setTimeout(
+          () => toast.remove(),
+          250
+        );
+      },
+      5000
+    );
+  }
+
+  function peopleDmHandleIncomingNotification(payload) {
+    /*
+      Si le MP contient un vrai @ping,
+      le comportement de ping existant est utilisé
+      et on évite un double son / double toast.
+    */
+    if (
+      peopleDmHandleMention(
+        payload
+      )
+    ) {
+      return;
+    }
+
+    const sender =
+      payload?.sender?.username ||
+      "Quelqu'un";
+
+    peopleDmPlayPing();
+
+    peopleDmShowMessageToast(
+      sender,
+      payload?.body,
+      Boolean(
+        payload?.imageId
+      )
+    );
+  }
+  // === PEOPLE_DM_NOTIFICATION_V1_END ===
 
   document.addEventListener(
     "click",
@@ -2023,7 +2146,9 @@ function dmTextLine(
 
     if (!senderName) return;
 
-    peopleDmHandleMention(payload);
+    peopleDmHandleIncomingNotification(
+      payload
+    );
 
     if (
       activeDmUser &&
