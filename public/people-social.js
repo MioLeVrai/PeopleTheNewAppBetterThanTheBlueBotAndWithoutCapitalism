@@ -1447,7 +1447,7 @@ function dmTextLine(
           25 * 1024 * 1024
       ) {
         alert(
-          "L’image source doit faire moins de 25 Mo."
+          "L'image source doit faire moins de 25 Mo."
         );
 
         profileAvatarInput.value = "";
@@ -1459,12 +1459,12 @@ function dmTextLine(
         profileAvatarUploadButton.textContent =
           "Recadrage...";
 
-        const compressed =
+        const cropped =
           await window
             .PeopleAvatarCropper
             ?.open(file);
 
-        if (!compressed) {
+        if (!cropped) {
           profileAvatarUploadButton.textContent =
             "Changer la photo";
 
@@ -1472,37 +1472,54 @@ function dmTextLine(
         }
 
         profileAvatarUploadButton.textContent =
-          "Compression...";
+          "Compression forte...";
 
-        const uploadBlob =
+        const prepared =
           await window
-            .PeopleAvatarUploadFix
-            ?.prepareForUpload(
-              compressed
+            .PeopleAvatarUltra
+            ?.prepare(
+              cropped
             );
 
-        if (!uploadBlob) {
+        if (
+          !prepared?.base64 ||
+          !prepared?.blob
+        ) {
           throw new Error(
-            "La compression finale a échoué."
+            "La compression de la PP a échoué."
           );
         }
 
+        const kb =
+          Math.max(
+            1,
+            Math.round(
+              prepared.blob.size /
+              1024
+            )
+          );
+
         profileAvatarUploadButton.textContent =
-          "Envoi...";
+          "Envoi • " +
+          kb +
+          " Ko...";
 
         const response =
           await fetch(
-            "/api/profile/avatar",
+            "/api/profile/avatar-ultra",
             {
               method: "PUT",
-              credentials: "same-origin",
+              credentials:
+                "same-origin",
               headers: {
                 "Content-Type":
-                  uploadBlob.type ||
-                  "image/jpeg"
+                  "application/json"
               },
               body:
-                uploadBlob
+                JSON.stringify({
+                  data:
+                    prepared.base64
+                })
             }
           );
 
@@ -1523,59 +1540,50 @@ function dmTextLine(
           );
         }
 
-        window.PeopleAvatarUploadFix
-          ?.applyBlobToElement(
-            profileModalAvatar,
-            currentProfile.username,
-            uploadBlob
-          );
-
-        window.PeopleAvatarUploadFix
-          ?.applyBlobEverywhere(
-            currentProfile.username,
-            uploadBlob
-          );
-
-        profileAvatarUploadButton.textContent =
-          "Vérification...";
-
-        const verified =
-          await window
-            .PeopleAvatarUploadFix
-            ?.reloadFromServer(
-              currentProfile.username
+        if (
+          data?.avatarDataUrl
+        ) {
+          window.PeopleAvatars
+            ?.applyDataUrlEverywhere(
+              currentProfile.username,
+              data.avatarDataUrl
             );
 
-        if (!verified) {
-          throw new Error(
-            "La photo a été envoyée, mais People n'arrive pas à la relire. Recharge la page et regarde les logs Render si elle n'apparaît toujours pas."
-          );
+          window.PeopleAvatars
+            ?.applyDataUrlToElement(
+              profileModalAvatar,
+              currentProfile.username,
+              data.avatarDataUrl
+            );
+        } else {
+          window.PeopleAvatarUltra
+            ?.applyPreview(
+              currentProfile.username,
+              prepared.blob
+            );
         }
-
-        const kb =
-          Math.max(
-            1,
-            Math.round(
-              uploadBlob.size / 1024
-            )
-          );
 
         profileAvatarUploadButton.textContent =
           "Photo enregistrée • " +
           kb +
-          " Ko";
+          " Ko ✓";
 
         setTimeout(
           () => {
             profileAvatarUploadButton.textContent =
               "Changer la photo";
           },
-          1500
+          1600
         );
       } catch (err) {
+        console.error(
+          "[People PP ultra]",
+          err
+        );
+
         alert(
           err?.message ||
-          "Impossible de traiter cette photo."
+          "Impossible d'envoyer la photo."
         );
 
         profileAvatarUploadButton.textContent =

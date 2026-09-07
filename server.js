@@ -2973,6 +2973,241 @@ app.put(
 );
 // === PEOPLE_PROFILE_AVATARS_V1_END ===
 
+// === PEOPLE_AVATAR_ULTRA_UPLOAD_V1_START ===
+app.put(
+  "/api/profile/avatar-ultra",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const encoded =
+        String(
+          req.body?.data ||
+          ""
+        ).trim();
+
+      if (
+        !encoded ||
+        encoded.length >
+          26000
+      ) {
+        return res.status(413).json({
+          ok: false,
+          error:
+            "La photo compressée est encore trop lourde."
+        });
+      }
+
+      let buffer = null;
+
+      try {
+        buffer =
+          Buffer.from(
+            encoded,
+            "base64"
+          );
+      } catch {
+        buffer = null;
+      }
+
+      if (
+        !Buffer.isBuffer(
+          buffer
+        ) ||
+        buffer.length <= 0 ||
+        buffer.length >
+          18 * 1024
+      ) {
+        return res.status(413).json({
+          ok: false,
+          error:
+            "La photo compressée dépasse la limite."
+        });
+      }
+
+      const mime =
+        peopleAvatarMime(
+          buffer
+        );
+
+      if (
+        mime !==
+        "image/jpeg"
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "La photo finale doit être en JPEG."
+        });
+      }
+
+      const saved =
+        await peopleSaveAvatar(
+          session.id,
+          buffer
+        );
+
+      const verified =
+        await peopleLoadAvatar(
+          session.id
+        );
+
+      if (
+        !verified ||
+        !Buffer.isBuffer(
+          verified.data
+        ) ||
+        verified.data.length <= 0
+      ) {
+        throw new Error(
+          "AVATAR_ULTRA_VERIFY"
+        );
+      }
+
+      const account =
+        await peopleFindAccountById(
+          session.id
+        );
+
+      if (!account) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Compte introuvable."
+        });
+      }
+
+      io.emit(
+        "profile-avatar-updated",
+        {
+          username:
+            account.username
+        }
+      );
+
+      res.json({
+        ok: true,
+        username:
+          account.username,
+        byteSize:
+          saved.byteSize,
+        mime:
+          saved.mime,
+        avatarDataUrl:
+          "data:" +
+          (
+            verified.mime ||
+            saved.mime ||
+            "image/jpeg"
+          ) +
+          ";base64," +
+          verified.data.toString(
+            "base64"
+          )
+      });
+    } catch (err) {
+      console.error(
+        "[People avatar/ultra]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible d'enregistrer la photo de profil."
+      });
+    }
+  }
+);
+// === PEOPLE_AVATAR_ULTRA_UPLOAD_V1_END ===
+
+// === PEOPLE_AVATAR_JSON_DISPLAY_V1_START ===
+app.get(
+  "/api/profile/avatar-json/:username",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) {
+        return;
+      }
+
+      const account =
+        await peopleFindAccount(
+          req.params.username
+        );
+
+      if (!account) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Profil introuvable."
+        });
+      }
+
+      const avatar =
+        await peopleLoadAvatar(
+          account.id
+        );
+
+      if (
+        !avatar ||
+        !Buffer.isBuffer(
+          avatar.data
+        ) ||
+        avatar.data.length <= 0
+      ) {
+        return res.json({
+          ok: true,
+          avatar: null
+        });
+      }
+
+      res.setHeader(
+        "Cache-Control",
+        "private, no-store"
+      );
+
+      res.json({
+        ok: true,
+        avatar: {
+          mime:
+            avatar.mime ||
+            "image/jpeg",
+          data:
+            avatar.data.toString(
+              "base64"
+            ),
+          byteSize:
+            avatar.data.length
+        }
+      });
+    } catch (err) {
+      console.error(
+        "[People avatar/json]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de charger la photo de profil."
+      });
+    }
+  }
+);
+// === PEOPLE_AVATAR_JSON_DISPLAY_V1_END ===
+
 app.get("/api/profile/:username", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res);
@@ -4636,17 +4871,66 @@ function emitVoiceState() {
 }
 
 
-// === PEOPLE_ONLINE_PANEL_V1_START ===
+// === PEOPLE_UNIQUE_PRESENCE_V1_START ===
+function peopleUniqueOnlineRoster() {
+  const byAccount = new Map();
+
+  for (
+    const [socketId, accountId]
+    of userIds.entries()
+  ) {
+    const username =
+      users.get(socketId);
+
+    if (
+      !accountId ||
+      !username
+    ) {
+      continue;
+    }
+
+    const key =
+      String(accountId);
+
+    const existing =
+      byAccount.get(key);
+
+    if (existing) {
+      existing.connections += 1;
+      continue;
+    }
+
+    byAccount.set(
+      key,
+      {
+        id: key,
+        accountId: key,
+        username,
+        connections: 1
+      }
+    );
+  }
+
+  return [
+    ...byAccount.values()
+  ];
+}
+
 function emitOnlineUsers() {
+  const roster =
+    peopleUniqueOnlineRoster();
+
+  io.emit(
+    "user-count",
+    roster.length
+  );
+
   io.emit(
     "online-users",
-    [...users.entries()].map(([id, username]) => ({
-      id,
-      username
-    }))
+    roster
   );
 }
-// === PEOPLE_ONLINE_PANEL_V1_END ===
+// === PEOPLE_UNIQUE_PRESENCE_V1_END ===
 
 function leaveVoice(socket) {
   if (!voiceUsers.has(socket.id)) return;
@@ -4670,11 +4954,24 @@ io.on("connection", (socket) => {
     }
 
     const cleanName = cleanUsername(account.username);
+    const accountId = String(account.id);
     const wasKnown = users.has(socket.id);
 
-    users.set(socket.id, cleanName);
-    userIds.set(socket.id, String(account.id));
-    io.emit("user-count", users.size);
+    const wasAccountOnline =
+      peopleAccountIsOnline(
+        accountId
+      );
+
+    users.set(
+      socket.id,
+      cleanName
+    );
+
+    userIds.set(
+      socket.id,
+      accountId
+    );
+
     emitOnlineUsers();
 
     peopleLoadGeneralMessages(100)
@@ -4691,7 +4988,11 @@ io.on("connection", (socket) => {
         );
       });
 
-    if (!wasKnown && !reconnect) {
+    if (
+      !wasKnown &&
+      !wasAccountOnline &&
+      !reconnect
+    ) {
       io.emit("system-message", {
         text: `${cleanName} a rejoint le serveur`,
         time: Date.now()
@@ -4922,15 +5223,39 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    const username = users.get(socket.id);
+    const username =
+      users.get(
+        socket.id
+      );
+
+    const accountId =
+      userIds.get(
+        socket.id
+      );
 
     leaveVoice(socket);
-    users.delete(socket.id);
-    userIds.delete(socket.id);
-    io.emit("user-count", users.size);
+
+    users.delete(
+      socket.id
+    );
+
+    userIds.delete(
+      socket.id
+    );
+
+    const accountStillOnline =
+      accountId
+        ? peopleAccountIsOnline(
+            accountId
+          )
+        : false;
+
     emitOnlineUsers();
 
-    if (username) {
+    if (
+      username &&
+      !accountStillOnline
+    ) {
       io.emit("system-message", {
         text: `${username} a quitté le serveur`,
         time: Date.now()

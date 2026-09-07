@@ -1554,6 +1554,29 @@ function peopleSetOnlinePanel(open) {
   }
 }
 
+// === PEOPLE_UNIQUE_PRESENCE_CLIENT_V1_START ===
+function peopleOnlineUserIsSelf(
+  user
+) {
+  return (
+    String(
+      user?.username || ""
+    )
+      .trim()
+      .toLocaleLowerCase(
+        "fr-FR"
+      ) ===
+    String(
+      username || ""
+    )
+      .trim()
+      .toLocaleLowerCase(
+        "fr-FR"
+      )
+  );
+}
+// === PEOPLE_UNIQUE_PRESENCE_CLIENT_V1_END ===
+
 function peopleRenderOnlineUsers(roster) {
   peopleOnlineRoster = Array.isArray(roster) ? roster : [];
 
@@ -1581,8 +1604,8 @@ function peopleRenderOnlineUsers(roster) {
   }
 
   const sorted = [...peopleOnlineRoster].sort((a, b) => {
-    if (a.id === socket.id) return -1;
-    if (b.id === socket.id) return 1;
+    if (peopleOnlineUserIsSelf(a)) return -1;
+    if (peopleOnlineUserIsSelf(b)) return 1;
 
     return String(a.username || "").localeCompare(
       String(b.username || ""),
@@ -1608,7 +1631,9 @@ function peopleRenderOnlineUsers(roster) {
 
     const name = document.createElement("strong");
     name.textContent =
-      user.id === socket.id
+      peopleOnlineUserIsSelf(
+        user
+      )
         ? (user.username || "Invité") + " (toi)"
         : (user.username || "Invité");
 
