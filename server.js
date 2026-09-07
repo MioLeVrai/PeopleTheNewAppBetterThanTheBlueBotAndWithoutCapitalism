@@ -4702,10 +4702,13 @@ app.get(
             "SELECT " +
             "i.owner_id, i.mime_type, i.data, " +
             "i.general_message_id, i.dm_message_id, " +
-            "dm.sender_id, dm.recipient_id " +
+            "dm.sender_id, dm.recipient_id, " +
+            "gm.server_id AS general_server_id " +
             "FROM people_message_images i " +
             "LEFT JOIN people_direct_messages dm " +
             "ON dm.id = i.dm_message_id " +
+            "LEFT JOIN people_general_messages gm " +
+            "ON gm.id = i.general_message_id " +
             "WHERE i.id = $1 LIMIT 1",
             [imageId]
           );
@@ -4720,9 +4723,17 @@ app.get(
         const me =
           String(session.id);
 
+        const generalAllowed =
+          row.general_message_id &&
+          row.general_server_id &&
+          await peopleIsServerMember(
+            me,
+            row.general_server_id
+          );
+
         const allowed =
           Boolean(
-            row.general_message_id
+            generalAllowed
           ) ||
           String(row.owner_id) === me ||
           (
@@ -4777,9 +4788,28 @@ app.get(
       const me =
         String(session.id);
 
+      const generalMessage =
+        item.scope === "general"
+          ? peopleReadLocalGeneral()
+              .find(
+                (message) =>
+                  String(message.id) ===
+                  String(item.messageId)
+              )
+          : null;
+
+      const generalAllowed =
+        generalMessage?.serverId
+          ? await peopleIsServerMember(
+              me,
+              generalMessage.serverId
+            )
+          : false;
+
       const allowed =
-        item.scope ===
-          "general" ||
+        Boolean(
+          generalAllowed
+        ) ||
         String(item.ownerId) ===
           me ||
         (
@@ -4846,39 +4876,1628 @@ app.get(
 );
 // === PEOPLE_MESSAGE_IMAGES_V1_END ===
 
+// === PEOPLE_SERVERS_V1_START ===
+const PEOPLE_LOCAL_SERVERS =
+  pathAccounts.join(
+    __dirname,
+    "people-servers.local.json"
+  );
+
+function peopleServerRoom(serverId) {
+  return (
+    "people-server:" +
+    String(serverId)
+  );
+}
+
+function peopleServerName(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 40);
+}
+
+function peopleValidServerName(value) {
+  const name =
+    peopleServerName(value);
+
+  return (
+    name.length >= 2 &&
+    name.length <= 40 &&
+    !/[\u0000-\u001f\u007f]/u.test(name)
+  );
+}
+
+function peopleNewInviteCode() {
+  return cryptoAccounts
+    .randomBytes(14)
+    .toString("base64url");
+}
+
+function peopleReadLocalServers() {
+  try {
+    if (
+      !fsAccounts.existsSync(
+        PEOPLE_LOCAL_SERVERS
+      )
+    ) {
+      return {
+        servers: [],
+        members: []
+      };
+    }
+
+    const raw =
+      JSON.parse(
+        fsAccounts.readFileSync(
+          PEOPLE_LOCAL_SERVERS,
+          "utf8"
+        )
+      );
+
+    return {
+      servers:
+        Array.isArray(raw?.servers)
+          ? raw.servers
+          : [],
+      members:
+        Array.isArray(raw?.members)
+          ? raw.members
+          : []
+    };
+  } catch {
+    return {
+      servers: [],
+      members: []
+    };
+  }
+}
+
+function peopleWriteLocalServers(data) {
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_SERVERS,
+    JSON.stringify(
+      {
+        servers:
+          Array.isArray(data?.servers)
+            ? data.servers
+            : [],
+        members:
+          Array.isArray(data?.members)
+            ? data.members
+            : []
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+}
+
+function peopleServerPublic(server) {
+  if (!server) return null;
+
+  return {
+    id:
+      String(server.id),
+    name:
+      server.name,
+    ownerId:
+      server.ownerId ??
+      server.owner_id ??
+      null,
+    official:
+      Boolean(
+        server.official ??
+        server.is_official
+      ),
+    createdAt:
+      server.createdAt ??
+      server.created_at ??
+      null
+  };
+}
+
+async function peopleGetServer(serverId) {
+  const id =
+    String(serverId || "").trim();
+
+  if (!id) return null;
+
+  if (peoplePool) {
+    if (!/^\d+$/.test(id)) {
+      return null;
+    }
+
+    const result =
+      await peoplePool.query(
+        "SELECT id, name, owner_id, invite_code, is_official, created_at " +
+        "FROM people_servers WHERE id = $1 LIMIT 1",
+        [id]
+      );
+
+    const row =
+      result.rows[0];
+
+    if (!row) return null;
+
+    return {
+      id:
+        String(row.id),
+      name:
+        row.name,
+      ownerId:
+        row.owner_id
+          ? String(row.owner_id)
+          : null,
+      inviteCode:
+        row.invite_code,
+      official:
+        Boolean(row.is_official),
+      createdAt:
+        row.created_at
+    };
+  }
+
+  const data =
+    peopleReadLocalServers();
+
+  return (
+    data.servers.find(
+      (server) =>
+        String(server.id) === id
+    ) || null
+  );
+}
+
+async function peopleGetServerByInvite(code) {
+  const invite =
+    String(code || "")
+      .trim()
+      .slice(0, 80);
+
+  if (!invite) return null;
+
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "SELECT id, name, owner_id, invite_code, is_official, created_at " +
+        "FROM people_servers WHERE invite_code = $1 LIMIT 1",
+        [invite]
+      );
+
+    const row =
+      result.rows[0];
+
+    if (!row) return null;
+
+    return {
+      id:
+        String(row.id),
+      name:
+        row.name,
+      ownerId:
+        row.owner_id
+          ? String(row.owner_id)
+          : null,
+      inviteCode:
+        row.invite_code,
+      official:
+        Boolean(row.is_official),
+      createdAt:
+        row.created_at
+    };
+  }
+
+  return (
+    peopleReadLocalServers()
+      .servers
+      .find(
+        (server) =>
+          String(server.inviteCode) ===
+          invite
+      ) || null
+  );
+}
+
+async function peopleIsServerMember(
+  accountId,
+  serverId
+) {
+  const userId =
+    String(accountId || "");
+
+  const id =
+    String(serverId || "");
+
+  if (!userId || !id) {
+    return false;
+  }
+
+  if (peoplePool) {
+    if (
+      !/^\d+$/.test(userId) ||
+      !/^\d+$/.test(id)
+    ) {
+      return false;
+    }
+
+    const result =
+      await peoplePool.query(
+        "SELECT 1 FROM people_server_members " +
+        "WHERE server_id = $1 AND user_id = $2 LIMIT 1",
+        [
+          id,
+          userId
+        ]
+      );
+
+    return Boolean(
+      result.rows[0]
+    );
+  }
+
+  return peopleReadLocalServers()
+    .members
+    .some(
+      (member) =>
+        String(member.serverId) === id &&
+        String(member.userId) === userId
+    );
+}
+
+async function peopleServerMemberCount(
+  serverId
+) {
+  const id =
+    String(serverId || "");
+
+  if (!id) return 0;
+
+  if (peoplePool) {
+    if (!/^\d+$/.test(id)) {
+      return 0;
+    }
+
+    const result =
+      await peoplePool.query(
+        "SELECT COUNT(*)::int AS count " +
+        "FROM people_server_members WHERE server_id = $1",
+        [id]
+      );
+
+    return Number(
+      result.rows[0]?.count || 0
+    );
+  }
+
+  return peopleReadLocalServers()
+    .members
+    .filter(
+      (member) =>
+        String(member.serverId) === id
+    ).length;
+}
+
+async function peopleListServersForUser(
+  accountId
+) {
+  const userId =
+    String(accountId);
+
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "SELECT s.id, s.name, s.owner_id, s.is_official, s.created_at " +
+        "FROM people_servers s " +
+        "JOIN people_server_members m ON m.server_id = s.id " +
+        "WHERE m.user_id = $1 " +
+        "ORDER BY m.joined_at ASC, s.id ASC",
+        [userId]
+      );
+
+    return result.rows.map(
+      (row) => ({
+        id:
+          String(row.id),
+        name:
+          row.name,
+        ownerId:
+          row.owner_id
+            ? String(row.owner_id)
+            : null,
+        official:
+          Boolean(row.is_official),
+        createdAt:
+          row.created_at
+      })
+    );
+  }
+
+  const data =
+    peopleReadLocalServers();
+
+  const joinedIds =
+    new Set(
+      data.members
+        .filter(
+          (member) =>
+            String(member.userId) ===
+            userId
+        )
+        .map(
+          (member) =>
+            String(member.serverId)
+        )
+    );
+
+  return data.servers
+    .filter(
+      (server) =>
+        joinedIds.has(
+          String(server.id)
+        )
+    )
+    .map(
+      peopleServerPublic
+    );
+}
+
+async function peopleJoinServer(
+  accountId,
+  serverId
+) {
+  const userId =
+    String(accountId);
+
+  const id =
+    String(serverId);
+
+  if (peoplePool) {
+    await peoplePool.query(
+      "INSERT INTO people_server_members (server_id, user_id) " +
+      "VALUES ($1, $2) ON CONFLICT DO NOTHING",
+      [
+        id,
+        userId
+      ]
+    );
+
+    return;
+  }
+
+  const data =
+    peopleReadLocalServers();
+
+  const exists =
+    data.members.some(
+      (member) =>
+        String(member.serverId) === id &&
+        String(member.userId) === userId
+    );
+
+  if (!exists) {
+    data.members.push({
+      serverId:
+        id,
+      userId:
+        userId,
+      joinedAt:
+        new Date().toISOString()
+    });
+
+    peopleWriteLocalServers(data);
+  }
+}
+
+async function peopleCreateServer(
+  accountId,
+  rawName
+) {
+  const ownerId =
+    String(accountId);
+
+  const name =
+    peopleServerName(rawName);
+
+  if (
+    !peopleValidServerName(name)
+  ) {
+    const err =
+      new Error("SERVER_NAME");
+
+    err.code =
+      "SERVER_NAME";
+
+    throw err;
+  }
+
+  if (peoplePool) {
+    const client =
+      await peoplePool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const result =
+        await client.query(
+          "INSERT INTO people_servers " +
+          "(name, owner_id, invite_code, is_official, legacy_seeded) " +
+          "VALUES ($1, $2, $3, FALSE, TRUE) " +
+          "RETURNING id, name, owner_id, invite_code, is_official, created_at",
+          [
+            name,
+            ownerId,
+            peopleNewInviteCode()
+          ]
+        );
+
+      const row =
+        result.rows[0];
+
+      await client.query(
+        "INSERT INTO people_server_members (server_id, user_id) " +
+        "VALUES ($1, $2)",
+        [
+          row.id,
+          ownerId
+        ]
+      );
+
+      await client.query("COMMIT");
+
+      return {
+        id:
+          String(row.id),
+        name:
+          row.name,
+        ownerId:
+          String(row.owner_id),
+        inviteCode:
+          row.invite_code,
+        official:
+          false,
+        createdAt:
+          row.created_at
+      };
+    } catch (err) {
+      await client
+        .query("ROLLBACK")
+        .catch(() => {});
+
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  const data =
+    peopleReadLocalServers();
+
+  const id =
+    cryptoAccounts.randomUUID();
+
+  const server = {
+    id,
+    name,
+    ownerId,
+    inviteCode:
+      peopleNewInviteCode(),
+    official:
+      false,
+    legacySeeded:
+      true,
+    createdAt:
+      new Date().toISOString()
+  };
+
+  data.servers.push(server);
+
+  data.members.push({
+    serverId:
+      id,
+    userId:
+      ownerId,
+    joinedAt:
+      new Date().toISOString()
+  });
+
+  peopleWriteLocalServers(data);
+
+  return server;
+}
+
+async function peopleServerReplyPreview(
+  serverId,
+  replyToId,
+  db = peoplePool
+) {
+  const id =
+    peopleReplyId(replyToId);
+
+  const sid =
+    String(serverId || "");
+
+  if (!id || !sid) {
+    return null;
+  }
+
+  if (peoplePool) {
+    if (
+      !/^\d+$/.test(id) ||
+      !/^\d+$/.test(sid)
+    ) {
+      return null;
+    }
+
+    const result =
+      await db.query(
+        "SELECT gm.id, gm.username, gm.body, " +
+        "(SELECT i.id FROM people_message_images i " +
+        "WHERE i.general_message_id = gm.id LIMIT 1) AS image_id " +
+        "FROM people_general_messages gm " +
+        "WHERE gm.id = $1 AND gm.server_id = $2 LIMIT 1",
+        [
+          id,
+          sid
+        ]
+      );
+
+    const row =
+      result.rows[0];
+
+    if (!row) return null;
+
+    return {
+      id:
+        String(row.id),
+      username:
+        row.username,
+      text:
+        row.body,
+      imageId:
+        row.image_id
+          ? String(row.image_id)
+          : null,
+      deleted:
+        false
+    };
+  }
+
+  const message =
+    peopleReadLocalGeneral()
+      .find(
+        (item) =>
+          String(item.id) === id &&
+          String(item.serverId) === sid
+      );
+
+  if (!message) {
+    return null;
+  }
+
+  return {
+    id:
+      String(message.id),
+    username:
+      String(message.username || ""),
+    text:
+      String(message.text || ""),
+    imageId:
+      message.imageId
+        ? String(message.imageId)
+        : null,
+    deleted:
+      false
+  };
+}
+
+async function peopleServerSaveMessage(
+  serverId,
+  senderId,
+  username,
+  text,
+  imageId = null,
+  replyToId = null
+) {
+  const sid =
+    String(serverId);
+
+  const cleanUsername =
+    peopleUsername(username)
+      .slice(0, 24);
+
+  const cleanText =
+    String(text || "")
+      .trim()
+      .slice(0, 1000);
+
+  const imageKey =
+    peopleNormalizeMessageImageId(
+      imageId
+    );
+
+  const replyKey =
+    peopleReplyId(
+      replyToId
+    );
+
+  if (
+    !sid ||
+    !cleanUsername ||
+    (
+      !cleanText &&
+      !imageKey
+    )
+  ) {
+    return null;
+  }
+
+  if (peoplePool) {
+    const client =
+      await peoplePool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const reply =
+        replyKey
+          ? await peopleServerReplyPreview(
+              sid,
+              replyKey,
+              client
+            )
+          : null;
+
+      if (
+        replyKey &&
+        !reply
+      ) {
+        const err =
+          new Error("REPLY_INVALID");
+
+        err.code =
+          "REPLY_INVALID";
+
+        throw err;
+      }
+
+      const result =
+        await client.query(
+          "INSERT INTO people_general_messages " +
+          "(server_id, sender_id, username, body, reply_to_id) " +
+          "VALUES ($1, $2, $3, $4, $5) " +
+          "RETURNING id, username, body, reply_to_id, created_at",
+          [
+            sid,
+            String(senderId),
+            cleanUsername,
+            cleanText,
+            replyKey || null
+          ]
+        );
+
+      const row =
+        result.rows[0];
+
+      let boundImageId =
+        null;
+
+      if (imageKey) {
+        boundImageId =
+          await peopleBindGeneralMessageImage(
+            senderId,
+            imageKey,
+            row.id,
+            client
+          );
+
+        if (!boundImageId) {
+          const err =
+            new Error("IMAGE_INVALID");
+
+          err.code =
+            "IMAGE_INVALID";
+
+          throw err;
+        }
+      }
+
+      await client.query("COMMIT");
+
+      return {
+        id:
+          String(row.id),
+        serverId:
+          sid,
+        username:
+          row.username,
+        text:
+          row.body,
+        imageId:
+          boundImageId,
+        replyTo:
+          reply,
+        time:
+          new Date(
+            row.created_at
+          ).getTime()
+      };
+    } catch (err) {
+      await client
+        .query("ROLLBACK")
+        .catch(() => {});
+
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  const messages =
+    peopleReadLocalGeneral();
+
+  const reply =
+    replyKey
+      ? await peopleServerReplyPreview(
+          sid,
+          replyKey
+        )
+      : null;
+
+  if (
+    replyKey &&
+    !reply
+  ) {
+    const err =
+      new Error("REPLY_INVALID");
+
+    err.code =
+      "REPLY_INVALID";
+
+    throw err;
+  }
+
+  const message = {
+    id:
+      cryptoAccounts.randomUUID(),
+    serverId:
+      sid,
+    senderId:
+      String(senderId),
+    username:
+      cleanUsername,
+    text:
+      cleanText,
+    imageId:
+      null,
+    replyToId:
+      replyKey || null,
+    time:
+      Date.now()
+  };
+
+  if (imageKey) {
+    const bound =
+      await peopleBindGeneralMessageImage(
+        senderId,
+        imageKey,
+        message.id
+      );
+
+    if (!bound) {
+      const err =
+        new Error("IMAGE_INVALID");
+
+      err.code =
+        "IMAGE_INVALID";
+
+      throw err;
+    }
+
+    message.imageId =
+      bound;
+  }
+
+  messages.push(message);
+
+  peopleWriteLocalGeneral(messages);
+
+  return {
+    ...message,
+    replyTo:
+      reply
+  };
+}
+
+async function peopleServerLoadMessages(
+  serverId,
+  limit = 100
+) {
+  const sid =
+    String(serverId);
+
+  const safeLimit =
+    Math.max(
+      1,
+      Math.min(
+        200,
+        Number(limit) || 100
+      )
+    );
+
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "SELECT " +
+        "gm.id, gm.username, gm.body, gm.reply_to_id, gm.created_at, " +
+        "(SELECT i.id FROM people_message_images i " +
+        "WHERE i.general_message_id = gm.id LIMIT 1) AS image_id, " +
+        "rgm.username AS reply_username, " +
+        "rgm.body AS reply_body, " +
+        "(SELECT ri.id FROM people_message_images ri " +
+        "WHERE ri.general_message_id = rgm.id LIMIT 1) AS reply_image_id " +
+        "FROM people_general_messages gm " +
+        "LEFT JOIN people_general_messages rgm " +
+        "ON rgm.id = gm.reply_to_id AND rgm.server_id = gm.server_id " +
+        "WHERE gm.server_id = $1 " +
+        "ORDER BY gm.created_at DESC LIMIT $2",
+        [
+          sid,
+          safeLimit
+        ]
+      );
+
+    return result.rows
+      .reverse()
+      .map(
+        (row) => ({
+          id:
+            String(row.id),
+          serverId:
+            sid,
+          username:
+            row.username,
+          text:
+            row.body,
+          imageId:
+            row.image_id
+              ? String(row.image_id)
+              : null,
+          replyTo:
+            row.reply_to_id
+              ? (
+                  row.reply_username
+                    ? {
+                        id:
+                          String(
+                            row.reply_to_id
+                          ),
+                        username:
+                          row.reply_username,
+                        text:
+                          row.reply_body || "",
+                        imageId:
+                          row.reply_image_id
+                            ? String(
+                                row.reply_image_id
+                              )
+                            : null,
+                        deleted:
+                          false
+                      }
+                    : peopleDeletedReply(
+                        row.reply_to_id
+                      )
+                )
+              : null,
+          time:
+            new Date(
+              row.created_at
+            ).getTime()
+        })
+      );
+  }
+
+  const all =
+    peopleReadLocalGeneral()
+      .filter(
+        (message) =>
+          String(message.serverId) ===
+          sid
+      );
+
+  const byId =
+    new Map(
+      all.map(
+        (message) => [
+          String(message.id),
+          message
+        ]
+      )
+    );
+
+  return all
+    .slice(-safeLimit)
+    .map(
+      (message) => {
+        const replyId =
+          peopleReplyId(
+            message.replyToId
+          );
+
+        const target =
+          replyId
+            ? byId.get(replyId)
+            : null;
+
+        return {
+          id:
+            String(message.id || ""),
+          serverId:
+            sid,
+          username:
+            String(
+              message.username || ""
+            ),
+          text:
+            String(
+              message.text || ""
+            ),
+          imageId:
+            message.imageId
+              ? String(message.imageId)
+              : null,
+          replyTo:
+            replyId
+              ? (
+                  target
+                    ? {
+                        id:
+                          String(target.id),
+                        username:
+                          String(
+                            target.username || ""
+                          ),
+                        text:
+                          String(
+                            target.text || ""
+                          ),
+                        imageId:
+                          target.imageId
+                            ? String(
+                                target.imageId
+                              )
+                            : null,
+                        deleted:
+                          false
+                      }
+                    : peopleDeletedReply(
+                        replyId
+                      )
+                )
+              : null,
+          time:
+            Number(
+              message.time ||
+              Date.now()
+            )
+        };
+      }
+    );
+}
+
+async function peopleServerDeleteMessage(
+  accountId,
+  serverId,
+  messageId
+) {
+  const owner =
+    String(accountId);
+
+  const sid =
+    String(serverId);
+
+  const id =
+    peopleReplyId(messageId);
+
+  if (
+    !owner ||
+    !sid ||
+    !id
+  ) {
+    return false;
+  }
+
+  if (peoplePool) {
+    if (
+      !/^\d+$/.test(id) ||
+      !/^\d+$/.test(sid)
+    ) {
+      return false;
+    }
+
+    const result =
+      await peoplePool.query(
+        "DELETE FROM people_general_messages " +
+        "WHERE id = $1 AND sender_id = $2 AND server_id = $3 " +
+        "RETURNING id",
+        [
+          id,
+          owner,
+          sid
+        ]
+      );
+
+    return Boolean(
+      result.rows[0]
+    );
+  }
+
+  const messages =
+    peopleReadLocalGeneral();
+
+  const index =
+    messages.findIndex(
+      (item) =>
+        String(item.id) === id &&
+        String(item.senderId) === owner &&
+        String(item.serverId) === sid
+    );
+
+  if (index < 0) {
+    return false;
+  }
+
+  messages.splice(index, 1);
+
+  peopleWriteLocalGeneral(
+    messages
+  );
+
+  peopleDeleteLocalBoundMessageImage(
+    "general",
+    id
+  );
+
+  return true;
+}
+
+async function peopleInitServersV1() {
+  if (peoplePool) {
+    await peoplePool.query(
+      "CREATE TABLE IF NOT EXISTS people_servers (" +
+      "id BIGSERIAL PRIMARY KEY, " +
+      "name VARCHAR(40) NOT NULL, " +
+      "owner_id BIGINT NULL REFERENCES people_accounts(id) ON DELETE SET NULL, " +
+      "invite_code VARCHAR(80) UNIQUE NOT NULL, " +
+      "is_official BOOLEAN NOT NULL DEFAULT FALSE, " +
+      "legacy_seeded BOOLEAN NOT NULL DEFAULT FALSE, " +
+      "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()" +
+      ")"
+    );
+
+    await peoplePool.query(
+      "ALTER TABLE people_servers " +
+      "ADD COLUMN IF NOT EXISTS legacy_seeded BOOLEAN NOT NULL DEFAULT FALSE"
+    );
+
+    await peoplePool.query(
+      "CREATE TABLE IF NOT EXISTS people_server_members (" +
+      "server_id BIGINT NOT NULL REFERENCES people_servers(id) ON DELETE CASCADE, " +
+      "user_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+      "joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+      "PRIMARY KEY(server_id, user_id)" +
+      ")"
+    );
+
+    await peoplePool.query(
+      "CREATE INDEX IF NOT EXISTS people_server_members_user_idx " +
+      "ON people_server_members(user_id, joined_at)"
+    );
+
+    let officialResult =
+      await peoplePool.query(
+        "SELECT id, name, owner_id, invite_code, is_official, legacy_seeded, created_at " +
+        "FROM people_servers WHERE is_official = TRUE LIMIT 1"
+      );
+
+    let official =
+      officialResult.rows[0];
+
+    if (!official) {
+      const founderResult =
+        await peoplePool.query(
+          "SELECT id FROM people_accounts " +
+          "ORDER BY created_at ASC, id ASC LIMIT 1"
+        );
+
+      const founderId =
+        founderResult.rows[0]?.id || null;
+
+      const inserted =
+        await peoplePool.query(
+          "INSERT INTO people_servers " +
+          "(name, owner_id, invite_code, is_official, legacy_seeded) " +
+          "VALUES ('People', $1, $2, TRUE, FALSE) " +
+          "RETURNING id, name, owner_id, invite_code, is_official, legacy_seeded, created_at",
+          [
+            founderId,
+            peopleNewInviteCode()
+          ]
+        );
+
+      official =
+        inserted.rows[0];
+    }
+
+    /*
+      Migration : seul le compte fondateur garde un accès direct.
+      Aucun autre compte existant ou futur n'est ajouté automatiquement.
+    */
+    if (!official.legacy_seeded) {
+      if (official.owner_id) {
+        await peoplePool.query(
+          "INSERT INTO people_server_members (server_id, user_id) " +
+          "VALUES ($1, $2) ON CONFLICT DO NOTHING",
+          [
+            official.id,
+            official.owner_id
+          ]
+        );
+      }
+
+      await peoplePool.query(
+        "UPDATE people_servers SET legacy_seeded = TRUE WHERE id = $1",
+        [official.id]
+      );
+    }
+
+    await peoplePool.query(
+      "ALTER TABLE people_general_messages " +
+      "ADD COLUMN IF NOT EXISTS server_id BIGINT NULL " +
+      "REFERENCES people_servers(id) ON DELETE CASCADE"
+    );
+
+    await peoplePool.query(
+      "UPDATE people_general_messages " +
+      "SET server_id = $1 WHERE server_id IS NULL",
+      [official.id]
+    );
+
+    await peoplePool.query(
+      "CREATE INDEX IF NOT EXISTS people_general_messages_server_created_idx " +
+      "ON people_general_messages(server_id, created_at DESC)"
+    );
+
+    console.log(
+      "[People] Serveur officiel prêt. Invitation: /invite/" +
+      official.invite_code
+    );
+
+    return;
+  }
+
+  const data =
+    peopleReadLocalServers();
+
+  let official =
+    data.servers.find(
+      (server) =>
+        Boolean(server.official)
+    );
+
+  if (!official) {
+    const accounts =
+      peopleReadLocalAccounts()
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(
+              a.created_at ||
+              a.createdAt ||
+              0
+            ).getTime() -
+            new Date(
+              b.created_at ||
+              b.createdAt ||
+              0
+            ).getTime()
+        );
+
+    const founderId =
+      accounts[0]?.id
+        ? String(accounts[0].id)
+        : null;
+
+    official = {
+      id:
+        cryptoAccounts.randomUUID(),
+      name:
+        "People",
+      ownerId:
+        founderId,
+      inviteCode:
+        peopleNewInviteCode(),
+      official:
+        true,
+      legacySeeded:
+        false,
+      createdAt:
+        new Date().toISOString()
+    };
+
+    data.servers.push(
+      official
+    );
+  }
+
+  if (!official.legacySeeded) {
+    if (official.ownerId) {
+      const exists =
+        data.members.some(
+          (member) =>
+            String(member.serverId) ===
+              String(official.id) &&
+            String(member.userId) ===
+              String(official.ownerId)
+        );
+
+      if (!exists) {
+        data.members.push({
+          serverId:
+            String(official.id),
+          userId:
+            String(official.ownerId),
+          joinedAt:
+            new Date().toISOString()
+        });
+      }
+    }
+
+    official.legacySeeded =
+      true;
+  }
+
+  const messages =
+    peopleReadLocalGeneral();
+
+  let changed = false;
+
+  for (const message of messages) {
+    if (!message.serverId) {
+      message.serverId =
+        String(official.id);
+
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    peopleWriteLocalGeneral(
+      messages
+    );
+  }
+
+  peopleWriteLocalServers(
+    data
+  );
+
+  console.log(
+    "[People] Serveur officiel local prêt. Invitation: /invite/" +
+    official.inviteCode
+  );
+}
+
+app.get(
+  "/api/servers",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const servers =
+        await peopleListServersForUser(
+          session.id
+        );
+
+      res.json({
+        ok: true,
+        servers
+      });
+    } catch (err) {
+      console.error(
+        "[People servers/list]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de charger tes serveurs."
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/servers",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const server =
+        await peopleCreateServer(
+          session.id,
+          req.body?.name
+        );
+
+      res.status(201).json({
+        ok: true,
+        server:
+          peopleServerPublic(server)
+      });
+    } catch (err) {
+      if (
+        err?.code ===
+        "SERVER_NAME"
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Le nom du serveur doit faire entre 2 et 40 caractères."
+        });
+      }
+
+      console.error(
+        "[People servers/create]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de créer le serveur."
+      });
+    }
+  }
+);
+
+app.get(
+  "/api/servers/invite/:code",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const server =
+        await peopleGetServerByInvite(
+          req.params.code
+        );
+
+      if (!server) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Cette invitation n'existe plus."
+        });
+      }
+
+      const joined =
+        await peopleIsServerMember(
+          session.id,
+          server.id
+        );
+
+      const memberCount =
+        await peopleServerMemberCount(
+          server.id
+        );
+
+      res.json({
+        ok: true,
+        server: {
+          ...peopleServerPublic(
+            server
+          ),
+          joined,
+          memberCount
+        }
+      });
+    } catch (err) {
+      console.error(
+        "[People servers/invite preview]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de charger l'invitation."
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/servers/invite/:code/join",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const server =
+        await peopleGetServerByInvite(
+          req.params.code
+        );
+
+      if (!server) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Cette invitation n'existe plus."
+        });
+      }
+
+      await peopleJoinServer(
+        session.id,
+        server.id
+      );
+
+      res.json({
+        ok: true,
+        server:
+          peopleServerPublic(server)
+      });
+    } catch (err) {
+      console.error(
+        "[People servers/join]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de rejoindre le serveur."
+      });
+    }
+  }
+);
+
+app.get(
+  "/api/servers/:id/invite",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const server =
+        await peopleGetServer(
+          req.params.id
+        );
+
+      if (!server) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Serveur introuvable."
+        });
+      }
+
+      const member =
+        await peopleIsServerMember(
+          session.id,
+          server.id
+        );
+
+      if (!member) {
+        return res.status(403).json({
+          ok: false,
+          error:
+            "Tu n'es pas membre de ce serveur."
+        });
+      }
+
+      res.json({
+        ok: true,
+        invitePath:
+          "/invite/" +
+          server.inviteCode
+      });
+    } catch (err) {
+      console.error(
+        "[People servers/invite link]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de créer le lien d'invitation."
+      });
+    }
+  }
+);
+
+app.get(
+  "/invite/:code",
+  (req, res) => {
+    res.sendFile(
+      pathAccounts.join(
+        __dirname,
+        "public",
+        "index.html"
+      )
+    );
+  }
+);
+// === PEOPLE_SERVERS_V1_END ===
+
 app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, app: "People" });
 });
 
 const users = new Map();
 const userIds = new Map();
+const socketServerIds = new Map();
 const voiceUsers = new Map();
 
 function cleanUsername(value) {
-  return String(value || "Invité").trim().slice(0, 24) || "Invité";
+  return String(value || "Invité")
+    .trim()
+    .slice(0, 24) || "Invité";
 }
 
-function emitVoiceState() {
-  io.emit(
-    "voice-state",
-    [...voiceUsers.entries()].map(([id, user]) => ({
-      id,
-      username: user.username,
-      muted: Boolean(user.muted),
-      camera: Boolean(user.camera)
-    }))
-  );
-}
+function peopleOnlineRosterForServer(
+  serverId
+) {
+  const sid =
+    String(serverId || "");
 
-
-// === PEOPLE_UNIQUE_PRESENCE_V1_START ===
-function peopleUniqueOnlineRoster() {
-  const byAccount = new Map();
+  const byAccount =
+    new Map();
 
   for (
-    const [socketId, accountId]
-    of userIds.entries()
+    const [socketId, currentServerId]
+    of socketServerIds.entries()
   ) {
+    if (
+      String(currentServerId) !==
+      sid
+    ) {
+      continue;
+    }
+
+    const accountId =
+      userIds.get(socketId);
+
     const username =
       users.get(socketId);
 
@@ -4903,10 +6522,13 @@ function peopleUniqueOnlineRoster() {
     byAccount.set(
       key,
       {
-        id: key,
-        accountId: key,
+        id:
+          key,
+        accountId:
+          key,
         username,
-        connections: 1
+        connections:
+          1
       }
     );
   }
@@ -4916,89 +6538,279 @@ function peopleUniqueOnlineRoster() {
   ];
 }
 
-function emitOnlineUsers() {
-  const roster =
-    peopleUniqueOnlineRoster();
+function emitOnlineUsers(
+  serverId
+) {
+  const sid =
+    String(serverId || "");
 
-  io.emit(
+  if (!sid) return;
+
+  const roster =
+    peopleOnlineRosterForServer(
+      sid
+    );
+
+  io.to(
+    peopleServerRoom(sid)
+  ).emit(
     "user-count",
     roster.length
   );
 
-  io.emit(
+  io.to(
+    peopleServerRoom(sid)
+  ).emit(
     "online-users",
     roster
   );
 }
-// === PEOPLE_UNIQUE_PRESENCE_V1_END ===
+
+function peopleVoiceRoster(
+  serverId
+) {
+  const sid =
+    String(serverId || "");
+
+  return [
+    ...voiceUsers.entries()
+  ]
+    .filter(
+      ([, user]) =>
+        String(user.serverId) ===
+        sid
+    )
+    .map(
+      ([id, user]) => ({
+        id,
+        username:
+          user.username,
+        muted:
+          Boolean(user.muted),
+        camera:
+          Boolean(user.camera)
+      })
+    );
+}
+
+function emitVoiceState(
+  serverId
+) {
+  const sid =
+    String(serverId || "");
+
+  if (!sid) return;
+
+  io.to(
+    peopleServerRoom(sid)
+  ).emit(
+    "voice-state",
+    peopleVoiceRoster(sid)
+  );
+}
 
 function leaveVoice(socket) {
-  if (!voiceUsers.has(socket.id)) return;
+  const current =
+    voiceUsers.get(
+      socket.id
+    );
 
-  voiceUsers.delete(socket.id);
-  socket.broadcast.emit("peer-left", socket.id);
-  emitVoiceState();
+  if (!current) return;
+
+  const sid =
+    String(
+      current.serverId || ""
+    );
+
+  voiceUsers.delete(
+    socket.id
+  );
+
+  if (sid) {
+    socket.to(
+      peopleServerRoom(sid)
+    ).emit(
+      "peer-left",
+      socket.id
+    );
+
+    emitVoiceState(sid);
+  }
 }
 
 io.on("connection", (socket) => {
-  socket.on("keepalive", () => {});
+  socket.on(
+    "keepalive",
+    () => {}
+  );
 
-  socket.on("join", ({ reconnect } = {}) => {
-    const account = peopleSessionFromCookie(
-      socket.handshake.headers.cookie || ""
-    );
+  socket.on(
+    "join",
+    () => {
+      const account =
+        peopleSessionFromCookie(
+          socket.handshake.headers.cookie ||
+          ""
+        );
 
-    if (!account) {
-      socket.emit("auth-required");
-      return;
-    }
+      if (!account) {
+        socket.emit(
+          "auth-required"
+        );
 
-    const cleanName = cleanUsername(account.username);
-    const accountId = String(account.id);
-    const wasKnown = users.has(socket.id);
+        return;
+      }
 
-    const wasAccountOnline =
-      peopleAccountIsOnline(
-        accountId
+      users.set(
+        socket.id,
+        cleanUsername(
+          account.username
+        )
       );
 
-    users.set(
-      socket.id,
-      cleanName
-    );
+      userIds.set(
+        socket.id,
+        String(account.id)
+      );
 
-    userIds.set(
-      socket.id,
-      accountId
-    );
+      socket.emit(
+        "people-ready",
+        {
+          ok: true
+        }
+      );
+    }
+  );
 
-    emitOnlineUsers();
+  socket.on(
+    "server-select",
+    async (
+      { serverId } = {},
+      ack = () => {}
+    ) => {
+      try {
+        const accountId =
+          userIds.get(
+            socket.id
+          );
 
-    peopleLoadGeneralMessages(100)
-      .then((history) => {
-        socket.emit(
-          "chat-history",
-          history
+        if (!accountId) {
+          return ack({
+            ok: false,
+            error:
+              "Session invalide."
+          });
+        }
+
+        const server =
+          await peopleGetServer(
+            serverId
+          );
+
+        if (!server) {
+          return ack({
+            ok: false,
+            error:
+              "Serveur introuvable."
+          });
+        }
+
+        const member =
+          await peopleIsServerMember(
+            accountId,
+            server.id
+          );
+
+        if (!member) {
+          return ack({
+            ok: false,
+            error:
+              "Tu n'es pas membre de ce serveur."
+          });
+        }
+
+        const oldServerId =
+          socketServerIds.get(
+            socket.id
+          );
+
+        if (
+          oldServerId &&
+          String(oldServerId) !==
+            String(server.id)
+        ) {
+          leaveVoice(socket);
+
+          await socket.leave(
+            peopleServerRoom(
+              oldServerId
+            )
+          );
+
+          socketServerIds.delete(
+            socket.id
+          );
+
+          emitOnlineUsers(
+            oldServerId
+          );
+        }
+
+        socketServerIds.set(
+          socket.id,
+          String(server.id)
         );
-      })
-      .catch((err) => {
+
+        await socket.join(
+          peopleServerRoom(
+            server.id
+          )
+        );
+
+        const history =
+          await peopleServerLoadMessages(
+            server.id,
+            100
+          );
+
+        const online =
+          peopleOnlineRosterForServer(
+            server.id
+          );
+
+        const voice =
+          peopleVoiceRoster(
+            server.id
+          );
+
+        emitOnlineUsers(
+          server.id
+        );
+
+        ack({
+          ok: true,
+          server:
+            peopleServerPublic(
+              server
+            ),
+          history,
+          online,
+          voice
+        });
+      } catch (err) {
         console.error(
-          "[People general/history]",
+          "[People server/select]",
           err
         );
-      });
 
-    if (
-      !wasKnown &&
-      !wasAccountOnline &&
-      !reconnect
-    ) {
-      io.emit("system-message", {
-        text: `${cleanName} a rejoint le serveur`,
-        time: Date.now()
-      });
+        ack({
+          ok: false,
+          error:
+            "Impossible d'ouvrir ce serveur."
+        });
+      }
     }
-  });
+  );
 
   socket.on(
     "chat-message",
@@ -5017,9 +6829,15 @@ io.on("connection", (socket) => {
           socket.id
         );
 
+      const serverId =
+        socketServerIds.get(
+          socket.id
+        );
+
       if (
         !username ||
-        !senderId
+        !senderId ||
+        !serverId
       ) {
         return;
       }
@@ -5043,7 +6861,8 @@ io.on("connection", (socket) => {
 
       try {
         const saved =
-          await peopleSaveGeneralMessage(
+          await peopleServerSaveMessage(
+            serverId,
             senderId,
             username,
             cleanText,
@@ -5055,13 +6874,17 @@ io.on("connection", (socket) => {
           return;
         }
 
-        io.emit(
+        io.to(
+          peopleServerRoom(
+            serverId
+          )
+        ).emit(
           "chat-message",
           saved
         );
       } catch (err) {
         console.error(
-          "[People general/save]",
+          "[People server message/save]",
           err
         );
 
@@ -5072,7 +6895,10 @@ io.on("connection", (socket) => {
               err?.code ===
                 "IMAGE_INVALID"
                 ? "Cette image n'est plus disponible. Réessaie de la sélectionner."
-                : "Le message n'a pas pu être sauvegardé.",
+                : err?.code ===
+                    "REPLY_INVALID"
+                  ? "Le message auquel tu réponds n'est plus disponible."
+                  : "Le message n'a pas pu être sauvegardé.",
             time:
               Date.now()
           }
@@ -5081,7 +6907,6 @@ io.on("connection", (socket) => {
     }
   );
 
-// === PEOPLE_GENERAL_DELETE_SOCKET_V1_START ===
   socket.on(
     "chat-message-delete",
     async (
@@ -5090,19 +6915,30 @@ io.on("connection", (socket) => {
     ) => {
       try {
         const senderId =
-          userIds.get(socket.id);
+          userIds.get(
+            socket.id
+          );
 
-        if (!senderId) {
+        const serverId =
+          socketServerIds.get(
+            socket.id
+          );
+
+        if (
+          !senderId ||
+          !serverId
+        ) {
           return ack({
             ok: false,
             error:
-              "Session invalide."
+              "Aucun serveur actif."
           });
         }
 
         const removed =
-          await peopleDeleteGeneralMessage(
+          await peopleServerDeleteMessage(
             senderId,
+            serverId,
             id
           );
 
@@ -5114,7 +6950,11 @@ io.on("connection", (socket) => {
           });
         }
 
-        io.emit(
+        io.to(
+          peopleServerRoom(
+            serverId
+          )
+        ).emit(
           "chat-message-deleted",
           {
             id:
@@ -5127,7 +6967,7 @@ io.on("connection", (socket) => {
         });
       } catch (err) {
         console.error(
-          "[People general/delete]",
+          "[People server message/delete]",
           err
         );
 
@@ -5139,135 +6979,309 @@ io.on("connection", (socket) => {
       }
     }
   );
-  // === PEOPLE_GENERAL_DELETE_SOCKET_V1_END ===
 
-  socket.on("voice-join", ({ muted, camera } = {}) => {
-    const username = users.get(socket.id);
-    if (!username) return;
+  socket.on(
+    "voice-join",
+    ({ muted, camera } = {}) => {
+      const username =
+        users.get(
+          socket.id
+        );
 
-    const existingPeers = [...voiceUsers.entries()]
-      .filter(([id]) => id !== socket.id)
-      .map(([id, user]) => ({
-        id,
-        username: user.username,
-        muted: Boolean(user.muted),
-        camera: Boolean(user.camera)
-      }));
+      const serverId =
+        socketServerIds.get(
+          socket.id
+        );
 
-    voiceUsers.set(socket.id, {
-      username,
-      muted: Boolean(muted),
-      camera: Boolean(camera)
-    });
+      if (
+        !username ||
+        !serverId
+      ) {
+        return;
+      }
 
-    socket.emit("voice-peers", existingPeers);
-    emitVoiceState();
-  });
-
-  socket.on("voice-leave", () => {
-    leaveVoice(socket);
-  });
-
-  socket.on("voice-mute", ({ muted } = {}) => {
-    const user = voiceUsers.get(socket.id);
-    if (!user) return;
-
-    user.muted = Boolean(muted);
-    voiceUsers.set(socket.id, user);
-    emitVoiceState();
-  });
-
-  socket.on("voice-camera", ({ camera } = {}) => {
-    const user = voiceUsers.get(socket.id);
-    if (!user) return;
-
-    user.camera = Boolean(camera);
-    voiceUsers.set(socket.id, user);
-    emitVoiceState();
-  });
-
-  socket.on("webrtc-offer", ({ target, sdp } = {}) => {
-    if (!voiceUsers.has(socket.id) || !voiceUsers.has(target) || !sdp) return;
-
-    io.to(target).emit("webrtc-offer", {
-      from: socket.id,
-      username: users.get(socket.id) || "Invité",
-      sdp
-    });
-  });
-
-  socket.on("webrtc-answer", ({ target, sdp } = {}) => {
-    if (!voiceUsers.has(socket.id) || !voiceUsers.has(target) || !sdp) return;
-
-    io.to(target).emit("webrtc-answer", {
-      from: socket.id,
-      sdp
-    });
-  });
-
-  socket.on("webrtc-ice-candidate", ({ target, candidate } = {}) => {
-    if (!voiceUsers.has(socket.id) || !voiceUsers.has(target) || !candidate) return;
-
-    io.to(target).emit("webrtc-ice-candidate", {
-      from: socket.id,
-      candidate
-    });
-  });
-
-  socket.on("voice-peer-reconnect", ({ target } = {}) => {
-    if (!voiceUsers.has(socket.id) || !voiceUsers.has(target)) return;
-
-    io.to(target).emit("voice-peer-reconnect", {
-      from: socket.id
-    });
-  });
-
-  socket.on("disconnect", () => {
-    const username =
-      users.get(
-        socket.id
-      );
-
-    const accountId =
-      userIds.get(
-        socket.id
-      );
-
-    leaveVoice(socket);
-
-    users.delete(
-      socket.id
-    );
-
-    userIds.delete(
-      socket.id
-    );
-
-    const accountStillOnline =
-      accountId
-        ? peopleAccountIsOnline(
-            accountId
+      const existingPeers =
+        [...voiceUsers.entries()]
+          .filter(
+            ([id, user]) =>
+              id !== socket.id &&
+              String(user.serverId) ===
+                String(serverId)
           )
-        : false;
+          .map(
+            ([id, user]) => ({
+              id,
+              username:
+                user.username,
+              muted:
+                Boolean(user.muted),
+              camera:
+                Boolean(user.camera)
+            })
+          );
 
-    emitOnlineUsers();
+      voiceUsers.set(
+        socket.id,
+        {
+          serverId:
+            String(serverId),
+          username,
+          muted:
+            Boolean(muted),
+          camera:
+            Boolean(camera)
+        }
+      );
 
-    if (
-      username &&
-      !accountStillOnline
-    ) {
-      io.emit("system-message", {
-        text: `${username} a quitté le serveur`,
-        time: Date.now()
-      });
+      socket.emit(
+        "voice-peers",
+        existingPeers
+      );
+
+      emitVoiceState(
+        serverId
+      );
     }
-  });
+  );
+
+  socket.on(
+    "voice-leave",
+    () => {
+      leaveVoice(socket);
+    }
+  );
+
+  socket.on(
+    "voice-mute",
+    ({ muted } = {}) => {
+      const user =
+        voiceUsers.get(
+          socket.id
+        );
+
+      if (!user) return;
+
+      user.muted =
+        Boolean(muted);
+
+      voiceUsers.set(
+        socket.id,
+        user
+      );
+
+      emitVoiceState(
+        user.serverId
+      );
+    }
+  );
+
+  socket.on(
+    "voice-camera",
+    ({ camera } = {}) => {
+      const user =
+        voiceUsers.get(
+          socket.id
+        );
+
+      if (!user) return;
+
+      user.camera =
+        Boolean(camera);
+
+      voiceUsers.set(
+        socket.id,
+        user
+      );
+
+      emitVoiceState(
+        user.serverId
+      );
+    }
+  );
+
+  socket.on(
+    "webrtc-offer",
+    ({
+      target,
+      sdp
+    } = {}) => {
+      const mine =
+        voiceUsers.get(
+          socket.id
+        );
+
+      const other =
+        voiceUsers.get(
+          target
+        );
+
+      if (
+        !mine ||
+        !other ||
+        String(mine.serverId) !==
+          String(other.serverId) ||
+        !sdp
+      ) {
+        return;
+      }
+
+      io.to(target).emit(
+        "webrtc-offer",
+        {
+          from:
+            socket.id,
+          username:
+            users.get(
+              socket.id
+            ) || "Invité",
+          sdp
+        }
+      );
+    }
+  );
+
+  socket.on(
+    "webrtc-answer",
+    ({
+      target,
+      sdp
+    } = {}) => {
+      const mine =
+        voiceUsers.get(
+          socket.id
+        );
+
+      const other =
+        voiceUsers.get(
+          target
+        );
+
+      if (
+        !mine ||
+        !other ||
+        String(mine.serverId) !==
+          String(other.serverId) ||
+        !sdp
+      ) {
+        return;
+      }
+
+      io.to(target).emit(
+        "webrtc-answer",
+        {
+          from:
+            socket.id,
+          sdp
+        }
+      );
+    }
+  );
+
+  socket.on(
+    "webrtc-ice-candidate",
+    ({
+      target,
+      candidate
+    } = {}) => {
+      const mine =
+        voiceUsers.get(
+          socket.id
+        );
+
+      const other =
+        voiceUsers.get(
+          target
+        );
+
+      if (
+        !mine ||
+        !other ||
+        String(mine.serverId) !==
+          String(other.serverId) ||
+        !candidate
+      ) {
+        return;
+      }
+
+      io.to(target).emit(
+        "webrtc-ice-candidate",
+        {
+          from:
+            socket.id,
+          candidate
+        }
+      );
+    }
+  );
+
+  socket.on(
+    "voice-peer-reconnect",
+    ({ target } = {}) => {
+      const mine =
+        voiceUsers.get(
+          socket.id
+        );
+
+      const other =
+        voiceUsers.get(
+          target
+        );
+
+      if (
+        !mine ||
+        !other ||
+        String(mine.serverId) !==
+          String(other.serverId)
+      ) {
+        return;
+      }
+
+      io.to(target).emit(
+        "voice-peer-reconnect",
+        {
+          from:
+            socket.id
+        }
+      );
+    }
+  );
+
+  socket.on(
+    "disconnect",
+    () => {
+      const oldServerId =
+        socketServerIds.get(
+          socket.id
+        );
+
+      leaveVoice(socket);
+
+      users.delete(
+        socket.id
+      );
+
+      userIds.delete(
+        socket.id
+      );
+
+      socketServerIds.delete(
+        socket.id
+      );
+
+      if (oldServerId) {
+        emitOnlineUsers(
+          oldServerId
+        );
+      }
+    }
+  );
 });
 
 const PORT = Number(process.env.PORT) || 3000;
 
 peopleInitAccounts()
   .then(() => peopleInitSocial())
+  .then(() => peopleInitServersV1())
   .then(() => {
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`People lance sur http://localhost:${PORT}`);

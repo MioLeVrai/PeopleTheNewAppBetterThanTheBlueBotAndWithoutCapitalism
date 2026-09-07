@@ -65,14 +65,20 @@
 
       <div class="rail-separator"></div>
 
+      <div
+        id="serverRailList"
+        class="server-rail-list"
+        aria-label="Tes serveurs"
+      ></div>
+
       <button
-        id="peopleRailButton"
-        class="rail-button rail-server active"
+        id="createServerRailButton"
+        class="rail-button server-create-button"
         type="button"
-        title="Serveur People"
-        aria-label="Serveur People"
+        title="Créer un serveur"
+        aria-label="Créer un serveur"
       >
-        P
+        +
       </button>
     </nav>
 
@@ -102,10 +108,30 @@
 
       <section id="peopleSidebar" class="sidebar-mode">
         <div class="server-title">
-          <div class="server-icon">P</div>
+          <div
+            id="activeServerIcon"
+            class="server-icon"
+          >?</div>
+
           <div>
-            <strong>People</strong>
-            <span><b id="userCount">0</b> en ligne</span>
+            <strong id="activeServerName">
+              Serveur
+            </strong>
+            <span>
+              <b id="userCount">0</b> en ligne
+            </span>
+          </div>
+
+          <div class="server-title-actions">
+            <button
+              id="serverInviteButton"
+              class="server-invite-button"
+              type="button"
+              title="Copier le lien d'invitation"
+              aria-label="Copier le lien d'invitation"
+            >
+              🔗
+            </button>
           </div>
         </div>
 
@@ -171,7 +197,7 @@
       <header class="topbar">
         <div>
           <strong># général</strong>
-          <span>ça c'est sensé être la description sous le salon</span>
+          <span id="activeTextChannelSubtitle">Salon général</span>
         </div>
 
         <button
@@ -197,7 +223,7 @@
         <div class="welcome">
           <div class="hash">#</div>
           <h2>Bienvenue dans # général</h2>
-          <p>Le salon texte général de People.</p>
+          <p id="serverWelcomeText">Le salon texte général.</p>
         </div>
       </section>
 
@@ -479,6 +505,112 @@
     </section>
   </div>
 
+
+  <div
+    id="createServerModal"
+    class="people-server-modal hidden"
+  >
+    <section
+      class="people-server-modal-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="createServerTitle"
+    >
+      <button
+        id="createServerModalClose"
+        class="people-server-modal-close"
+        type="button"
+        aria-label="Fermer"
+      >✕</button>
+
+      <h2 id="createServerTitle">
+        Créer ton serveur
+      </h2>
+
+      <p>
+        Pour cette V1, il aura automatiquement un
+        # général et un 🔊 vocal. Pas d'autres salons pour l'instant.
+      </p>
+
+      <form
+        id="createServerForm"
+        class="people-server-form"
+      >
+        <label for="createServerNameInput">
+          NOM DU SERVEUR
+        </label>
+
+        <input
+          id="createServerNameInput"
+          maxlength="40"
+          minlength="2"
+          placeholder="Mon serveur"
+          autocomplete="off"
+          required
+        />
+
+        <div
+          id="createServerError"
+          class="people-server-error"
+        ></div>
+
+        <button
+          class="people-server-primary"
+          type="submit"
+        >
+          Créer
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <div
+    id="serverInviteModal"
+    class="people-server-modal hidden"
+  >
+    <section
+      class="people-server-modal-card people-invite-card"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        id="serverInviteModalClose"
+        class="people-server-modal-close"
+        type="button"
+        aria-label="Fermer"
+      >✕</button>
+
+      <div
+        id="inviteServerIcon"
+        class="people-invite-icon"
+      >?</div>
+
+      <p>Tu as reçu une invitation pour rejoindre</p>
+
+      <h2 id="inviteServerName">
+        Serveur
+      </h2>
+
+      <p id="inviteServerMembers">
+        0 membre
+      </p>
+
+      <div
+        id="inviteError"
+        class="people-server-error"
+      ></div>
+
+      <button
+        id="inviteJoinButton"
+        class="people-server-primary"
+        type="button"
+      >
+        Rejoindre le serveur
+      </button>
+    </section>
+  </div>
+
+
   <div id="audioContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -490,6 +622,7 @@
 <script src="people-avatar-upload-fix.js"></script>
 <script src="people-avatar-ultra.js"></script>
 <script src="people-social.js"></script>
+<script src="people-servers.js"></script>
 <script src="people-local-controls.js"></script>
 </body>
 </html>

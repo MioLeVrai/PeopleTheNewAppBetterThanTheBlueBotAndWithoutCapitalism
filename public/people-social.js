@@ -227,6 +227,11 @@
     );
   }
 
+  window.PeopleSocialNavigation = {
+    setMode,
+    showFriends
+  };
+
   function updateUnreadBadge(total) {
     const count = Math.max(0, Number(total || 0));
 
@@ -1226,17 +1231,7 @@ function dmTextLine(
         refreshDirectory("")
       ]);
 
-      let preferred = "server";
-
-      try {
-        preferred =
-          localStorage.getItem("people-main-mode") ||
-          "server";
-      } catch {}
-
-      setMode(
-        preferred === "home" ? "home" : "server"
-      );
+      showFriends();
     } catch {
       socialReady = false;
     }
@@ -1245,11 +1240,6 @@ function dmTextLine(
   homeRailButton?.addEventListener(
     "click",
     showFriends
-  );
-
-  peopleRailButton?.addEventListener(
-    "click",
-    () => setMode("server")
   );
 
   friendsNavButton?.addEventListener(

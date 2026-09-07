@@ -2366,3 +2366,188 @@ button, input { font: inherit; }
 }
 
 /* === PEOPLE_LOGOUT_BOTTOM_LEFT_TEMP_V1_END === */
+
+/* === PEOPLE_SERVERS_V1_UI_START === */
+
+.server-rail-list {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.dynamic-server-button {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.server-create-button {
+  margin-top: 8px;
+  background: #2b2d31;
+  color: #23a559;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.server-create-button:hover {
+  background: #23a559;
+  color: white;
+}
+
+.server-rail-empty {
+  color: #5d6069;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.server-title {
+  position: relative;
+}
+
+.server-title-actions {
+  margin-left: auto;
+}
+
+.server-invite-button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: #35373c;
+  color: #dbdee1;
+  cursor: pointer;
+}
+
+.server-invite-button:hover {
+  background: #404249;
+  color: white;
+}
+
+.people-server-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 25000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.people-server-modal.hidden {
+  display: none;
+}
+
+.people-server-modal-card {
+  position: relative;
+  width: min(92vw, 410px);
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 14px;
+  background: #1e1f22;
+  color: #dbdee1;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.5);
+}
+
+.people-server-modal-card h2 {
+  margin: 0 36px 6px 0;
+  font-size: 19px;
+}
+
+.people-server-modal-card > p {
+  margin: 0 0 16px;
+  color: #949ba4;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.people-server-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #b5bac1;
+  cursor: pointer;
+}
+
+.people-server-modal-close:hover {
+  background: #35373c;
+  color: white;
+}
+
+.people-server-form {
+  display: grid;
+  gap: 10px;
+}
+
+.people-server-form label {
+  color: #b5bac1;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.people-server-form input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid #111214;
+  border-radius: 7px;
+  outline: 0;
+  background: #111214;
+  color: white;
+}
+
+.people-server-form input:focus {
+  border-color: #5865f2;
+}
+
+.people-server-primary {
+  min-height: 40px;
+  border: 0;
+  border-radius: 7px;
+  background: #5865f2;
+  color: white;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.people-server-primary:hover {
+  background: #4752c4;
+}
+
+.people-server-error {
+  min-height: 15px;
+  color: #fa777c;
+  font-size: 10px;
+}
+
+.people-invite-card {
+  text-align: center;
+}
+
+.people-invite-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 12px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  background: #5865f2;
+  color: white;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.people-invite-card h2 {
+  margin-right: 0;
+}
+
+.people-invite-card .people-server-primary {
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* === PEOPLE_SERVERS_V1_UI_END === */

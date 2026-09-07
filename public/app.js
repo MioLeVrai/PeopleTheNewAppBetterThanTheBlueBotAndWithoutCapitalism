@@ -676,6 +676,148 @@ function attachRemoteMedia(peerId, stream) {
   syncVideoStageVisibility();
 }
 
+// === PEOPLE_SERVER_RUNTIME_V1_START ===
+let peopleActiveServerId = null;
+
+function peopleApplySelectedServerPayload(
+  payload
+) {
+  renderChatHistory(
+    payload?.history || []
+  );
+
+  peopleRenderOnlineUsers(
+    payload?.online || []
+  );
+
+  userCount.textContent =
+    String(
+      (
+        payload?.online ||
+        []
+      ).length
+    );
+
+  renderVoiceUsers(
+    payload?.voice || []
+  );
+}
+
+function peopleSelectServerSocket(
+  serverId
+) {
+  return new Promise(
+    (resolve) => {
+      socket.emit(
+        "server-select",
+        {
+          serverId:
+            String(serverId)
+        },
+        (response) => {
+          resolve(
+            response || {
+              ok: false,
+              error:
+                "Le serveur n'a pas répondu."
+            }
+          );
+        }
+      );
+    }
+  );
+}
+
+window.PeopleServerRuntime = {
+  async selectServer(server) {
+    if (!server?.id) {
+      return {
+        ok: false,
+        error:
+          "Serveur invalide."
+      };
+    }
+
+    if (voiceJoined) {
+      leaveVoice();
+    }
+
+    closeAllPeers();
+
+    const response =
+      await peopleSelectServerSocket(
+        server.id
+      );
+
+    if (!response?.ok) {
+      return response;
+    }
+
+    peopleActiveServerId =
+      String(server.id);
+
+    peopleGeneralReplyController
+      ?.clear();
+
+    peopleGeneralImagePicker
+      ?.clear();
+
+    peopleApplySelectedServerPayload(
+      response
+    );
+
+    return response;
+  },
+
+  async reselect() {
+    if (!peopleActiveServerId) {
+      return;
+    }
+
+    const response =
+      await peopleSelectServerSocket(
+        peopleActiveServerId
+      );
+
+    if (!response?.ok) {
+      peopleActiveServerId =
+        null;
+
+      window.dispatchEvent(
+        new CustomEvent(
+          "people-server-invalid"
+        )
+      );
+
+      return;
+    }
+
+    peopleApplySelectedServerPayload(
+      response
+    );
+
+    if (
+      voiceJoined &&
+      localStream
+    ) {
+      socket.emit(
+        "voice-join",
+        {
+          muted:
+            micMuted,
+          camera:
+            cameraEnabled
+        }
+      );
+    }
+  },
+
+  getActiveServerId() {
+    return peopleActiveServerId;
+  }
+};
+// === PEOPLE_SERVER_RUNTIME_V1_END ===
+
 let authMode = "login";
 
 function setAuthMode(mode) {
@@ -864,6 +1006,11 @@ messageForm.addEventListener(
   async (e) => {
     e.preventDefault();
 
+    if (!peopleActiveServerId) {
+      alert("Choisis d'abord un serveur.");
+      return;
+    }
+
     const text =
       messageInput.value.trim();
 
@@ -951,18 +1098,22 @@ socket.on("connect", () => {
   if (!username) return;
 
   socket.emit("join", {
-    username,
     reconnect: true
   });
 
-  if (voiceJoined && localStream) {
+  if (
+    window.PeopleServerRuntime
+      ?.getActiveServerId()
+  ) {
     closeAllPeers();
-    setTimeout(() => {
-      socket.emit("voice-join", {
-        muted: micMuted,
-        camera: cameraEnabled
-      });
-    }, 150);
+
+    setTimeout(
+      () => {
+        window.PeopleServerRuntime
+          ?.reselect();
+      },
+      80
+    );
   }
 });
 
