@@ -136,6 +136,13 @@
           <span
             id="peopleDmCallStatus"
           >Connexion…</span>
+
+          <span
+            id="peopleDmCallOtherVoice"
+            class="people-dm-call-other-voice hidden"
+          >
+            Actif dans un autre vocal
+          </span>
         </div>
 
         <video
@@ -258,6 +265,11 @@
   const callStatus =
     document.getElementById(
       "peopleDmCallStatus"
+    );
+
+  const callOtherVoice =
+    document.getElementById(
+      "peopleDmCallOtherVoice"
     );
 
   const incomingActions =
@@ -559,6 +571,16 @@
       String(
         text ||
         ""
+      );
+  }
+
+  function setOtherVoice(
+    active
+  ) {
+    callOtherVoice
+      ?.classList.toggle(
+        "hidden",
+        !active
       );
   }
 
@@ -1451,6 +1473,8 @@
         "Appel interrompu",
       unavailable:
         "Utilisateur hors ligne",
+      limit:
+        "Limite de 2 vocaux/appels atteinte",
       "answered-elsewhere":
         "Appel pris sur un autre onglet"
     };
@@ -1479,6 +1503,10 @@
       call;
 
     call = null;
+
+    setOtherVoice(
+      false
+    );
 
     showMode(
       "none"
@@ -1536,6 +1564,12 @@
 
     setCallPerson(
       call.username
+    );
+
+    setOtherVoice(
+      Boolean(
+        payload?.peerOtherVoice
+      )
     );
 
     setStatus(
@@ -1598,6 +1632,12 @@
       Boolean(
         payload?.peerCamera
       );
+
+    setOtherVoice(
+      Boolean(
+        payload?.peerOtherVoice
+      )
+    );
 
     setStatus(
       "Connexion…"
@@ -1717,6 +1757,12 @@
 
         setCallPerson(
           call.username
+        );
+
+        setOtherVoice(
+          Boolean(
+            response?.peerOtherVoice
+          )
         );
 
         setStatus(
@@ -1874,6 +1920,27 @@
     (payload) => {
       void beginActiveCall(
         payload
+      );
+    }
+  );
+
+  socket.on(
+    "dm-call-other-voice",
+    (payload) => {
+      if (
+        !call ||
+        String(
+          payload?.callId ||
+          ""
+        ) !== call.id
+      ) {
+        return;
+      }
+
+      setOtherVoice(
+        Boolean(
+          payload?.otherVoice
+        )
       );
     }
   );

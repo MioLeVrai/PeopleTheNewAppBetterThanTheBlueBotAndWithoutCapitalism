@@ -7206,6 +7206,11 @@ function peopleDmCallFinish(
     return false;
   }
 
+  // === PEOPLE_DM_CALL_FINISH_VOICE_REFRESH_V3 ===
+  const wasActive =
+    call.status ===
+    "active";
+
   const timer =
     peopleDmCallTimers.get(
       id
@@ -7282,6 +7287,16 @@ function peopleDmCallFinish(
         )
     }
   );
+
+  if (wasActive) {
+    peopleVoiceRefreshAccount(
+      call.callerAccountId
+    );
+
+    peopleVoiceRefreshAccount(
+      call.calleeAccountId
+    );
+  }
 
   return true;
 }
@@ -8184,6 +8199,241 @@ function peopleVoiceAccountServerIds(
   return rooms;
 }
 
+// === PEOPLE_UNIFIED_VOICE_LIMIT_V3_START ===
+const PEOPLE_MAX_SIMULTANEOUS_VOICES =
+  2;
+
+function peopleAccountDmCallCount(
+  accountId,
+  {
+    includeRinging = false
+  } = {}
+) {
+  const wanted =
+    String(
+      accountId ||
+      ""
+    );
+
+  if (!wanted) {
+    return 0;
+  }
+
+  let count =
+    0;
+
+  for (
+    const call of
+    peopleDmCalls.values()
+  ) {
+    const involved =
+      String(
+        call?.callerAccountId ||
+        ""
+      ) === wanted ||
+      String(
+        call?.calleeAccountId ||
+        ""
+      ) === wanted;
+
+    if (!involved) {
+      continue;
+    }
+
+    if (
+      call.status ===
+      "active"
+    ) {
+      count +=
+        1;
+
+      continue;
+    }
+
+    if (
+      includeRinging &&
+      call.status ===
+        "ringing"
+    ) {
+      count +=
+        1;
+    }
+  }
+
+  return count;
+}
+
+function peopleAccountActiveVoiceCount(
+  accountId
+) {
+  return (
+    peopleVoiceAccountServerIds(
+      accountId
+    ).size +
+    peopleAccountDmCallCount(
+      accountId
+    )
+  );
+}
+
+function peopleAccountReservedVoiceCount(
+  accountId
+) {
+  /*
+    Un appel qui sonne réserve déjà une place.
+    Sinon 3 appels pourraient sonner en parallèle,
+    puis être acceptés et dépasser la limite.
+  */
+  return (
+    peopleVoiceAccountServerIds(
+      accountId
+    ).size +
+    peopleAccountDmCallCount(
+      accountId,
+      {
+        includeRinging:
+          true
+      }
+    )
+  );
+}
+
+function peopleAccountHasVoiceSlot(
+  accountId
+) {
+  return (
+    peopleAccountReservedVoiceCount(
+      accountId
+    ) <
+    PEOPLE_MAX_SIMULTANEOUS_VOICES
+  );
+}
+
+function peopleDmCallPeerHasOtherVoice(
+  call,
+  peerAccountId
+) {
+  const active =
+    peopleAccountActiveVoiceCount(
+      peerAccountId
+    );
+
+  /*
+    Pendant un appel ACTIF, l'appel courant est déjà
+    compris dans "active". Il faut donc > 1.
+
+    Pendant la sonnerie, l'appel courant n'est pas
+    encore actif : > 0 signifie que la personne est
+    déjà dans un autre vocal.
+  */
+  return call?.status ===
+    "active"
+    ? active > 1
+    : active > 0;
+}
+
+function peopleDmCallEmitOtherVoiceState(
+  call
+) {
+  if (!call?.id) {
+    return;
+  }
+
+  const callerSocket =
+    String(
+      call.callerSocketId ||
+      ""
+    );
+
+  if (callerSocket) {
+    io.to(
+      callerSocket
+    ).emit(
+      "dm-call-other-voice",
+      {
+        callId:
+          call.id,
+        otherVoice:
+          peopleDmCallPeerHasOtherVoice(
+            call,
+            call.calleeAccountId
+          )
+      }
+    );
+  }
+
+  const calleeSockets =
+    call.calleeSocketId
+      ? [
+          String(
+            call.calleeSocketId
+          )
+        ]
+      : peopleDmCallAccountSocketIds(
+          call.calleeAccountId
+        );
+
+  peopleDmCallEmitSocketIds(
+    calleeSockets,
+    "dm-call-other-voice",
+    {
+      callId:
+        call.id,
+      otherVoice:
+        peopleDmCallPeerHasOtherVoice(
+          call,
+          call.callerAccountId
+        )
+    }
+  );
+}
+
+function peopleDmCallRefreshOtherVoiceForAccount(
+  accountId
+) {
+  const wanted =
+    String(
+      accountId ||
+      ""
+    );
+
+  if (!wanted) {
+    return;
+  }
+
+  for (
+    const call of
+    peopleDmCalls.values()
+  ) {
+    if (
+      call.status !==
+        "ringing" &&
+      call.status !==
+        "active"
+    ) {
+      continue;
+    }
+
+    if (
+      String(
+        call.callerAccountId ||
+        ""
+      ) !== wanted &&
+      String(
+        call.calleeAccountId ||
+        ""
+      ) !== wanted
+    ) {
+      continue;
+    }
+
+    peopleDmCallEmitOtherVoiceState(
+      call
+    );
+  }
+}
+// === PEOPLE_UNIFIED_VOICE_LIMIT_V3_END ===
+
 function peopleVoiceAccountInServer(
   accountId,
   serverId,
@@ -8255,9 +8505,9 @@ function peopleVoicePublicUser(
 
   const roomCount =
     accountId
-      ? peopleVoiceAccountServerIds(
+      ? peopleAccountActiveVoiceCount(
           accountId
-        ).size
+        )
       : 1;
 
   return {
@@ -8320,6 +8570,15 @@ function peopleVoiceRefreshAccount(
       sid
     );
   }
+
+  /*
+    Si ce compte est aussi dans un appel MP,
+    son interlocuteur doit voir instantanément
+    "Actif dans un autre vocal".
+  */
+  peopleDmCallRefreshOtherVoiceForAccount(
+    accountId
+  );
 }
 // === PEOPLE_MULTI_VOICE_V1_END ===
 
@@ -8609,26 +8868,26 @@ io.on("connection", (socket) => {
           );
 
         if (
-          peopleDmCallAccountBusy(
+          !peopleAccountHasVoiceSlot(
             callerAccountId
           )
         ) {
           return ack({
             ok: false,
             error:
-              "Tu es déjà dans un appel."
+              "Tu es déjà dans 2 vocaux/appels."
           });
         }
 
         if (
-          peopleDmCallAccountBusy(
+          !peopleAccountHasVoiceSlot(
             target.id
           )
         ) {
           return ack({
             ok: false,
             error:
-              "Cette personne est déjà en appel."
+              "Cette personne est déjà active dans 2 vocaux/appels."
           });
         }
 
@@ -8705,7 +8964,11 @@ io.on("connection", (socket) => {
                 ),
               username:
                 call.callerUsername
-            }
+            },
+            peerOtherVoice:
+              peopleAccountActiveVoiceCount(
+                callerAccountId
+              ) > 0
           }
         );
 
@@ -8715,7 +8978,11 @@ io.on("connection", (socket) => {
           target:
             peoplePublicAccount(
               target
-            )
+            ),
+          peerOtherVoice:
+            peopleAccountActiveVoiceCount(
+              target.id
+            ) > 0
         });
       } catch (err) {
         console.error(
@@ -8770,6 +9037,29 @@ io.on("connection", (socket) => {
         });
       }
 
+      // === VOICE_LIMIT_ON_ANSWER ===
+      if (
+        peopleAccountActiveVoiceCount(
+          call.callerAccountId
+        ) >=
+          PEOPLE_MAX_SIMULTANEOUS_VOICES ||
+        peopleAccountActiveVoiceCount(
+          call.calleeAccountId
+        ) >=
+          PEOPLE_MAX_SIMULTANEOUS_VOICES
+      ) {
+        peopleDmCallFinish(
+          call.id,
+          "limit"
+        );
+
+        return ack({
+          ok: false,
+          reason:
+            "limit"
+        });
+      }
+
       const timer =
         peopleDmCallTimers.get(
           call.id
@@ -8799,6 +9089,19 @@ io.on("connection", (socket) => {
       peopleDmCalls.set(
         call.id,
         call
+      );
+
+      /*
+        L'appel MP devient une vraie session vocale.
+        On rafraîchit les listes des vocaux serveur
+        et tous les appels concernés.
+      */
+      peopleVoiceRefreshAccount(
+        call.callerAccountId
+      );
+
+      peopleVoiceRefreshAccount(
+        call.calleeAccountId
       );
 
       const otherCalleeSockets =
@@ -8837,7 +9140,12 @@ io.on("connection", (socket) => {
           initiator:
             true,
           peerCamera:
-            false
+            false,
+          peerOtherVoice:
+            peopleDmCallPeerHasOtherVoice(
+              call,
+              call.calleeAccountId
+            )
         }
       );
 
@@ -8855,7 +9163,12 @@ io.on("connection", (socket) => {
           initiator:
             false,
           peerCamera:
-            false
+            false,
+          peerOtherVoice:
+            peopleDmCallPeerHasOtherVoice(
+              call,
+              call.callerAccountId
+            )
         }
       );
 
@@ -9592,9 +9905,9 @@ io.on("connection", (socket) => {
                   aid
                 ).size,
               otherVoice:
-                peopleVoiceAccountServerIds(
+                peopleAccountActiveVoiceCount(
                   aid
-                ).size > 1
+                ) > 1
             });
           }
 
@@ -9633,15 +9946,17 @@ io.on("connection", (socket) => {
           !currentRooms.has(
             sid
           ) &&
-          currentRooms.size >=
-            PEOPLE_MAX_VOICE_ROOMS_PER_ACCOUNT
+          peopleAccountReservedVoiceCount(
+            aid
+          ) >=
+            PEOPLE_MAX_SIMULTANEOUS_VOICES
         ) {
           return ack({
             ok: false,
             code:
               "VOICE_LIMIT",
             error:
-              "Tu es déjà dans 2 vocaux. Quitte-en un avant d'en rejoindre un autre."
+              "Tu es déjà dans 2 vocaux/appels. Quitte-en un avant d'en rejoindre un autre."
           });
         }
 
@@ -9693,9 +10008,9 @@ io.on("connection", (socket) => {
         );
 
         const roomCount =
-          peopleVoiceAccountServerIds(
+          peopleAccountActiveVoiceCount(
             aid
-          ).size;
+          );
 
         ack({
           ok: true,
