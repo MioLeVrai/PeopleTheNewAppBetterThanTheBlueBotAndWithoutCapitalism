@@ -729,6 +729,32 @@ function peopleSelectServerSocket(
 }
 
 window.PeopleServerRuntime = {
+  clearSelection() {
+    if (voiceJoined) {
+      leaveVoice();
+    }
+
+    closeAllPeers();
+
+    peopleActiveServerId =
+      null;
+
+    renderChatHistory(
+      []
+    );
+
+    peopleRenderOnlineUsers(
+      []
+    );
+
+    userCount.textContent =
+      "0";
+
+    renderVoiceUsers(
+      []
+    );
+  },
+
   async selectServer(server) {
     if (!server?.id) {
       return {
@@ -816,6 +842,31 @@ window.PeopleServerRuntime = {
     return peopleActiveServerId;
   }
 };
+socket.on(
+  "server-membership-left",
+  ({ serverId } = {}) => {
+    if (
+      String(
+        window.PeopleServerRuntime
+          ?.getActiveServerId() ||
+        ""
+      ) !==
+      String(serverId || "")
+    ) {
+      return;
+    }
+
+    window.PeopleServerRuntime
+      ?.clearSelection();
+
+    window.dispatchEvent(
+      new CustomEvent(
+        "people-server-invalid"
+      )
+    );
+  }
+);
+
 // === PEOPLE_SERVER_RUNTIME_V1_END ===
 
 let authMode = "login";

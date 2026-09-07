@@ -2551,3 +2551,45 @@ button, input { font: inherit; }
 }
 
 /* === PEOPLE_SERVERS_V1_UI_END === */
+
+/* === PEOPLE_SERVER_CONTEXT_MENU_V1_UI_START === */
+
+.people-server-context-menu {
+  position: fixed;
+  z-index: 32000;
+  width: 190px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 9px;
+  background: #111214;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+}
+
+.people-server-context-item {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #dbdee1;
+  cursor: pointer;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.people-server-context-item:hover {
+  background: #35373c;
+}
+
+.people-server-context-item.danger {
+  color: #f23f42;
+}
+
+.people-server-context-item.danger:hover {
+  background: #da373c;
+  color: white;
+}
+
+/* === PEOPLE_SERVER_CONTEXT_MENU_V1_UI_END === */

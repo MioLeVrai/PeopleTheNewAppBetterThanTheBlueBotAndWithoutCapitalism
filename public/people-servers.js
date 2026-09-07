@@ -171,6 +171,274 @@
         : null;
   }
 
+// === PEOPLE_SERVER_CONTEXT_MENU_V1_START ===
+  let serverContextMenu =
+    null;
+
+  function closeServerContextMenu() {
+    if (!serverContextMenu) {
+      return;
+    }
+
+    serverContextMenu.remove();
+    serverContextMenu = null;
+  }
+
+  function makeServerMenuItem(
+    label,
+    className,
+    action
+  ) {
+    const button =
+      document.createElement(
+        "button"
+      );
+
+    button.type =
+      "button";
+
+    button.className =
+      "people-server-context-item " +
+      className;
+
+    button.textContent =
+      label;
+
+    button.addEventListener(
+      "click",
+      async () => {
+        closeServerContextMenu();
+
+        try {
+          await action();
+        } catch (err) {
+          alert(
+            err?.message ||
+            "Action impossible."
+          );
+        }
+      }
+    );
+
+    return button;
+  }
+
+  async function getServerInviteLink(
+    server
+  ) {
+    if (!server?.id) {
+      throw new Error(
+        "Serveur invalide."
+      );
+    }
+
+    const data =
+      await api(
+        "/api/servers/" +
+          encodeURIComponent(
+            server.id
+          ) +
+          "/invite"
+      );
+
+    return (
+      location.origin +
+      data.invitePath
+    );
+  }
+
+  async function copyServerInvite(
+    server
+  ) {
+    const link =
+      await getServerInviteLink(
+        server
+      );
+
+    try {
+      await navigator
+        .clipboard
+        .writeText(
+          link
+        );
+    } catch {
+      prompt(
+        "Lien d'invitation :",
+        link
+      );
+    }
+  }
+
+  async function leaveServer(
+    server
+  ) {
+    if (!server?.id) {
+      return;
+    }
+
+    const accepted =
+      confirm(
+        "Quitter « " +
+          server.name +
+          " » ?"
+      );
+
+    if (!accepted) {
+      return;
+    }
+
+    await api(
+      "/api/servers/" +
+        encodeURIComponent(
+          server.id
+        ) +
+        "/membership",
+      {
+        method:
+          "DELETE"
+      }
+    );
+
+    const wasActive =
+      activeServer &&
+      String(activeServer.id) ===
+        String(server.id);
+
+    if (wasActive) {
+      activeServer = null;
+      viewingHome = true;
+
+      window
+        .PeopleServerRuntime
+        ?.clearSelection();
+
+      window
+        .PeopleSocialNavigation
+        ?.showFriends();
+    }
+
+    await refreshServers();
+
+    renderRail();
+  }
+
+  function openServerContextMenu(
+    event,
+    server
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    closeServerContextMenu();
+
+    const menu =
+      document.createElement(
+        "div"
+      );
+
+    menu.className =
+      "people-server-context-menu";
+
+    menu.appendChild(
+      makeServerMenuItem(
+        "🔗 Copier le lien",
+        "copy",
+        () =>
+          copyServerInvite(
+            server
+          )
+      )
+    );
+
+    menu.appendChild(
+      makeServerMenuItem(
+        "🚪 Quitter le serveur",
+        "danger",
+        () =>
+          leaveServer(
+            server
+          )
+      )
+    );
+
+    document.body.appendChild(
+      menu
+    );
+
+    serverContextMenu =
+      menu;
+
+    const rect =
+      menu.getBoundingClientRect();
+
+    const left =
+      Math.max(
+        8,
+        Math.min(
+          event.clientX,
+          window.innerWidth -
+            rect.width -
+            8
+        )
+      );
+
+    const top =
+      Math.max(
+        8,
+        Math.min(
+          event.clientY,
+          window.innerHeight -
+            rect.height -
+            8
+        )
+      );
+
+    menu.style.left =
+      left + "px";
+
+    menu.style.top =
+      top + "px";
+  }
+
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (
+        serverContextMenu &&
+        !serverContextMenu.contains(
+          event.target
+        )
+      ) {
+        closeServerContextMenu();
+      }
+    },
+    true
+  );
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key ===
+        "Escape"
+      ) {
+        closeServerContextMenu();
+      }
+    }
+  );
+
+  window.addEventListener(
+    "blur",
+    closeServerContextMenu
+  );
+
+  document.addEventListener(
+    "scroll",
+    closeServerContextMenu,
+    true
+  );
+  // === PEOPLE_SERVER_CONTEXT_MENU_V1_END ===
+
   function renderRail() {
     if (!railList) return;
 
@@ -217,6 +485,15 @@
         "click",
         () =>
           openServer(
+            server
+          )
+      );
+
+      button.addEventListener(
+        "contextmenu",
+        (event) =>
+          openServerContextMenu(
+            event,
             server
           )
       );
@@ -568,45 +845,23 @@
     }
 
     try {
-      const data =
-        await api(
-          "/api/servers/" +
-            encodeURIComponent(
-              activeServer.id
-            ) +
-            "/invite"
-        );
+      await copyServerInvite(
+        activeServer
+      );
 
-      const link =
-        location.origin +
-        data.invitePath;
+      const old =
+        inviteButton.textContent;
 
-      try {
-        await navigator
-          .clipboard
-          .writeText(
-            link
-          );
+      inviteButton.textContent =
+        "✓";
 
-        const old =
-          inviteButton.textContent;
-
-        inviteButton.textContent =
-          "✓";
-
-        setTimeout(
-          () => {
-            inviteButton.textContent =
-              old;
-          },
-          1000
-        );
-      } catch {
-        prompt(
-          "Lien d'invitation :",
-          link
-        );
-      }
+      setTimeout(
+        () => {
+          inviteButton.textContent =
+            old;
+        },
+        1000
+      );
     } catch (err) {
       alert(
         err.message

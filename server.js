@@ -6386,6 +6386,160 @@ app.post(
   }
 );
 
+// === PEOPLE_SERVER_LEAVE_V1_START ===
+app.delete(
+  "/api/servers/:id/membership",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const server =
+        await peopleGetServer(
+          req.params.id
+        );
+
+      if (!server) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Serveur introuvable."
+        });
+      }
+
+      const member =
+        await peopleIsServerMember(
+          session.id,
+          server.id
+        );
+
+      if (!member) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Tu n'es pas membre de ce serveur."
+        });
+      }
+
+      if (
+        server.ownerId &&
+        String(server.ownerId) ===
+          String(session.id)
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Tu ne peux pas quitter un serveur dont tu es propriétaire pour l'instant."
+        });
+      }
+
+      if (peoplePool) {
+        await peoplePool.query(
+          "DELETE FROM people_server_members " +
+          "WHERE server_id = $1 AND user_id = $2",
+          [
+            String(server.id),
+            String(session.id)
+          ]
+        );
+      } else {
+        const data =
+          peopleReadLocalServers();
+
+        data.members =
+          data.members.filter(
+            (entry) =>
+              !(
+                String(entry.serverId) ===
+                  String(server.id) &&
+                String(entry.userId) ===
+                  String(session.id)
+              )
+          );
+
+        peopleWriteLocalServers(
+          data
+        );
+      }
+
+      for (
+        const [
+          socketId,
+          currentServerId
+        ]
+        of socketServerIds.entries()
+      ) {
+        if (
+          String(currentServerId) !==
+            String(server.id) ||
+          String(
+            userIds.get(socketId) || ""
+          ) !==
+            String(session.id)
+        ) {
+          continue;
+        }
+
+        const targetSocket =
+          io.sockets.sockets.get(
+            socketId
+          );
+
+        if (targetSocket) {
+          leaveVoice(
+            targetSocket
+          );
+
+          await targetSocket.leave(
+            peopleServerRoom(
+              server.id
+            )
+          );
+
+          targetSocket.emit(
+            "server-membership-left",
+            {
+              serverId:
+                String(server.id)
+            }
+          );
+        }
+
+        socketServerIds.delete(
+          socketId
+        );
+      }
+
+      emitOnlineUsers(
+        server.id
+      );
+
+      res.json({
+        ok: true,
+        serverId:
+          String(server.id)
+      });
+    } catch (err) {
+      console.error(
+        "[People servers/leave]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de quitter le serveur."
+      });
+    }
+  }
+);
+// === PEOPLE_SERVER_LEAVE_V1_END ===
+
 app.get(
   "/api/servers/:id/invite",
   async (req, res) => {
