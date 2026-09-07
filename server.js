@@ -7012,6 +7012,375 @@ const userIds = new Map();
 const socketServerIds = new Map();
 const voiceUsers = new Map();
 
+// === PEOPLE_DM_CALLS_V1_START ===
+const peopleDmCalls =
+  new Map();
+
+const peopleDmCallTimers =
+  new Map();
+
+const peopleDmCallLastStart =
+  new Map();
+
+const PEOPLE_DM_CALL_RING_MS =
+  35 * 1000;
+
+async function peopleDmCallFindAccountByUsername(
+  value
+) {
+  const wantedKey =
+    peopleUsernameKey(
+      value
+    );
+
+  if (!wantedKey) {
+    return null;
+  }
+
+  const matches =
+    await peopleListAccounts(
+      value
+    );
+
+  return (
+    matches.find(
+      (account) =>
+        peopleUsernameKey(
+          account?.username
+        ) === wantedKey
+    ) ||
+    null
+  );
+}
+
+function peopleDmCallAccountSocketIds(
+  accountId
+) {
+  const wanted =
+    String(
+      accountId ||
+      ""
+    );
+
+  const sockets = [];
+
+  for (
+    const [socketId, currentId]
+    of userIds.entries()
+  ) {
+    if (
+      String(currentId) ===
+      wanted
+    ) {
+      sockets.push(
+        socketId
+      );
+    }
+  }
+
+  return sockets;
+}
+
+function peopleDmCallAccountBusy(
+  accountId
+) {
+  const wanted =
+    String(
+      accountId ||
+      ""
+    );
+
+  for (
+    const call of
+    peopleDmCalls.values()
+  ) {
+    if (
+      call.status !== "ringing" &&
+      call.status !== "active"
+    ) {
+      continue;
+    }
+
+    if (
+      String(
+        call.callerAccountId
+      ) === wanted ||
+      String(
+        call.calleeAccountId
+      ) === wanted
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function peopleDmCallEmitSocketIds(
+  socketIds,
+  event,
+  payload
+) {
+  const unique =
+    new Set(
+      socketIds
+        .map(
+          (id) =>
+            String(
+              id ||
+              ""
+            )
+        )
+        .filter(Boolean)
+    );
+
+  for (
+    const socketId of
+    unique
+  ) {
+    io.to(
+      socketId
+    ).emit(
+      event,
+      payload
+    );
+  }
+}
+
+function peopleDmCallFinish(
+  callId,
+  reason = "hangup"
+) {
+  const id =
+    String(
+      callId ||
+      ""
+    );
+
+  const call =
+    peopleDmCalls.get(
+      id
+    );
+
+  if (!call) {
+    return false;
+  }
+
+  const timer =
+    peopleDmCallTimers.get(
+      id
+    );
+
+  if (timer) {
+    clearTimeout(
+      timer
+    );
+  }
+
+  peopleDmCallTimers.delete(
+    id
+  );
+
+  peopleDmCalls.delete(
+    id
+  );
+
+  const recipients = [
+    call.callerSocketId
+  ];
+
+  if (
+    call.calleeSocketId
+  ) {
+    recipients.push(
+      call.calleeSocketId
+    );
+  } else {
+    recipients.push(
+      ...peopleDmCallAccountSocketIds(
+        call.calleeAccountId
+      )
+    );
+  }
+
+  peopleDmCallEmitSocketIds(
+    recipients,
+    "dm-call-ended",
+    {
+      callId:
+        id,
+      reason:
+        String(
+          reason ||
+          "hangup"
+        )
+    }
+  );
+
+  return true;
+}
+
+function peopleDmCallForActiveSocket(
+  callId,
+  socketId
+) {
+  const call =
+    peopleDmCalls.get(
+      String(
+        callId ||
+        ""
+      )
+    );
+
+  if (
+    !call ||
+    call.status !==
+      "active"
+  ) {
+    return null;
+  }
+
+  const currentSocket =
+    String(
+      socketId ||
+      ""
+    );
+
+  if (
+    String(
+      call.callerSocketId
+    ) !== currentSocket &&
+    String(
+      call.calleeSocketId
+    ) !== currentSocket
+  ) {
+    return null;
+  }
+
+  return call;
+}
+
+function peopleDmCallOtherSocket(
+  call,
+  socketId
+) {
+  const current =
+    String(
+      socketId ||
+      ""
+    );
+
+  if (
+    String(
+      call.callerSocketId
+    ) === current
+  ) {
+    return String(
+      call.calleeSocketId ||
+      ""
+    );
+  }
+
+  if (
+    String(
+      call.calleeSocketId
+    ) === current
+  ) {
+    return String(
+      call.callerSocketId ||
+      ""
+    );
+  }
+
+  return "";
+}
+
+function peopleDmCallDisconnect(
+  socket
+) {
+  const socketId =
+    String(
+      socket?.id ||
+      ""
+    );
+
+  const accountId =
+    String(
+      userIds.get(
+        socketId
+      ) ||
+      ""
+    );
+
+  if (
+    !socketId ||
+    !accountId
+  ) {
+    return;
+  }
+
+  for (
+    const call of
+    [...peopleDmCalls.values()]
+  ) {
+    if (
+      String(
+        call.callerSocketId
+      ) === socketId
+    ) {
+      peopleDmCallFinish(
+        call.id,
+        "disconnected"
+      );
+
+      continue;
+    }
+
+    if (
+      call.status ===
+        "active" &&
+      String(
+        call.calleeSocketId
+      ) === socketId
+    ) {
+      peopleDmCallFinish(
+        call.id,
+        "disconnected"
+      );
+
+      continue;
+    }
+
+    if (
+      call.status ===
+        "ringing" &&
+      String(
+        call.calleeAccountId
+      ) === accountId
+    ) {
+      const otherSockets =
+        peopleDmCallAccountSocketIds(
+          accountId
+        ).filter(
+          (id) =>
+            String(id) !==
+            socketId
+        );
+
+      if (
+        otherSockets.length ===
+        0
+      ) {
+        peopleDmCallFinish(
+          call.id,
+          "unavailable"
+        );
+      }
+    }
+  }
+}
+// === PEOPLE_DM_CALLS_V1_END ===
+
 function cleanUsername(value) {
   return String(value || "Invité")
     .trim()
@@ -7457,6 +7826,668 @@ io.on("connection", (socket) => {
       );
     }
   );
+
+// === PEOPLE_DM_CALL_SOCKET_V1_START ===
+  socket.on(
+    "dm-call-start",
+    async (
+      { targetUsername } = {},
+      ack = () => {}
+    ) => {
+      try {
+        const callerAccountId =
+          userIds.get(
+            socket.id
+          );
+
+        const callerUsername =
+          users.get(
+            socket.id
+          );
+
+        if (
+          !callerAccountId ||
+          !callerUsername
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Session invalide."
+          });
+        }
+
+        const now =
+          Date.now();
+
+        const lastStart =
+          Number(
+            peopleDmCallLastStart.get(
+              String(
+                callerAccountId
+              )
+            ) || 0
+          );
+
+        if (
+          now - lastStart <
+          3000
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Attends un instant avant de rappeler."
+          });
+        }
+
+        peopleDmCallLastStart.set(
+          String(
+            callerAccountId
+          ),
+          now
+        );
+
+        const target =
+          await peopleDmCallFindAccountByUsername(
+            targetUsername
+          );
+
+        if (!target) {
+          return ack({
+            ok: false,
+            error:
+              "Utilisateur introuvable."
+          });
+        }
+
+        if (
+          String(
+            target.id
+          ) ===
+          String(
+            callerAccountId
+          )
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Tu ne peux pas t'appeler toi-même."
+          });
+        }
+
+        const targetSockets =
+          peopleDmCallAccountSocketIds(
+            target.id
+          );
+
+        if (
+          targetSockets.length ===
+          0
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Cette personne est hors ligne."
+          });
+        }
+
+        if (
+          peopleDmCallAccountBusy(
+            callerAccountId
+          )
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Tu es déjà dans un appel."
+          });
+        }
+
+        if (
+          peopleDmCallAccountBusy(
+            target.id
+          )
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Cette personne est déjà en appel."
+          });
+        }
+
+        const callId =
+          cryptoAccounts
+            .randomUUID();
+
+        const call = {
+          id:
+            callId,
+          status:
+            "ringing",
+          callerAccountId:
+            String(
+              callerAccountId
+            ),
+          callerSocketId:
+            String(
+              socket.id
+            ),
+          callerUsername:
+            cleanUsername(
+              callerUsername
+            ),
+          calleeAccountId:
+            String(
+              target.id
+            ),
+          calleeSocketId:
+            null,
+          calleeUsername:
+            cleanUsername(
+              target.username
+            ),
+          createdAt:
+            Date.now()
+        };
+
+        peopleDmCalls.set(
+          callId,
+          call
+        );
+
+        const timer =
+          setTimeout(
+            () => {
+              peopleDmCallFinish(
+                callId,
+                "timeout"
+              );
+            },
+            PEOPLE_DM_CALL_RING_MS
+          );
+
+        peopleDmCallTimers.set(
+          callId,
+          timer
+        );
+
+        peopleDmCallEmitSocketIds(
+          targetSockets,
+          "dm-call-incoming",
+          {
+            callId,
+            caller: {
+              id:
+                String(
+                  callerAccountId
+                ),
+              username:
+                call.callerUsername
+            }
+          }
+        );
+
+        ack({
+          ok: true,
+          callId,
+          target:
+            peoplePublicAccount(
+              target
+            )
+        });
+      } catch (err) {
+        console.error(
+          "[People dm-call/start]",
+          err
+        );
+
+        ack({
+          ok: false,
+          error:
+            "Impossible de lancer l'appel."
+        });
+      }
+    }
+  );
+
+  socket.on(
+    "dm-call-answer",
+    (
+      { callId } = {},
+      ack = () => {}
+    ) => {
+      const call =
+        peopleDmCalls.get(
+          String(
+            callId ||
+            ""
+          )
+        );
+
+      const accountId =
+        userIds.get(
+          socket.id
+        );
+
+      if (
+        !call ||
+        call.status !==
+          "ringing" ||
+        !accountId ||
+        String(
+          call.calleeAccountId
+        ) !==
+          String(
+            accountId
+          )
+      ) {
+        return ack({
+          ok: false,
+          reason:
+            "unavailable"
+        });
+      }
+
+      const timer =
+        peopleDmCallTimers.get(
+          call.id
+        );
+
+      if (timer) {
+        clearTimeout(
+          timer
+        );
+      }
+
+      peopleDmCallTimers.delete(
+        call.id
+      );
+
+      call.status =
+        "active";
+
+      call.calleeSocketId =
+        String(
+          socket.id
+        );
+
+      peopleDmCalls.set(
+        call.id,
+        call
+      );
+
+      const otherCalleeSockets =
+        peopleDmCallAccountSocketIds(
+          call.calleeAccountId
+        ).filter(
+          (id) =>
+            String(id) !==
+            String(
+              socket.id
+            )
+        );
+
+      peopleDmCallEmitSocketIds(
+        otherCalleeSockets,
+        "dm-call-ended",
+        {
+          callId:
+            call.id,
+          reason:
+            "answered-elsewhere"
+        }
+      );
+
+      io.to(
+        call.callerSocketId
+      ).emit(
+        "dm-call-accepted",
+        {
+          callId:
+            call.id,
+          peerSocketId:
+            call.calleeSocketId,
+          peerUsername:
+            call.calleeUsername,
+          initiator:
+            true,
+          peerCamera:
+            false
+        }
+      );
+
+      io.to(
+        call.calleeSocketId
+      ).emit(
+        "dm-call-accepted",
+        {
+          callId:
+            call.id,
+          peerSocketId:
+            call.callerSocketId,
+          peerUsername:
+            call.callerUsername,
+          initiator:
+            false,
+          peerCamera:
+            false
+        }
+      );
+
+      ack({
+        ok: true
+      });
+    }
+  );
+
+  socket.on(
+    "dm-call-decline",
+    ({ callId } = {}) => {
+      const call =
+        peopleDmCalls.get(
+          String(
+            callId ||
+            ""
+          )
+        );
+
+      const accountId =
+        userIds.get(
+          socket.id
+        );
+
+      if (
+        !call ||
+        call.status !==
+          "ringing" ||
+        !accountId ||
+        String(
+          call.calleeAccountId
+        ) !==
+          String(
+            accountId
+          )
+      ) {
+        return;
+      }
+
+      peopleDmCallFinish(
+        call.id,
+        "declined"
+      );
+    }
+  );
+
+  socket.on(
+    "dm-call-cancel",
+    ({ callId } = {}) => {
+      const call =
+        peopleDmCalls.get(
+          String(
+            callId ||
+            ""
+          )
+        );
+
+      if (
+        !call ||
+        call.status !==
+          "ringing" ||
+        String(
+          call.callerSocketId
+        ) !==
+          String(
+            socket.id
+          )
+      ) {
+        return;
+      }
+
+      peopleDmCallFinish(
+        call.id,
+        "cancelled"
+      );
+    }
+  );
+
+  socket.on(
+    "dm-call-hangup",
+    ({ callId } = {}) => {
+      const call =
+        peopleDmCalls.get(
+          String(
+            callId ||
+            ""
+          )
+        );
+
+      if (!call) {
+        return;
+      }
+
+      const current =
+        String(
+          socket.id
+        );
+
+      if (
+        String(
+          call.callerSocketId
+        ) !== current &&
+        String(
+          call.calleeSocketId ||
+          ""
+        ) !== current
+      ) {
+        return;
+      }
+
+      peopleDmCallFinish(
+        call.id,
+        "hangup"
+      );
+    }
+  );
+
+  socket.on(
+    "dm-call-webrtc-offer",
+    ({
+      callId,
+      target,
+      sdp
+    } = {}) => {
+      const call =
+        peopleDmCallForActiveSocket(
+          callId,
+          socket.id
+        );
+
+      if (
+        !call ||
+        !sdp
+      ) {
+        return;
+      }
+
+      const other =
+        peopleDmCallOtherSocket(
+          call,
+          socket.id
+        );
+
+      if (
+        !other ||
+        String(target) !==
+          other
+      ) {
+        return;
+      }
+
+      io.to(
+        other
+      ).emit(
+        "dm-call-webrtc-offer",
+        {
+          callId:
+            call.id,
+          from:
+            String(
+              socket.id
+            ),
+          sdp
+        }
+      );
+    }
+  );
+
+  socket.on(
+    "dm-call-webrtc-answer",
+    ({
+      callId,
+      target,
+      sdp
+    } = {}) => {
+      const call =
+        peopleDmCallForActiveSocket(
+          callId,
+          socket.id
+        );
+
+      if (
+        !call ||
+        !sdp
+      ) {
+        return;
+      }
+
+      const other =
+        peopleDmCallOtherSocket(
+          call,
+          socket.id
+        );
+
+      if (
+        !other ||
+        String(target) !==
+          other
+      ) {
+        return;
+      }
+
+      io.to(
+        other
+      ).emit(
+        "dm-call-webrtc-answer",
+        {
+          callId:
+            call.id,
+          from:
+            String(
+              socket.id
+            ),
+          sdp
+        }
+      );
+    }
+  );
+
+  socket.on(
+    "dm-call-webrtc-ice",
+    ({
+      callId,
+      target,
+      candidate
+    } = {}) => {
+      const call =
+        peopleDmCallForActiveSocket(
+          callId,
+          socket.id
+        );
+
+      if (
+        !call ||
+        !candidate
+      ) {
+        return;
+      }
+
+      const other =
+        peopleDmCallOtherSocket(
+          call,
+          socket.id
+        );
+
+      if (
+        !other ||
+        String(target) !==
+          other
+      ) {
+        return;
+      }
+
+      io.to(
+        other
+      ).emit(
+        "dm-call-webrtc-ice",
+        {
+          callId:
+            call.id,
+          from:
+            String(
+              socket.id
+            ),
+          candidate
+        }
+      );
+    }
+  );
+
+  socket.on(
+    "dm-call-media-state",
+    ({
+      callId,
+      muted,
+      camera
+    } = {}) => {
+      const call =
+        peopleDmCallForActiveSocket(
+          callId,
+          socket.id
+        );
+
+      if (!call) {
+        return;
+      }
+
+      const other =
+        peopleDmCallOtherSocket(
+          call,
+          socket.id
+        );
+
+      if (!other) {
+        return;
+      }
+
+      io.to(
+        other
+      ).emit(
+        "dm-call-media-state",
+        {
+          callId:
+            call.id,
+          muted:
+            Boolean(
+              muted
+            ),
+          camera:
+            Boolean(
+              camera
+            )
+        }
+      );
+    }
+  );
+  // === PEOPLE_DM_CALL_SOCKET_V1_END ===
 
   socket.on(
     "server-select",
@@ -8024,7 +9055,11 @@ io.on("connection", (socket) => {
 
   socket.on(
     "disconnect",
-    () => {
+    () => { 
+      peopleDmCallDisconnect(
+        socket
+      );
+
       const accountId =
         userIds.get(
           socket.id

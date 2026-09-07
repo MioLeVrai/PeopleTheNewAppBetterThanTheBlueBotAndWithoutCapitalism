@@ -1,0 +1,417 @@
+/* === PEOPLE_DM_CALLS_V1_START === */
+
+.people-dm-call-button {
+  margin-left: auto;
+  min-width: 42px;
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: #211d30;
+  color: #e9e4f5;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background .15s ease,
+    transform .15s ease,
+    border-color .15s ease;
+}
+
+.people-dm-call-button:hover {
+  background: #302944;
+  border-color: rgba(138,121,202,.35);
+}
+
+.people-dm-call-button:active {
+  transform: scale(.97);
+}
+
+.people-dm-call-button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.people-dm-call-button strong {
+  font-size: 12px;
+}
+
+.people-dm-call-overlay {
+  position: fixed;
+  z-index: 3000;
+  inset: 0;
+  padding: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 4, 9, .68);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+
+.people-dm-call-overlay.hidden {
+  display: none;
+}
+
+.people-dm-call-overlay.visible {
+  opacity: 1;
+}
+
+.people-dm-call-card {
+  position: relative;
+  width: min(620px, 100%);
+  overflow: hidden;
+  border: 1px solid rgba(138,121,202,.22);
+  border-radius: 24px;
+  background:
+    linear-gradient(
+      145deg,
+      #171421,
+      #0f0d16
+    );
+  box-shadow:
+    0 30px 100px
+    rgba(0,0,0,.62);
+}
+
+.people-dm-call-glow {
+  position: absolute;
+  z-index: 0;
+  top: -110px;
+  right: -85px;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: rgba(119,103,180,.17);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+.people-dm-call-stage {
+  position: relative;
+  z-index: 1;
+  min-height: 390px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      rgba(103,88,157,.18),
+      transparent 45%
+    );
+}
+
+.people-dm-call-identity {
+  position: relative;
+  z-index: 3;
+  max-width: 86%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition:
+    opacity .15s ease,
+    transform .15s ease;
+}
+
+.people-dm-call-identity.with-video {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 13px;
+  background: rgba(9,8,13,.66);
+  backdrop-filter: blur(8px);
+}
+
+.people-dm-call-avatar {
+  width: 106px;
+  height: 106px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #67589d;
+  color: white;
+  font-size: 28px;
+  font-weight: 900;
+  box-shadow:
+    0 14px 38px
+    rgba(0,0,0,.36);
+}
+
+.people-dm-call-identity.with-video
+.people-dm-call-avatar {
+  display: none;
+}
+
+.people-dm-call-identity strong {
+  margin-top: 18px;
+  color: #f3f0fa;
+  font-size: 25px;
+}
+
+.people-dm-call-identity.with-video strong {
+  margin-top: 0;
+  font-size: 14px;
+}
+
+.people-dm-call-identity span {
+  margin-top: 7px;
+  color: #aba3ba;
+  font-size: 13px;
+}
+
+.people-dm-call-identity.with-video span {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.people-dm-call-remote-video {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #070609;
+}
+
+.people-dm-call-local-video {
+  position: absolute;
+  z-index: 5;
+  right: 16px;
+  bottom: 16px;
+  width: 142px;
+  height: 92px;
+  border: 2px solid rgba(255,255,255,.18);
+  border-radius: 13px;
+  object-fit: cover;
+  background: #09080d;
+  box-shadow:
+    0 10px 30px
+    rgba(0,0,0,.45);
+}
+
+.people-dm-call-remote-video.hidden,
+.people-dm-call-local-video.hidden {
+  display: none;
+}
+
+.people-dm-call-incoming-actions,
+.people-dm-call-outgoing-actions,
+.people-dm-call-active-actions {
+  position: relative;
+  z-index: 2;
+  min-height: 104px;
+  padding: 18px 20px 22px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  border-top: 1px solid rgba(255,255,255,.05);
+  background: rgba(10,9,14,.82);
+}
+
+.people-dm-call-incoming-actions.hidden,
+.people-dm-call-outgoing-actions.hidden,
+.people-dm-call-active-actions.hidden {
+  display: none;
+}
+
+.people-dm-call-big-action,
+.people-dm-call-control {
+  border: 0;
+  color: white;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.people-dm-call-big-action {
+  min-width: 92px;
+  padding: 0;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  background: transparent;
+}
+
+.people-dm-call-big-action > span {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 23px;
+  box-shadow:
+    0 9px 25px
+    rgba(0,0,0,.3);
+}
+
+.people-dm-call-big-action small {
+  color: #c1bacb;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.people-dm-call-big-action.accept > span {
+  background: #2d9b63;
+}
+
+.people-dm-call-big-action.decline > span {
+  background: #c84f58;
+}
+
+.people-dm-call-control {
+  min-width: 78px;
+  padding: 9px 11px;
+  border-radius: 14px;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  background: #292431;
+  transition:
+    transform .15s ease,
+    background .15s ease;
+}
+
+.people-dm-call-control:hover {
+  background: #393145;
+}
+
+.people-dm-call-control:active {
+  transform: scale(.96);
+}
+
+.people-dm-call-control.active {
+  background: #52466d;
+}
+
+.people-dm-call-control.danger {
+  background: #b8424d;
+}
+
+.people-dm-call-control.danger:hover {
+  background: #cb4c58;
+}
+
+.people-dm-call-control span {
+  font-size: 20px;
+}
+
+.people-dm-call-control small {
+  font-size: 10px;
+  font-weight: 750;
+}
+
+@media (max-width: 780px) {
+  .people-dm-call-button {
+    min-width: 40px;
+    width: 40px;
+    padding: 0;
+  }
+
+  .people-dm-call-button strong {
+    display: none;
+  }
+
+  .people-dm-call-overlay {
+    padding:
+      max(
+        8px,
+        env(safe-area-inset-top)
+      )
+      8px
+      max(
+        8px,
+        env(safe-area-inset-bottom)
+      );
+  }
+
+  .people-dm-call-card {
+    width: 100%;
+    max-height: calc(
+      100dvh -
+      16px -
+      env(safe-area-inset-top) -
+      env(safe-area-inset-bottom)
+    );
+    border-radius: 18px;
+  }
+
+  .people-dm-call-stage {
+    min-height: min(
+      62dvh,
+      470px
+    );
+  }
+
+  .people-dm-call-avatar {
+    width: 88px;
+    height: 88px;
+    font-size: 24px;
+  }
+
+  .people-dm-call-identity strong {
+    font-size: 21px;
+  }
+
+  .people-dm-call-local-video {
+    right: 10px;
+    bottom: 10px;
+    width: 108px;
+    height: 72px;
+  }
+
+  .people-dm-call-active-actions {
+    gap: 9px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .people-dm-call-control {
+    min-width: 70px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+@media (
+  max-width: 900px
+)
+and (
+  max-height: 520px
+)
+and (
+  orientation: landscape
+) {
+  .people-dm-call-card {
+    display: grid;
+    grid-template-columns:
+      minmax(0, 1fr)
+      auto;
+  }
+
+  .people-dm-call-stage {
+    min-height: calc(
+      100dvh -
+      20px
+    );
+  }
+
+  .people-dm-call-incoming-actions,
+  .people-dm-call-outgoing-actions,
+  .people-dm-call-active-actions {
+    min-width: 112px;
+    flex-direction: column;
+    border-top: 0;
+    border-left: 1px solid rgba(255,255,255,.05);
+  }
+}
+
+/* === PEOPLE_DM_CALLS_V1_END === */
