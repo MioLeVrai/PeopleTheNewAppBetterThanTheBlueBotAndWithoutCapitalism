@@ -766,6 +766,11 @@
         audioTracks
       );
 
+    void window.PeopleAudioDevices
+      ?.applyOutput?.(
+        remoteAudio
+      );
+
     remoteAudio
       .play()
       .catch(() => {});
@@ -837,12 +842,15 @@
         await navigator
           .mediaDevices
           .getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              channelCount: 1
-            },
+            audio:
+              window.PeopleAudioDevices
+                ?.getInputConstraints?.() ||
+              {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                channelCount: 1
+              },
             video: false
           });
 
@@ -1163,6 +1171,146 @@
       );
     }
   }
+
+  // === PEOPLE_DM_INPUT_SWITCH_V1 ===
+  async function peopleDmSwitchInputDevice() {
+    if (
+      !call ||
+      !localStream ||
+      !localStream
+        .getAudioTracks()
+        .some(
+          (track) =>
+            track.readyState ===
+            "live"
+        )
+    ) {
+      return;
+    }
+
+    try {
+      const replacement =
+        await navigator.mediaDevices
+          .getUserMedia({
+            audio:
+              window.PeopleAudioDevices
+                ?.getInputConstraints?.() ||
+              {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                channelCount: 1
+              },
+            video: false
+          });
+
+      const newTrack =
+        replacement
+          .getAudioTracks()[0];
+
+      if (!newTrack) {
+        return;
+      }
+
+      newTrack.enabled =
+        !micMuted;
+
+      const oldTracks =
+        localStream
+          .getAudioTracks();
+
+      const sender =
+        peer
+          ?.getSenders()
+          .find(
+            (item) =>
+              item.track?.kind ===
+              "audio"
+          );
+
+      if (sender) {
+        await sender.replaceTrack(
+          newTrack
+        );
+      }
+
+      for (
+        const oldTrack of
+        oldTracks
+      ) {
+        try {
+          localStream.removeTrack(
+            oldTrack
+          );
+        } catch {}
+
+        try {
+          oldTrack.stop();
+        } catch {}
+      }
+
+      localStream.addTrack(
+        newTrack
+      );
+
+      if (
+        peer &&
+        !sender
+      ) {
+        peer.addTrack(
+          newTrack,
+          localStream
+        );
+      }
+
+      setStatus(
+        "Micro changé ✓"
+      );
+
+      setTimeout(
+        () => {
+          if (
+            call &&
+            call.phase ===
+              "active"
+          ) {
+            setStatus(
+              "Appel en cours"
+            );
+          }
+        },
+        900
+      );
+
+      updateMediaButtons();
+    } catch (err) {
+      console.warn(
+        "[People changement micro MP]",
+        err
+      );
+
+      setStatus(
+        "Impossible d'utiliser ce micro"
+      );
+    }
+  }
+
+  window.addEventListener(
+    "people-audio-input-device-changed",
+    () => {
+      void peopleDmSwitchInputDevice();
+    }
+  );
+
+  window.addEventListener(
+    "people-audio-output-device-changed",
+    () => {
+      void window.PeopleAudioDevices
+        ?.applyOutput?.(
+          remoteAudio
+        );
+    }
+  );
 
   async function enableCamera() {
     if (

@@ -963,6 +963,12 @@ function attachRemoteMedia(peerId, stream) {
     }
 
     audio.srcObject = new MediaStream(audioTracks);
+
+    void window.PeopleAudioDevices
+      ?.applyOutput?.(
+        audio
+      );
+
     const audioPlay = audio.play();
     if (audioPlay && typeof audioPlay.catch === "function") {
       audioPlay.catch(() => {
@@ -1578,18 +1584,146 @@ async function ensureLocalAudio() {
   }
 
   localStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      channelCount: 1
-    },
+    audio:
+      window.PeopleAudioDevices
+        ?.getInputConstraints?.() ||
+      {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1
+      },
     video: false
   });
 
   updateMicUi();
   return localStream;
 }
+
+// === PEOPLE_VOICE_INPUT_SWITCH_V1 ===
+async function peopleSwitchVoiceInputDevice() {
+  if (
+    !voiceJoined ||
+    !localStream
+  ) {
+    return;
+  }
+
+  try {
+    const replacementStream =
+      await navigator.mediaDevices
+        .getUserMedia({
+          audio:
+            window.PeopleAudioDevices
+              ?.getInputConstraints?.() ||
+            {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              channelCount: 1
+            },
+          video: false
+        });
+
+    const newTrack =
+      replacementStream
+        .getAudioTracks()[0];
+
+    if (!newTrack) {
+      return;
+    }
+
+    newTrack.enabled =
+      !micMuted;
+
+    const oldTracks =
+      localStream
+        .getAudioTracks();
+
+    for (
+      const pc of
+      peers.values()
+    ) {
+      const sender =
+        pc
+          .getSenders()
+          .find(
+            (item) =>
+              item.track?.kind ===
+              "audio"
+          );
+
+      if (sender) {
+        await sender.replaceTrack(
+          newTrack
+        );
+      }
+    }
+
+    for (
+      const oldTrack of
+      oldTracks
+    ) {
+      try {
+        localStream.removeTrack(
+          oldTrack
+        );
+      } catch {}
+
+      try {
+        oldTrack.stop();
+      } catch {}
+    }
+
+    localStream.addTrack(
+      newTrack
+    );
+
+    updateMicUi();
+
+    voiceStatus.textContent =
+      "Micro changé ✓";
+
+    if (
+      activeVoiceServerId &&
+      peopleActiveServerId &&
+      peopleVoiceSameServer(
+        activeVoiceServerId,
+        peopleActiveServerId
+      )
+    ) {
+      setTimeout(
+        () => {
+          peopleSyncVoiceUiContext();
+        },
+        900
+      );
+    }
+  } catch (err) {
+    console.warn(
+      "[People changement micro vocal]",
+      err
+    );
+
+    voiceStatus.textContent =
+      "Impossible d'utiliser ce micro";
+  }
+}
+
+window.addEventListener(
+  "people-audio-input-device-changed",
+  () => {
+    void peopleSwitchVoiceInputDevice();
+  }
+);
+
+window.addEventListener(
+  "people-audio-output-device-changed",
+  () => {
+    void window.PeopleAudioDevices
+      ?.applyOutputToAll?.();
+  }
+);
 
 // === PEOPLE_UNIFIED_CALL_CONTROLS_V3_START ===
 function peopleDmCallStateForControls() {

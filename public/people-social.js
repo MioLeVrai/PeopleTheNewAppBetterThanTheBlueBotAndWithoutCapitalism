@@ -768,6 +768,188 @@
     }
   }
 
+  // === PEOPLE_DM_CLOSE_CLIENT_V1_START ===
+  let peopleDmContextMenu =
+    null;
+
+  function closeDmContextMenu() {
+    peopleDmContextMenu
+      ?.remove();
+
+    peopleDmContextMenu =
+      null;
+  }
+
+  function positionDmContextMenu(
+    menu,
+    x,
+    y
+  ) {
+    const margin =
+      8;
+
+    const rect =
+      menu.getBoundingClientRect();
+
+    const left =
+      Math.max(
+        margin,
+        Math.min(
+          window.innerWidth -
+            rect.width -
+            margin,
+          x
+        )
+      );
+
+    const top =
+      Math.max(
+        margin,
+        Math.min(
+          window.innerHeight -
+            rect.height -
+            margin,
+          y
+        )
+      );
+
+    menu.style.left =
+      left + "px";
+
+    menu.style.top =
+      top + "px";
+  }
+
+  async function closeDmForMe(
+    username
+  ) {
+    const wanted =
+      String(
+        username ||
+        ""
+      ).trim();
+
+    if (!wanted) {
+      return;
+    }
+
+    await api(
+      "/api/dm/" +
+        encodeURIComponent(
+          wanted
+        ) +
+        "/close",
+      {
+        method:
+          "POST"
+      }
+    );
+
+    if (
+      activeDmUser &&
+      activeDmUser.username ===
+        wanted
+    ) {
+      showFriends();
+    }
+
+    await refreshConversations();
+  }
+
+  function showDmContextMenu(
+    conversation,
+    x,
+    y
+  ) {
+    closeDmContextMenu();
+
+    const menu =
+      document.createElement(
+        "div"
+      );
+
+    menu.className =
+      "people-dm-context-menu";
+
+    const closeButton =
+      document.createElement(
+        "button"
+      );
+
+    closeButton.type =
+      "button";
+
+    closeButton.className =
+      "people-dm-context-item danger";
+
+    closeButton.textContent =
+      "Fermer le MP";
+
+    closeButton.addEventListener(
+      "click",
+      async () => {
+        closeDmContextMenu();
+
+        try {
+          await closeDmForMe(
+            conversation.user.username
+          );
+        } catch (err) {
+          alert(
+            err?.message ||
+            "Impossible de fermer ce MP."
+          );
+        }
+      }
+    );
+
+    menu.appendChild(
+      closeButton
+    );
+
+    document.body.appendChild(
+      menu
+    );
+
+    peopleDmContextMenu =
+      menu;
+
+    positionDmContextMenu(
+      menu,
+      x,
+      y
+    );
+  }
+
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (
+        peopleDmContextMenu &&
+        !peopleDmContextMenu
+          .contains(
+            event.target
+          )
+      ) {
+        closeDmContextMenu();
+      }
+    },
+    true
+  );
+
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key ===
+        "Escape"
+      ) {
+        closeDmContextMenu();
+      }
+    }
+  );
+  // === PEOPLE_DM_CLOSE_CLIENT_V1_END ===
+
   function renderConversationList() {
     if (!dmConversationList) return;
 
@@ -828,6 +1010,20 @@
       row.addEventListener(
         "click",
         () => openDm(conversation.user.username)
+      );
+
+      row.addEventListener(
+        "contextmenu",
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          showDmContextMenu(
+            conversation,
+            event.clientX,
+            event.clientY
+          );
+        }
       );
 
       dmConversationList.appendChild(row);
@@ -1464,6 +1660,21 @@ function dmTextLine(
 
   async function openDm(username) {
     if (!username) return;
+
+    // === PEOPLE_DM_REOPEN_CLIENT_V1 ===
+    try {
+      await api(
+        "/api/dm/" +
+          encodeURIComponent(
+            username
+          ) +
+          "/open",
+        {
+          method:
+            "POST"
+        }
+      );
+    } catch {}
 
     setMode("home");
     homeMain?.classList.add("dm-open");

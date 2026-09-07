@@ -462,7 +462,13 @@ const PEOPLE_LOCAL_SOCIAL = pathAccounts.join(
 function peopleReadLocalSocial() {
   try {
     if (!fsAccounts.existsSync(PEOPLE_LOCAL_SOCIAL)) {
-      return { friends: [], dms: [], friend_requests: [] };
+      // === PEOPLE_DM_CLOSE_V1_LOCAL ===
+      return {
+        friends: [],
+        dms: [],
+        friend_requests: [],
+        closed_dms: []
+      };
     }
 
     const raw = JSON.parse(
@@ -474,10 +480,19 @@ function peopleReadLocalSocial() {
       dms: Array.isArray(raw.dms) ? raw.dms : [],
       friend_requests: Array.isArray(raw.friend_requests)
         ? raw.friend_requests
-        : []
+        : [],
+      closed_dms:
+        Array.isArray(raw.closed_dms)
+          ? raw.closed_dms
+          : []
     };
   } catch {
-    return { friends: [], dms: [], friend_requests: [] };
+    return {
+      friends: [],
+      dms: [],
+      friend_requests: [],
+      closed_dms: []
+    };
   }
 }
 
@@ -490,7 +505,11 @@ function peopleWriteLocalSocial(data) {
         dms: Array.isArray(data.dms) ? data.dms : [],
         friend_requests: Array.isArray(data.friend_requests)
           ? data.friend_requests
-          : []
+          : [],
+        closed_dms:
+          Array.isArray(data.closed_dms)
+            ? data.closed_dms
+            : []
       },
       null,
       2
@@ -1415,9 +1434,158 @@ async function peopleMarkDmRead(accountId, otherId) {
   if (changed) peopleWriteLocalSocial(data);
 }
 
+// === PEOPLE_DM_CLOSE_V1_START ===
+async function peopleDmClosedIds(
+  accountId
+) {
+  const me =
+    String(
+      accountId
+    );
+
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "SELECT other_id FROM people_closed_dms WHERE user_id = $1",
+        [
+          me
+        ]
+      );
+
+    return new Set(
+      result.rows.map(
+        (row) =>
+          String(
+            row.other_id
+          )
+      )
+    );
+  }
+
+  const data =
+    peopleReadLocalSocial();
+
+  return new Set(
+    (
+      Array.isArray(
+        data.closed_dms
+      )
+        ? data.closed_dms
+        : []
+    )
+      .filter(
+        (item) =>
+          String(
+            item.user_id
+          ) === me
+      )
+      .map(
+        (item) =>
+          String(
+            item.other_id
+          )
+      )
+  );
+}
+
+async function peopleSetDmClosed(
+  accountId,
+  otherId,
+  closed
+) {
+  const me =
+    String(
+      accountId
+    );
+
+  const other =
+    String(
+      otherId
+    );
+
+  if (
+    !me ||
+    !other ||
+    me === other
+  ) {
+    return;
+  }
+
+  if (peoplePool) {
+    if (closed) {
+      await peoplePool.query(
+        "INSERT INTO people_closed_dms (user_id, other_id) " +
+        "VALUES ($1, $2) " +
+        "ON CONFLICT (user_id, other_id) " +
+        "DO UPDATE SET closed_at = NOW()",
+        [
+          me,
+          other
+        ]
+      );
+    } else {
+      await peoplePool.query(
+        "DELETE FROM people_closed_dms " +
+        "WHERE user_id = $1 AND other_id = $2",
+        [
+          me,
+          other
+        ]
+      );
+    }
+
+    return;
+  }
+
+  const data =
+    peopleReadLocalSocial();
+
+  const list =
+    Array.isArray(
+      data.closed_dms
+    )
+      ? data.closed_dms
+      : [];
+
+  data.closed_dms =
+    list.filter(
+      (item) =>
+        !(
+          String(
+            item.user_id
+          ) === me &&
+          String(
+            item.other_id
+          ) === other
+        )
+    );
+
+  if (closed) {
+    data.closed_dms.push({
+      user_id:
+        me,
+      other_id:
+        other,
+      closed_at:
+        new Date()
+          .toISOString()
+    });
+  }
+
+  peopleWriteLocalSocial(
+    data
+  );
+}
+// === PEOPLE_DM_CLOSE_V1_END ===
+
 async function peopleDmConversations(accountId) {
   const me =
     String(accountId);
+
+  const closedIds =
+    await peopleDmClosedIds(
+      me
+    );
 
   let messages;
 
@@ -1477,6 +1645,14 @@ async function peopleDmConversations(accountId) {
         : String(
             message.sender_id
           );
+
+    if (
+      closedIds.has(
+        otherId
+      )
+    ) {
+      continue;
+    }
 
     if (
       !map.has(otherId)
@@ -2538,6 +2714,16 @@ async function peopleInitSocial() {
     "read_at TIMESTAMPTZ NULL" +
     ")"
   );
+  await peoplePool.query(
+    "CREATE TABLE IF NOT EXISTS people_closed_dms (" +
+    "user_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+    "other_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+    "closed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+    "PRIMARY KEY (user_id, other_id), " +
+    "CHECK(user_id <> other_id)" +
+    ")"
+  );
+
   await peoplePool.query(
     "CREATE TABLE IF NOT EXISTS people_message_images (" +
     "id BIGSERIAL PRIMARY KEY, " +
@@ -3864,6 +4050,131 @@ app.delete(
 );
 // === PEOPLE_MESSAGE_DELETE_ROUTES_V1_END ===
 
+// === PEOPLE_DM_CLOSE_ROUTES_V1_START ===
+app.post(
+  "/api/dm/:username/close",
+  async (
+    req,
+    res
+  ) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) {
+        return;
+      }
+
+      const target =
+        await peopleFindAccount(
+          req.params.username
+        );
+
+      if (!target) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Utilisateur introuvable."
+        });
+      }
+
+      if (
+        String(
+          target.id
+        ) ===
+        String(
+          session.id
+        )
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Conversation invalide."
+        });
+      }
+
+      await peopleSetDmClosed(
+        session.id,
+        target.id,
+        true
+      );
+
+      res.json({
+        ok: true
+      });
+    } catch (err) {
+      console.error(
+        "[People dm/close]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de fermer ce MP."
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/dm/:username/open",
+  async (
+    req,
+    res
+  ) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) {
+        return;
+      }
+
+      const target =
+        await peopleFindAccount(
+          req.params.username
+        );
+
+      if (!target) {
+        return res.status(404).json({
+          ok: false,
+          error:
+            "Utilisateur introuvable."
+        });
+      }
+
+      await peopleSetDmClosed(
+        session.id,
+        target.id,
+        false
+      );
+
+      res.json({
+        ok: true
+      });
+    } catch (err) {
+      console.error(
+        "[People dm/open]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de rouvrir ce MP."
+      });
+    }
+  }
+);
+// === PEOPLE_DM_CLOSE_ROUTES_V1_END ===
+
 app.get("/api/dm/conversations", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res);
@@ -4131,6 +4442,19 @@ app.post("/api/dm/:username", async (req, res) => {
         imageId,
         replyToId
       );
+
+    // === PEOPLE_DM_REOPEN_ON_MESSAGE_V1 ===
+    await peopleSetDmClosed(
+      session.id,
+      target.id,
+      false
+    );
+
+    await peopleSetDmClosed(
+      target.id,
+      session.id,
+      false
+    );
 
     const sender =
       await peopleFindAccountById(

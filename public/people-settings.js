@@ -118,8 +118,244 @@
       }
     } catch {}
 
+    if (
+      audioContext
+    ) {
+      void window.PeopleAudioDevices
+        ?.applyContext?.(
+          audioContext
+        );
+    }
+
     return audioContext;
   }
+
+  // === PEOPLE_AUDIO_DEVICES_V1_START ===
+  const AUDIO_DEVICE_KEYS = {
+    input:
+      "people-audio-input-device-v1",
+    output:
+      "people-audio-output-device-v1"
+  };
+
+  const PEOPLE_BASE_AUDIO_CONSTRAINTS = {
+    echoCancellation:
+      true,
+    noiseSuppression:
+      true,
+    autoGainControl:
+      true,
+    channelCount:
+      1
+  };
+
+  function audioDeviceValue(
+    kind
+  ) {
+    try {
+      return (
+        localStorage.getItem(
+          AUDIO_DEVICE_KEYS[
+            kind
+          ]
+        ) || ""
+      );
+    } catch {
+      return "";
+    }
+  }
+
+  function saveAudioDeviceValue(
+    kind,
+    value
+  ) {
+    try {
+      localStorage.setItem(
+        AUDIO_DEVICE_KEYS[
+          kind
+        ],
+        String(
+          value || ""
+        )
+      );
+    } catch {}
+  }
+
+  function inputConstraints() {
+    const deviceId =
+      audioDeviceValue(
+        "input"
+      );
+
+    return {
+      ...PEOPLE_BASE_AUDIO_CONSTRAINTS,
+      ...(
+        deviceId
+          ? {
+              deviceId: {
+                exact:
+                  deviceId
+              }
+            }
+          : {}
+      )
+    };
+  }
+
+  async function applyOutput(
+    element
+  ) {
+    if (
+      !element ||
+      typeof element.setSinkId !==
+        "function"
+    ) {
+      return false;
+    }
+
+    const deviceId =
+      audioDeviceValue(
+        "output"
+      );
+
+    try {
+      await element.setSinkId(
+        deviceId ||
+        "default"
+      );
+
+      return true;
+    } catch (err) {
+      console.warn(
+        "[People sortie audio]",
+        err
+      );
+
+      return false;
+    }
+  }
+
+  async function applyContext(
+    context
+  ) {
+    if (
+      !context ||
+      typeof context.setSinkId !==
+        "function"
+    ) {
+      return false;
+    }
+
+    const deviceId =
+      audioDeviceValue(
+        "output"
+      );
+
+    try {
+      await context.setSinkId(
+        deviceId ||
+        "default"
+      );
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function applyOutputToAll() {
+    const audioElements =
+      [
+        ...document.querySelectorAll(
+          "audio"
+        )
+      ];
+
+    await Promise.allSettled(
+      audioElements.map(
+        (element) =>
+          applyOutput(
+            element
+          )
+      )
+    );
+
+    if (audioContext) {
+      await applyContext(
+        audioContext
+      );
+    }
+  }
+
+  window.PeopleAudioDevices = {
+    getInputId() {
+      return audioDeviceValue(
+        "input"
+      );
+    },
+
+    getOutputId() {
+      return audioDeviceValue(
+        "output"
+      );
+    },
+
+    getInputConstraints:
+      inputConstraints,
+
+    setInputId(
+      value
+    ) {
+      saveAudioDeviceValue(
+        "input",
+        value
+      );
+
+      window.dispatchEvent(
+        new CustomEvent(
+          "people-audio-input-device-changed",
+          {
+            detail: {
+              deviceId:
+                String(
+                  value || ""
+                )
+            }
+          }
+        )
+      );
+    },
+
+    setOutputId(
+      value
+    ) {
+      saveAudioDeviceValue(
+        "output",
+        value
+      );
+
+      void applyOutputToAll();
+
+      window.dispatchEvent(
+        new CustomEvent(
+          "people-audio-output-device-changed",
+          {
+            detail: {
+              deviceId:
+                String(
+                  value || ""
+                )
+            }
+          }
+        )
+      );
+    },
+
+    applyOutput,
+    applyOutputToAll,
+    applyContext
+  };
+  // === PEOPLE_AUDIO_DEVICES_V1_END ===
 
   function storedSound(
     key,
@@ -838,6 +1074,70 @@
           </div>
 
           <div
+            class="people-settings-section people-settings-audio-devices"
+          >
+            <div
+              class="people-settings-section-title"
+            >
+              <div>
+                <strong>Entrée / sortie audio</strong>
+                <span>
+                  Choisis le micro et le casque ou haut-parleur utilisés par les vocaux et appels.
+                </span>
+              </div>
+            </div>
+
+            <div
+              class="people-settings-device-grid"
+            >
+              <label
+                class="people-settings-device-field"
+              >
+                <span>Entrée — Microphone</span>
+
+                <select
+                  id="peopleSettingsAudioInput"
+                >
+                  <option value="">
+                    Microphone par défaut
+                  </option>
+                </select>
+              </label>
+
+              <label
+                class="people-settings-device-field"
+              >
+                <span>Sortie — Casque / haut-parleurs</span>
+
+                <select
+                  id="peopleSettingsAudioOutput"
+                >
+                  <option value="">
+                    Sortie par défaut
+                  </option>
+                </select>
+              </label>
+            </div>
+
+            <div
+              class="people-settings-device-actions"
+            >
+              <span
+                id="peopleSettingsAudioDeviceStatus"
+                class="people-settings-device-status"
+              ></span>
+
+              <button
+                id="peopleSettingsAudioRefresh"
+                class="people-settings-secondary"
+                type="button"
+              >
+                Détecter / actualiser
+              </button>
+            </div>
+          </div>
+
+          <div
             class="people-settings-section"
           >
             <div
@@ -938,6 +1238,26 @@
   const notifications =
     document.getElementById(
       "peopleSettingsNotifications"
+    );
+
+  const audioInputSelect =
+    document.getElementById(
+      "peopleSettingsAudioInput"
+    );
+
+  const audioOutputSelect =
+    document.getElementById(
+      "peopleSettingsAudioOutput"
+    );
+
+  const audioRefreshButton =
+    document.getElementById(
+      "peopleSettingsAudioRefresh"
+    );
+
+  const audioDeviceStatus =
+    document.getElementById(
+      "peopleSettingsAudioDeviceStatus"
     );
 
   let currentUser =
@@ -1182,6 +1502,10 @@
     );
 
     renderSounds();
+
+    void refreshAudioDevices(
+      false
+    );
 
     void loadProfile();
   }
@@ -1441,6 +1765,359 @@
   // ==========================================================
   // CHOIX DES SONS
   // ==========================================================
+
+  // === PEOPLE_AUDIO_DEVICE_UI_V1_START ===
+  function deviceLabel(
+    device,
+    fallback,
+    index
+  ) {
+    return (
+      String(
+        device?.label ||
+        ""
+      ).trim() ||
+      (
+        fallback +
+        " " +
+        String(
+          index + 1
+        )
+      )
+    );
+  }
+
+  function fillDeviceSelect(
+    select,
+    devices,
+    kind
+  ) {
+    if (!select) {
+      return;
+    }
+
+    const selected =
+      kind ===
+        "input"
+        ? window.PeopleAudioDevices
+            ?.getInputId?.() ||
+          ""
+        : window.PeopleAudioDevices
+            ?.getOutputId?.() ||
+          "";
+
+    select.innerHTML =
+      "";
+
+    const fallback =
+      document.createElement(
+        "option"
+      );
+
+    fallback.value =
+      "";
+
+    fallback.textContent =
+      kind ===
+        "input"
+        ? "Microphone par défaut"
+        : "Sortie par défaut";
+
+    select.appendChild(
+      fallback
+    );
+
+    const unique =
+      new Set();
+
+    let visibleIndex =
+      0;
+
+    for (
+      const device of
+      devices
+    ) {
+      if (
+        !device?.deviceId ||
+        device.deviceId ===
+          "default" ||
+        unique.has(
+          device.deviceId
+        )
+      ) {
+        continue;
+      }
+
+      unique.add(
+        device.deviceId
+      );
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+      option.value =
+        device.deviceId;
+
+      option.textContent =
+        deviceLabel(
+          device,
+          kind ===
+            "input"
+            ? "Microphone"
+            : "Sortie audio",
+          visibleIndex
+        );
+
+      visibleIndex +=
+        1;
+
+      select.appendChild(
+        option
+      );
+    }
+
+    const stillExists =
+      !selected ||
+      [...select.options]
+        .some(
+          (option) =>
+            option.value ===
+            selected
+        );
+
+    if (!stillExists) {
+      if (
+        kind ===
+        "input"
+      ) {
+        window.PeopleAudioDevices
+          ?.setInputId?.(
+            ""
+          );
+      } else {
+        window.PeopleAudioDevices
+          ?.setOutputId?.(
+            ""
+          );
+      }
+    }
+
+    select.value =
+      stillExists
+        ? selected
+        : "";
+  }
+
+  async function refreshAudioDevices(
+    requestPermission = false
+  ) {
+    if (
+      !navigator.mediaDevices
+        ?.enumerateDevices
+    ) {
+      if (
+        audioDeviceStatus
+      ) {
+        audioDeviceStatus.textContent =
+          "Ce navigateur ne permet pas de choisir les périphériques audio.";
+      }
+
+      return;
+    }
+
+    if (
+      audioRefreshButton
+    ) {
+      audioRefreshButton.disabled =
+        true;
+    }
+
+    if (
+      audioDeviceStatus
+    ) {
+      audioDeviceStatus.textContent =
+        "Recherche des périphériques…";
+    }
+
+    try {
+      if (
+        requestPermission &&
+        navigator.mediaDevices
+          ?.getUserMedia
+      ) {
+        try {
+          const temporary =
+            await navigator.mediaDevices
+              .getUserMedia({
+                audio: true,
+                video: false
+              });
+
+          for (
+            const track of
+            temporary.getTracks()
+          ) {
+            track.stop();
+          }
+        } catch {}
+      }
+
+      const devices =
+        await navigator.mediaDevices
+          .enumerateDevices();
+
+      const inputs =
+        devices.filter(
+          (device) =>
+            device.kind ===
+            "audioinput"
+        );
+
+      const outputs =
+        devices.filter(
+          (device) =>
+            device.kind ===
+            "audiooutput"
+        );
+
+      fillDeviceSelect(
+        audioInputSelect,
+        inputs,
+        "input"
+      );
+
+      fillDeviceSelect(
+        audioOutputSelect,
+        outputs,
+        "output"
+      );
+
+      const hasNamedInput =
+        inputs.some(
+          (device) =>
+            Boolean(
+              String(
+                device.label ||
+                ""
+              ).trim()
+            )
+        );
+
+      const outputSupported =
+        "setSinkId" in
+        HTMLMediaElement.prototype;
+
+      if (
+        audioOutputSelect
+      ) {
+        audioOutputSelect.disabled =
+          !outputSupported;
+      }
+
+      if (
+        audioDeviceStatus
+      ) {
+        if (
+          !outputSupported
+        ) {
+          audioDeviceStatus.textContent =
+            "Micro sélectionnable. Le choix de sortie n'est pas supporté par ce navigateur.";
+        } else if (
+          !hasNamedInput
+        ) {
+          audioDeviceStatus.textContent =
+            "Clique sur Détecter / actualiser pour autoriser People à afficher les noms.";
+        } else {
+          audioDeviceStatus.textContent =
+            "Les changements sont appliqués automatiquement.";
+        }
+      }
+
+      await window.PeopleAudioDevices
+        ?.applyOutputToAll?.();
+    } catch (err) {
+      if (
+        audioDeviceStatus
+      ) {
+        audioDeviceStatus.textContent =
+          err?.message ||
+          "Impossible de charger les périphériques.";
+      }
+    } finally {
+      if (
+        audioRefreshButton
+      ) {
+        audioRefreshButton.disabled =
+          false;
+      }
+    }
+  }
+
+  audioInputSelect
+    ?.addEventListener(
+      "change",
+      () => {
+        window.PeopleAudioDevices
+          ?.setInputId?.(
+            audioInputSelect.value
+          );
+
+        if (
+          audioDeviceStatus
+        ) {
+          audioDeviceStatus.textContent =
+            "Micro changé ✓";
+        }
+      }
+    );
+
+  audioOutputSelect
+    ?.addEventListener(
+      "change",
+      () => {
+        window.PeopleAudioDevices
+          ?.setOutputId?.(
+            audioOutputSelect.value
+          );
+
+        if (
+          audioDeviceStatus
+        ) {
+          audioDeviceStatus.textContent =
+            "Sortie audio changée ✓";
+        }
+      }
+    );
+
+  audioRefreshButton
+    ?.addEventListener(
+      "click",
+      () => {
+        void refreshAudioDevices(
+          true
+        );
+      }
+    );
+
+  navigator.mediaDevices
+    ?.addEventListener?.(
+      "devicechange",
+      () => {
+        if (
+          !modal.classList
+            .contains(
+              "hidden"
+            )
+        ) {
+          void refreshAudioDevices(
+            false
+          );
+        }
+      }
+    );
+  // === PEOPLE_AUDIO_DEVICE_UI_V1_END ===
 
   function soundCard(
     sound,

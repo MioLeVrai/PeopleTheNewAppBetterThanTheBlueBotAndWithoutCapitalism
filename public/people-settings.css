@@ -682,3 +682,106 @@
 }
 
 /* === PEOPLE_SETTINGS_V1_END === */
+
+
+/* === PEOPLE_AUDIO_DEVICES_SETTINGS_V1_START === */
+
+.people-settings-device-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      2,
+      minmax(
+        0,
+        1fr
+      )
+    );
+  gap: 11px;
+}
+
+.people-settings-device-field {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.people-settings-device-field > span {
+  color: #91899b;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.people-settings-device-field select {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding:
+    0
+    10px;
+  border:
+    1px solid
+    #302a39;
+  border-radius: 9px;
+  outline: none;
+  background:
+    #0d0b11;
+  color:
+    #e5e0ed;
+  font: inherit;
+  font-size: 12px;
+}
+
+.people-settings-device-field select:focus {
+  border-color:
+    #67589d;
+  box-shadow:
+    0 0 0 2px
+    rgba(
+      103,
+      88,
+      157,
+      .13
+    );
+}
+
+.people-settings-device-field select:disabled {
+  opacity: .5;
+}
+
+.people-settings-device-actions {
+  min-height: 42px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.people-settings-device-status {
+  margin-right: auto;
+  color:
+    #817987;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+@media (max-width: 780px) {
+  .people-settings-device-grid {
+    grid-template-columns:
+      minmax(
+        0,
+        1fr
+      );
+  }
+
+  .people-settings-device-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .people-settings-device-status {
+    margin-right: 0;
+  }
+}
+
+/* === PEOPLE_AUDIO_DEVICES_SETTINGS_V1_END === */
