@@ -6775,6 +6775,48 @@ app.delete(
         );
       }
 
+      // === PEOPLE_VOICE_MEMBERSHIP_CLEANUP_V2 ===
+      for (
+        const [
+          voiceSocketId,
+          voiceUser
+        ]
+        of [...voiceUsers.entries()]
+      ) {
+        if (
+          String(
+            voiceUser?.serverId ||
+            ""
+          ) !==
+            String(
+              server.id
+            ) ||
+          String(
+            voiceUser?.accountId ||
+            userIds.get(
+              voiceSocketId
+            ) ||
+            ""
+          ) !==
+            String(
+              session.id
+            )
+        ) {
+          continue;
+        }
+
+        const voiceSocket =
+          io.sockets.sockets.get(
+            voiceSocketId
+          );
+
+        if (voiceSocket) {
+          leaveVoice(
+            voiceSocket
+          );
+        }
+      }
+
       emitOnlineUsers(
         server.id
       );
@@ -8061,6 +8103,23 @@ function peopleSchedulePresenceOffline(
   );
 }
 
+// === PEOPLE_VOICE_NAVIGATION_V2_START ===
+function peopleVoiceRoom(
+  serverId
+) {
+  const sid =
+    String(
+      serverId ||
+      ""
+    );
+
+  return (
+    "people:voice:" +
+    sid
+  );
+}
+// === PEOPLE_VOICE_NAVIGATION_V2_END ===
+
 // === PEOPLE_MULTI_VOICE_V1_START ===
 const PEOPLE_MAX_VOICE_ROOMS_PER_ACCOUNT =
   2;
@@ -8295,12 +8354,34 @@ function emitVoiceState(
 
   if (!sid) return;
 
+  const payload = {
+    serverId:
+      sid,
+    roster:
+      peopleVoiceRoster(
+        sid
+      )
+  };
+
+  /*
+    - peopleServerRoom : personnes qui REGARDENT ce serveur
+    - peopleVoiceRoom  : personnes qui sont DANS le vocal,
+      même si elles naviguent ailleurs dans People.
+  */
   io.to(
-    peopleServerRoom(sid)
-  ).emit(
-    "voice-state",
-    peopleVoiceRoster(sid)
-  );
+    peopleServerRoom(
+      sid
+    )
+  )
+    .to(
+      peopleVoiceRoom(
+        sid
+      )
+    )
+    .emit(
+      "voice-state",
+      payload
+    );
 }
 
 function leaveVoice(socket) {
@@ -8330,19 +8411,27 @@ function leaveVoice(socket) {
   );
 
   if (sid) {
+    /*
+      Les peers restent abonnés à peopleVoiceRoom(sid)
+      même s'ils sont actuellement dans Amis / MP / autre serveur.
+    */
     socket.to(
-      peopleServerRoom(sid)
+      peopleVoiceRoom(
+        sid
+      )
     ).emit(
       "peer-left",
       socket.id
     );
+
+    void socket.leave(
+      peopleVoiceRoom(
+        sid
+      )
+    );
   }
 
   if (accountId) {
-    /*
-      Le vocal quitté + le vocal restant doivent tous
-      les deux recevoir le nouveau booléen otherVoice.
-    */
     peopleVoiceRefreshAccount(
       accountId,
       [
@@ -9143,8 +9232,10 @@ io.on("connection", (socket) => {
           String(oldServerId) !==
             String(server.id)
         ) {
-          leaveVoice(socket);
-
+          /*
+            Le serveur consulté change, mais le vocal
+            de cet onglet reste totalement indépendant.
+          */
           await socket.leave(
             peopleServerRoom(
               oldServerId
@@ -9386,145 +9477,248 @@ io.on("connection", (socket) => {
 
   socket.on(
     "voice-join",
-    (
+    async (
       {
+        serverId:
+          requestedServerId,
         muted,
         camera
       } = {},
       ack = () => {}
     ) => {
-      const username =
-        users.get(
-          socket.id
+      // === PEOPLE_VOICE_JOIN_V2 ===
+      try {
+        const username =
+          users.get(
+            socket.id
+          );
+
+        const accountId =
+          userIds.get(
+            socket.id
+          );
+
+        const wantedServerId =
+          String(
+            requestedServerId ||
+            socketServerIds.get(
+              socket.id
+            ) ||
+            ""
+          );
+
+        if (
+          !username ||
+          !accountId ||
+          !wantedServerId
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Session vocale invalide."
+          });
+        }
+
+        const server =
+          await peopleGetServer(
+            wantedServerId
+          );
+
+        if (!server) {
+          return ack({
+            ok: false,
+            error:
+              "Serveur vocal introuvable."
+          });
+        }
+
+        const member =
+          await peopleIsServerMember(
+            accountId,
+            server.id
+          );
+
+        if (!member) {
+          return ack({
+            ok: false,
+            error:
+              "Tu n'es plus membre de ce serveur."
+          });
+        }
+
+        const sid =
+          String(
+            server.id
+          );
+
+        const aid =
+          String(
+            accountId
+          );
+
+        const currentVoice =
+          voiceUsers.get(
+            socket.id
+          );
+
+        /*
+          Un onglet = un vocal WebRTC.
+          Les deux vocaux simultanés utilisent donc 2 onglets/fenêtres.
+        */
+        if (currentVoice) {
+          if (
+            String(
+              currentVoice.serverId
+            ) === sid
+          ) {
+            await socket.join(
+              peopleVoiceRoom(
+                sid
+              )
+            );
+
+            const roster =
+              peopleVoiceRoster(
+                sid
+              );
+
+            return ack({
+              ok: true,
+              serverId:
+                sid,
+              roster,
+              voiceRooms:
+                peopleVoiceAccountServerIds(
+                  aid
+                ).size,
+              otherVoice:
+                peopleVoiceAccountServerIds(
+                  aid
+                ).size > 1
+            });
+          }
+
+          return ack({
+            ok: false,
+            code:
+              "VOICE_TAB_BUSY",
+            error:
+              "Cet onglet est déjà dans un vocal. Ouvre un autre onglet People pour rejoindre un deuxième vocal."
+          });
+        }
+
+        if (
+          peopleVoiceAccountInServer(
+            aid,
+            sid,
+            socket.id
+          )
+        ) {
+          return ack({
+            ok: false,
+            code:
+              "VOICE_ALREADY_HERE",
+            error:
+              "Tu es déjà dans ce vocal sur un autre onglet."
+          });
+        }
+
+        const currentRooms =
+          peopleVoiceAccountServerIds(
+            aid,
+            socket.id
+          );
+
+        if (
+          !currentRooms.has(
+            sid
+          ) &&
+          currentRooms.size >=
+            PEOPLE_MAX_VOICE_ROOMS_PER_ACCOUNT
+        ) {
+          return ack({
+            ok: false,
+            code:
+              "VOICE_LIMIT",
+            error:
+              "Tu es déjà dans 2 vocaux. Quitte-en un avant d'en rejoindre un autre."
+          });
+        }
+
+        voiceUsers.set(
+          socket.id,
+          {
+            serverId:
+              sid,
+            accountId:
+              aid,
+            username,
+            muted:
+              Boolean(
+                muted
+              ),
+            camera:
+              Boolean(
+                camera
+              )
+          }
         );
 
-      const accountId =
-        userIds.get(
-          socket.id
+        await socket.join(
+          peopleVoiceRoom(
+            sid
+          )
         );
 
-      const serverId =
-        socketServerIds.get(
-          socket.id
+        const roster =
+          peopleVoiceRoster(
+            sid
+          );
+
+        socket.emit(
+          "voice-peers",
+          roster.filter(
+            (user) =>
+              user.id !==
+              socket.id
+          )
         );
 
-      if (
-        !username ||
-        !accountId ||
-        !serverId
-      ) {
-        return ack({
-          ok: false,
-          error:
-            "Session vocale invalide."
-        });
-      }
-
-      const sid =
-        String(
-          serverId
+        /*
+          Si c'est le deuxième vocal du compte,
+          cette fonction rafraîchit LES DEUX vocaux.
+        */
+        peopleVoiceRefreshAccount(
+          aid
         );
 
-      const aid =
-        String(
-          accountId
-        );
+        const roomCount =
+          peopleVoiceAccountServerIds(
+            aid
+          ).size;
 
-      /*
-        Deux onglets ne doivent pas créer deux copies
-        du même compte dans LE MÊME vocal.
-      */
-      if (
-        peopleVoiceAccountInServer(
-          aid,
-          sid,
-          socket.id
-        )
-      ) {
-        return ack({
-          ok: false,
-          code:
-            "VOICE_ALREADY_HERE",
-          error:
-            "Tu es déjà dans ce vocal sur un autre onglet."
-        });
-      }
-
-      const currentRooms =
-        peopleVoiceAccountServerIds(
-          aid,
-          socket.id
-        );
-
-      if (
-        !currentRooms.has(
-          sid
-        ) &&
-        currentRooms.size >=
-          PEOPLE_MAX_VOICE_ROOMS_PER_ACCOUNT
-      ) {
-        return ack({
-          ok: false,
-          code:
-            "VOICE_LIMIT",
-          error:
-            "Tu es déjà dans 2 vocaux. Quitte-en un avant d'en rejoindre un autre."
-        });
-      }
-
-      voiceUsers.set(
-        socket.id,
-        {
+        ack({
+          ok: true,
           serverId:
             sid,
-          accountId:
-            aid,
-          username,
-          muted:
-            Boolean(muted),
-          camera:
-            Boolean(camera)
-        }
-      );
-
-      /*
-        On calcule les peers APRÈS l'ajout :
-        otherVoice est immédiatement juste pour tout le monde.
-      */
-      const existingPeers =
-        peopleVoiceRoster(
-          sid
-        ).filter(
-          (user) =>
-            user.id !==
-            socket.id
+          roster,
+          voiceRooms:
+            roomCount,
+          otherVoice:
+            roomCount > 1
+        });
+      } catch (err) {
+        console.error(
+          "[People voice-join V2]",
+          err
         );
 
-      socket.emit(
-        "voice-peers",
-        existingPeers
-      );
-
-      /*
-        Si c'est le deuxième vocal du compte,
-        le premier vocal doit aussi être rafraîchi.
-      */
-      peopleVoiceRefreshAccount(
-        aid
-      );
-
-      const roomCount =
-        peopleVoiceAccountServerIds(
-          aid
-        ).size;
-
-      ack({
-        ok: true,
-        voiceRooms:
-          roomCount,
-        otherVoice:
-          roomCount > 1
-      });
+        ack({
+          ok: false,
+          error:
+            "Impossible de rejoindre le vocal."
+        });
+      }
     }
   );
 

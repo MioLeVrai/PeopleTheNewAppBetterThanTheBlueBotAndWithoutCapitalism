@@ -172,6 +172,13 @@ let cameraEnabled = false;
 let voiceJoined = false;
 let lastVoiceRoster = [];
 
+/*
+  lastVoiceRoster   = vocal du serveur actuellement AFFICHÉ
+  activeVoiceRoster = vocal WebRTC réellement rejoint par cet onglet
+*/
+let activeVoiceRoster = [];
+let activeVoiceServerId = null;
+
 const peers = new Map();
 const pendingCandidates = new Map();
 const reconnectTimers = new Map();
@@ -201,11 +208,33 @@ function scrollBottom() {
 }
 
 // === PEOPLE_GENERAL_HISTORY_V1_START ===
+// === PEOPLE_AVATAR_PRELOAD_APP_V1 ===
+function peoplePreloadAppAvatars(
+  usernames
+) {
+  void window.PeopleAvatars
+    ?.preloadMany(
+      usernames
+    );
+}
+
 function renderChatHistory(history) {
   const items =
     Array.isArray(history)
       ? history
       : [];
+
+  peoplePreloadAppAvatars(
+    items
+      .filter(
+        (item) =>
+          !item?.system
+      )
+      .map(
+        (item) =>
+          item?.username
+      )
+  );
 
   peopleResetGeneralGroup();
 
@@ -471,11 +500,266 @@ function addChatMessage(data) {
 // === PEOPLE_MESSAGE_GROUPING_V1_END ===
 
 function getVoiceUser(peerId) {
-  return lastVoiceRoster.find(user => user.id === peerId) || null;
+  return activeVoiceRoster.find(
+    user =>
+      user.id === peerId
+  ) || null;
 }
+
+// === PEOPLE_VOICE_NAVIGATION_CLIENT_V2_START ===
+function peopleSetActiveVoiceRoster(
+  roster
+) {
+  activeVoiceRoster =
+    Array.isArray(
+      roster
+    )
+      ? roster
+      : [];
+
+  peoplePreloadAppAvatars(
+    activeVoiceRoster.map(
+      (user) =>
+        user?.username
+    )
+  );
+
+  syncVideoTilesWithRoster();
+}
+
+function peopleVoiceSameServer(
+  left,
+  right
+) {
+  return (
+    String(
+      left || ""
+    ) ===
+    String(
+      right || ""
+    )
+  );
+}
+
+function peopleSyncVoiceVideoContext() {
+  syncVideoStageVisibility();
+}
+
+function peopleSyncVoiceUiContext() {
+  const selected =
+    String(
+      peopleActiveServerId ||
+      ""
+    );
+
+  const active =
+    String(
+      activeVoiceServerId ||
+      ""
+    );
+
+  if (
+    voiceJoined &&
+    active
+  ) {
+    if (
+      selected &&
+      peopleVoiceSameServer(
+        selected,
+        active
+      )
+    ) {
+      voiceStatus.textContent =
+        "Connecté au vocal";
+
+      voiceStatus.classList.add(
+        "connected"
+      );
+
+      voiceButton.childNodes[0].nodeValue =
+        "🔊 quitter le vocal ";
+    } else if (selected) {
+      voiceStatus.textContent =
+        "Tu es déjà en vocal sur un autre serveur";
+
+      voiceStatus.classList.remove(
+        "connected"
+      );
+
+      voiceButton.childNodes[0].nodeValue =
+        "🔊 vocal ";
+    }
+
+    if (
+      leaveVoiceQuickButton
+    ) {
+      leaveVoiceQuickButton.disabled =
+        false;
+    }
+
+    peopleSyncVoiceVideoContext();
+
+    return;
+  }
+
+  if (selected) {
+    voiceStatus.textContent =
+      "Pas connecté";
+
+    voiceStatus.classList.remove(
+      "connected"
+    );
+
+    voiceButton.childNodes[0].nodeValue =
+      "🔊 vocal ";
+  }
+
+  peopleSyncVoiceVideoContext();
+}
+
+function peopleHandleVoiceState(
+  payload
+) {
+  const legacy =
+    Array.isArray(
+      payload
+    );
+
+  const serverId =
+    legacy
+      ? String(
+          peopleActiveServerId ||
+          activeVoiceServerId ||
+          ""
+        )
+      : String(
+          payload?.serverId ||
+          ""
+        );
+
+  const roster =
+    legacy
+      ? payload
+      : (
+          Array.isArray(
+            payload?.roster
+          )
+            ? payload.roster
+            : []
+        );
+
+  if (
+    activeVoiceServerId &&
+    peopleVoiceSameServer(
+      serverId,
+      activeVoiceServerId
+    )
+  ) {
+    peopleSetActiveVoiceRoster(
+      roster
+    );
+  }
+
+  if (
+    peopleActiveServerId &&
+    peopleVoiceSameServer(
+      serverId,
+      peopleActiveServerId
+    )
+  ) {
+    renderVoiceUsers(
+      roster
+    );
+  }
+}
+
+async function peopleConnectActiveVoicePeers() {
+  if (
+    !voiceJoined
+  ) {
+    return;
+  }
+
+  const peerIds =
+    activeVoiceRoster
+      .map(
+        (user) =>
+          user?.id
+      )
+      .filter(
+        (peerId) =>
+          peerId &&
+          peerId !==
+            socket.id
+      );
+
+  await Promise.allSettled(
+    peerIds.map(
+      (peerId) =>
+        makeOffer(
+          peerId
+        )
+    )
+  );
+}
+
+async function peopleReconnectVoiceSession() {
+  if (
+    !voiceJoined ||
+    !activeVoiceServerId ||
+    !localStream
+  ) {
+    return;
+  }
+
+  const response =
+    await peopleVoiceJoinRequest(
+      activeVoiceServerId
+    );
+
+  if (
+    !response?.ok
+  ) {
+    peopleVoiceRejectJoin(
+      response
+    );
+
+    activeVoiceServerId =
+      null;
+
+    peopleSetActiveVoiceRoster(
+      []
+    );
+
+    return;
+  }
+
+  activeVoiceServerId =
+    String(
+      response.serverId ||
+      activeVoiceServerId
+    );
+
+  peopleSetActiveVoiceRoster(
+    response.roster ||
+    []
+  );
+
+  peopleSyncVoiceUiContext();
+
+  await peopleConnectActiveVoicePeers();
+}
+// === PEOPLE_VOICE_NAVIGATION_CLIENT_V2_END ===
 
 function renderVoiceUsers(roster) {
   lastVoiceRoster = Array.isArray(roster) ? roster : [];
+
+  peoplePreloadAppAvatars(
+    lastVoiceRoster.map(
+      (user) =>
+        user?.username
+    )
+  );
   voiceCount.textContent = lastVoiceRoster.length ? `(${lastVoiceRoster.length})` : "";
   voiceUsers.innerHTML = "";
 
@@ -534,9 +818,7 @@ function renderVoiceUsers(roster) {
         "voice-user-other-vocal";
 
       otherVoice.textContent =
-        user.id === socket.id
-          ? "Tu es aussi dans un autre vocal"
-          : "Aussi dans un autre vocal";
+        "Actif dans un autre vocal";
 
       otherVoice.title =
         "People ne révèle pas dans quel autre vocal cette personne se trouve.";
@@ -632,12 +914,25 @@ function removeVideoTile(peerId, isLocal = false) {
 }
 
 function syncVideoStageVisibility() {
-  videoStage.classList.toggle("hidden", videoGrid.children.length === 0);
+  const viewingActiveVoice =
+    voiceJoined &&
+    activeVoiceServerId &&
+    peopleActiveServerId &&
+    peopleVoiceSameServer(
+      activeVoiceServerId,
+      peopleActiveServerId
+    );
+
+  videoStage.classList.toggle(
+    "hidden",
+    videoGrid.children.length === 0 ||
+    !viewingActiveVoice
+  );
 }
 
 function syncVideoTilesWithRoster() {
   const cameraUsers = new Set(
-    lastVoiceRoster.filter(user => user.camera).map(user => user.id)
+    activeVoiceRoster.filter(user => user.camera).map(user => user.id)
   );
 
   if (cameraEnabled && voiceJoined) {
@@ -646,7 +941,7 @@ function syncVideoTilesWithRoster() {
     removeVideoTile(socket.id || "local", true);
   }
 
-  for (const user of lastVoiceRoster) {
+  for (const user of activeVoiceRoster) {
     if (user.id === socket.id) continue;
 
     if (user.camera) {
@@ -737,6 +1032,30 @@ let peopleActiveServerId = null;
 function peopleApplySelectedServerPayload(
   payload
 ) {
+  peoplePreloadAppAvatars(
+    [
+      ...(payload?.history || [])
+        .filter(
+          (item) =>
+            !item?.system
+        )
+        .map(
+          (item) =>
+            item?.username
+        ),
+      ...(payload?.online || [])
+        .map(
+          (user) =>
+            user?.username
+        ),
+      ...(payload?.voice || [])
+        .map(
+          (user) =>
+            user?.username
+        )
+    ]
+  );
+
   renderChatHistory(
     payload?.history || []
   );
@@ -789,12 +1108,10 @@ function peopleSelectServerSocket(
 
 window.PeopleServerRuntime = {
   clearSelection() {
-    if (voiceJoined) {
-      leaveVoice();
-    }
-
-    closeAllPeers();
-
+    /*
+      Accueil / Amis / MP n'ont plus aucun effet
+      sur le vocal WebRTC actif.
+    */
     peopleActiveServerId =
       null;
 
@@ -812,6 +1129,8 @@ window.PeopleServerRuntime = {
     renderVoiceUsers(
       []
     );
+
+    peopleSyncVoiceUiContext();
   },
 
   async selectServer(server) {
@@ -823,12 +1142,10 @@ window.PeopleServerRuntime = {
       };
     }
 
-    if (voiceJoined) {
-      leaveVoice();
-    }
-
-    closeAllPeers();
-
+    /*
+      On change uniquement le serveur affiché.
+      Le vocal actif de cet onglet reste connecté.
+    */
     const response =
       await peopleSelectServerSocket(
         server.id
@@ -850,6 +1167,8 @@ window.PeopleServerRuntime = {
     peopleApplySelectedServerPayload(
       response
     );
+
+    peopleSyncVoiceUiContext();
 
     return response;
   },
@@ -881,30 +1200,12 @@ window.PeopleServerRuntime = {
       response
     );
 
-    if (
-      voiceJoined &&
-      localStream
-    ) {
-      void peopleVoiceJoinRequest()
-        .then(
-          (voiceResponse) => {
-            if (
-              !voiceResponse?.ok
-            ) {
-              peopleVoiceRejectJoin(
-                voiceResponse
-              );
-
-              return;
-            }
-
-            voiceStatus.textContent =
-              voiceResponse.otherVoice
-                ? "Connecté • aussi dans un autre vocal"
-                : "Connecté au vocal";
-          }
-        );
-    }
+    /*
+      Le reselect concerne seulement le serveur TEXTE affiché.
+      La reconnexion du vocal utilise activeVoiceServerId
+      via l'événement people-ready.
+    */
+    peopleSyncVoiceUiContext();
   },
 
   getActiveServerId() {
@@ -1237,6 +1538,25 @@ socket.on("connect", () => {
   }
 });
 
+// === PEOPLE_VOICE_RECONNECT_V2 ===
+socket.on(
+  "people-ready",
+  () => {
+    if (
+      voiceJoined &&
+      activeVoiceServerId &&
+      localStream
+    ) {
+      setTimeout(
+        () => {
+          void peopleReconnectVoiceSession();
+        },
+        100
+      );
+    }
+  }
+);
+
 socket.on("disconnect", () => {
   if (voiceJoined) {
     voiceStatus.textContent = "Reconnexion...";
@@ -1273,7 +1593,10 @@ socket.on(
 socket.on("chat-message", addChatMessage);
 socket.on("system-message", addSystemMessage);
 socket.on("user-count", count => userCount.textContent = count);
-socket.on("voice-state", renderVoiceUsers);
+socket.on(
+  "voice-state",
+  peopleHandleVoiceState
+);
 
 async function ensureLocalAudio() {
   if (localStream && localStream.getAudioTracks().some(track => track.readyState === "live")) {
@@ -1481,7 +1804,11 @@ function updateCameraUi() {
   peopleSyncUnifiedCallControls();
 }
 
-function peopleVoiceJoinRequest() {
+function peopleVoiceJoinRequest(
+  serverId =
+    activeVoiceServerId ||
+    peopleActiveServerId
+) {
   return new Promise(
     (resolve) => {
       let finished =
@@ -1524,6 +1851,11 @@ function peopleVoiceJoinRequest() {
       socket.emit(
         "voice-join",
         {
+          serverId:
+            String(
+              serverId ||
+              ""
+            ),
           muted:
             micMuted,
           camera:
@@ -1605,8 +1937,22 @@ async function joinVoice() {
     voiceStatus.textContent = "Connexion au vocal...";
     await ensureLocalAudio();
 
+    const targetVoiceServerId =
+      String(
+        peopleActiveServerId ||
+        ""
+      );
+
+    if (!targetVoiceServerId) {
+      throw new Error(
+        "Choisis un serveur avant de rejoindre son vocal."
+      );
+    }
+
     const response =
-      await peopleVoiceJoinRequest();
+      await peopleVoiceJoinRequest(
+        targetVoiceServerId
+      );
 
     if (
       !response?.ok
@@ -1620,6 +1966,17 @@ async function joinVoice() {
 
     voiceJoined = true;
 
+    activeVoiceServerId =
+      String(
+        response.serverId ||
+        targetVoiceServerId
+      );
+
+    peopleSetActiveVoiceRoster(
+      response.roster ||
+      []
+    );
+
     if (leaveVoiceQuickButton) {
       leaveVoiceQuickButton.disabled = false;
     }
@@ -1627,13 +1984,9 @@ async function joinVoice() {
     updateMicUi();
     updateCameraUi();
 
-    voiceStatus.textContent =
-      response.otherVoice
-        ? "Connecté • aussi dans un autre vocal"
-        : "Connecté au vocal";
+    peopleSyncVoiceUiContext();
 
-    voiceStatus.classList.add("connected");
-    voiceButton.childNodes[0].nodeValue = "🔊 quitter le vocal ";
+    await peopleConnectActiveVoicePeers();
 
     return true;
   } catch (err) {
@@ -1736,6 +2089,12 @@ function leaveVoice() {
   socket.emit("voice-leave");
   voiceJoined = false;
 
+  activeVoiceServerId =
+    null;
+
+  activeVoiceRoster =
+    [];
+
   if (leaveVoiceQuickButton) {
     leaveVoiceQuickButton.disabled = true;
   }
@@ -1764,10 +2123,28 @@ function leaveVoice() {
   syncVideoStageVisibility();
 }
 
-voiceButton.addEventListener("click", () => {
-  if (voiceJoined) leaveVoice();
-  else joinVoice();
-});
+voiceButton.addEventListener(
+  "click",
+  () => {
+    if (!voiceJoined) {
+      void joinVoice();
+      return;
+    }
+
+    if (
+      peopleVoiceSameServer(
+        activeVoiceServerId,
+        peopleActiveServerId
+      )
+    ) {
+      leaveVoice();
+      return;
+    }
+
+    voiceStatus.textContent =
+      "Cet onglet est déjà dans un autre vocal. Ouvre un deuxième onglet People pour rejoindre celui-ci.";
+  }
+);
 
 leaveVoiceQuickButton?.addEventListener(
   "click",
@@ -1886,7 +2263,10 @@ function closeAllPeers() {
 }
 
 function peerIsStillInVoice(peerId) {
-  return lastVoiceRoster.some(user => user.id === peerId);
+  return activeVoiceRoster.some(
+    user =>
+      user.id === peerId
+  );
 }
 
 function requestPeerRecovery(peerId) {
@@ -1999,7 +2379,7 @@ async function makeOffer(peerId) {
 async function rebuildPeersForMediaChange() {
   if (!voiceJoined) return;
 
-  const peerIds = lastVoiceRoster
+  const peerIds = activeVoiceRoster
     .map(user => user.id)
     .filter(peerId => peerId && peerId !== socket.id);
 
@@ -2007,7 +2387,18 @@ async function rebuildPeersForMediaChange() {
 }
 
 socket.on("voice-peers", async (existingPeers) => {
-  if (!voiceJoined) return;
+  /*
+    Pendant un join/reconnect, l'ACK peut arriver juste
+    après cet event. Le roster de l'ACK reconnectera aussi
+    les peers, donc on ignore seulement si aucune session
+    vocale n'est en cours/prévue.
+  */
+  if (
+    !voiceJoined &&
+    !activeVoiceServerId
+  ) {
+    return;
+  }
 
   for (const peer of existingPeers) {
     if (!peer || !peer.id || peer.id === socket.id) continue;
@@ -2158,6 +2549,19 @@ function peopleOnlineUserIsSelf(
 // === PEOPLE_UNIQUE_PRESENCE_CLIENT_V1_END ===
 
 function peopleRenderOnlineUsers(roster) {
+  peoplePreloadAppAvatars(
+    (
+      Array.isArray(
+        roster
+      )
+        ? roster
+        : []
+    ).map(
+      (user) =>
+        user?.username
+    )
+  );
+
   peopleOnlineRoster =
     Array.isArray(roster)
       ? roster.map(

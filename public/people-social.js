@@ -492,6 +492,16 @@
     return row;
   }
 
+  // === PEOPLE_AVATAR_PRELOAD_SOCIAL_V1 ===
+  function peoplePreloadSocialAvatars(
+    usernames
+  ) {
+    void window.PeopleAvatars
+      ?.preloadMany(
+        usernames
+      );
+  }
+
   async function refreshFriendRequests() {
     if (
       !socialReady ||
@@ -515,6 +525,16 @@
         Array.isArray(data.outgoing)
           ? data.outgoing
           : [];
+
+      peoplePreloadSocialAvatars(
+        [
+          ...incoming,
+          ...outgoing
+        ].map(
+          (request) =>
+            request?.user?.username
+        )
+      );
 
       if (friendRequestsCount) {
         friendRequestsCount.textContent =
@@ -587,6 +607,13 @@
         ? data.friends
         : [];
 
+      peoplePreloadSocialAvatars(
+        list.map(
+          (person) =>
+            person?.username
+        )
+      );
+
       friendsList.innerHTML = "";
 
       if (friendsCount) {
@@ -636,6 +663,13 @@
         Array.isArray(data.people)
           ? data.people
           : [];
+
+      peoplePreloadSocialAvatars(
+        list.map(
+          (person) =>
+            person?.username
+        )
+      );
 
       peopleDirectory.innerHTML =
         "";
@@ -811,6 +845,13 @@
       conversations = Array.isArray(data.conversations)
         ? data.conversations
         : [];
+
+      peoplePreloadSocialAvatars(
+        conversations.map(
+          (conversation) =>
+            conversation?.user?.username
+        )
+      );
 
       updateUnreadBadge(data.unreadTotal || 0);
       renderConversationList();
@@ -1347,6 +1388,13 @@ function dmTextLine(
       );
 
       activeDmUser = data.user;
+
+      peoplePreloadSocialAvatars(
+        [
+          activeDmUser?.username,
+          me?.username
+        ]
+      );
 
       if (dmHeaderName) {
         dmHeaderName.textContent =
