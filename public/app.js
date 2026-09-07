@@ -500,11 +500,51 @@ function renderVoiceUsers(roster) {
     user.username
   );
 
+    const copy =
+      document.createElement(
+        "div"
+      );
+
+    copy.className =
+      "voice-user-copy";
+
     const name = document.createElement("div");
     name.className = "voice-user-name";
     name.textContent = user.id === socket.id
       ? `${user.username} (toi)`
       : user.username;
+
+    copy.appendChild(
+      name
+    );
+
+    if (
+      user.otherVoice
+    ) {
+      row.classList.add(
+        "other-voice"
+      );
+
+      const otherVoice =
+        document.createElement(
+          "div"
+        );
+
+      otherVoice.className =
+        "voice-user-other-vocal";
+
+      otherVoice.textContent =
+        user.id === socket.id
+          ? "Tu es aussi dans un autre vocal"
+          : "Aussi dans un autre vocal";
+
+      otherVoice.title =
+        "People ne révèle pas dans quel autre vocal cette personne se trouve.";
+
+      copy.appendChild(
+        otherVoice
+      );
+    }
 
     const icons = document.createElement("div");
     icons.className = "voice-media-icons";
@@ -521,7 +561,12 @@ function renderVoiceUsers(roster) {
     mic.textContent = user.muted ? "🔇" : "🎙️";
     icons.appendChild(mic);
 
-    row.append(av, name, icons);
+    row.append(
+      av,
+      copy,
+      icons
+    );
+
     voiceUsers.appendChild(row);
   }
 
@@ -840,15 +885,25 @@ window.PeopleServerRuntime = {
       voiceJoined &&
       localStream
     ) {
-      socket.emit(
-        "voice-join",
-        {
-          muted:
-            micMuted,
-          camera:
-            cameraEnabled
-        }
-      );
+      void peopleVoiceJoinRequest()
+        .then(
+          (voiceResponse) => {
+            if (
+              !voiceResponse?.ok
+            ) {
+              peopleVoiceRejectJoin(
+                voiceResponse
+              );
+
+              return;
+            }
+
+            voiceStatus.textContent =
+              voiceResponse.otherVoice
+                ? "Connecté • aussi dans un autre vocal"
+                : "Connecté au vocal";
+          }
+        );
     }
   },
 
@@ -1426,6 +1481,123 @@ function updateCameraUi() {
   peopleSyncUnifiedCallControls();
 }
 
+function peopleVoiceJoinRequest() {
+  return new Promise(
+    (resolve) => {
+      let finished =
+        false;
+
+      const finish =
+        (response) => {
+          if (finished) {
+            return;
+          }
+
+          finished =
+            true;
+
+          clearTimeout(
+            timer
+          );
+
+          resolve(
+            response || {
+              ok: false,
+              error:
+                "Le serveur vocal n'a pas répondu."
+            }
+          );
+        };
+
+      const timer =
+        setTimeout(
+          () => {
+            finish({
+              ok: false,
+              error:
+                "Le serveur vocal n'a pas répondu."
+            });
+          },
+          7000
+        );
+
+      socket.emit(
+        "voice-join",
+        {
+          muted:
+            micMuted,
+          camera:
+            cameraEnabled
+        },
+        finish
+      );
+    }
+  );
+}
+
+function peopleVoiceRejectJoin(
+  response
+) {
+  voiceJoined =
+    false;
+
+  closeAllPeers();
+
+  if (cameraTrack) {
+    try {
+      cameraTrack.stop();
+    } catch {}
+
+    cameraTrack =
+      null;
+  }
+
+  cameraEnabled =
+    false;
+
+  if (localStream) {
+    for (
+      const track of
+      localStream.getTracks()
+    ) {
+      try {
+        track.stop();
+      } catch {}
+    }
+
+    localStream =
+      null;
+  }
+
+  removeVideoTile(
+    socket.id ||
+    "local",
+    true
+  );
+
+  voiceStatus.textContent =
+    response?.error ||
+    "Impossible de rejoindre le vocal.";
+
+  voiceStatus.classList.remove(
+    "connected"
+  );
+
+  voiceButton.childNodes[0].nodeValue =
+    "🔊 vocal ";
+
+  if (
+    leaveVoiceQuickButton
+  ) {
+    leaveVoiceQuickButton.disabled =
+      true;
+  }
+
+  updateMicUi();
+  updateCameraUi();
+  syncVideoStageVisibility();
+}
+
 async function joinVoice() {
   if (voiceJoined) return true;
 
@@ -1433,20 +1605,36 @@ async function joinVoice() {
     voiceStatus.textContent = "Connexion au vocal...";
     await ensureLocalAudio();
 
+    const response =
+      await peopleVoiceJoinRequest();
+
+    if (
+      !response?.ok
+    ) {
+      peopleVoiceRejectJoin(
+        response
+      );
+
+      return false;
+    }
+
     voiceJoined = true;
+
     if (leaveVoiceQuickButton) {
       leaveVoiceQuickButton.disabled = false;
     }
+
     updateMicUi();
     updateCameraUi();
 
-    voiceStatus.textContent = "Connecté au vocal";
+    voiceStatus.textContent =
+      response.otherVoice
+        ? "Connecté • aussi dans un autre vocal"
+        : "Connecté au vocal";
+
     voiceStatus.classList.add("connected");
     voiceButton.childNodes[0].nodeValue = "🔊 quitter le vocal ";
-    socket.emit("voice-join", {
-      muted: micMuted,
-      camera: cameraEnabled
-    });
+
     return true;
   } catch (err) {
     console.error(err);
@@ -1458,6 +1646,7 @@ async function joinVoice() {
     } else {
       voiceStatus.textContent = "Micro indisponible";
     }
+
     return false;
   }
 }

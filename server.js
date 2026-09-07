@@ -8061,6 +8061,209 @@ function peopleSchedulePresenceOffline(
   );
 }
 
+// === PEOPLE_MULTI_VOICE_V1_START ===
+const PEOPLE_MAX_VOICE_ROOMS_PER_ACCOUNT =
+  2;
+
+function peopleVoiceAccountServerIds(
+  accountId,
+  exceptSocketId = ""
+) {
+  const wantedAccount =
+    String(
+      accountId ||
+      ""
+    );
+
+  const excludedSocket =
+    String(
+      exceptSocketId ||
+      ""
+    );
+
+  const rooms =
+    new Set();
+
+  if (!wantedAccount) {
+    return rooms;
+  }
+
+  for (
+    const [socketId, user]
+    of voiceUsers.entries()
+  ) {
+    if (
+      excludedSocket &&
+      String(socketId) ===
+        excludedSocket
+    ) {
+      continue;
+    }
+
+    if (
+      String(
+        user?.accountId ||
+        ""
+      ) !== wantedAccount
+    ) {
+      continue;
+    }
+
+    const serverId =
+      String(
+        user?.serverId ||
+        ""
+      );
+
+    if (serverId) {
+      rooms.add(
+        serverId
+      );
+    }
+  }
+
+  return rooms;
+}
+
+function peopleVoiceAccountInServer(
+  accountId,
+  serverId,
+  exceptSocketId = ""
+) {
+  const wantedAccount =
+    String(
+      accountId ||
+      ""
+    );
+
+  const wantedServer =
+    String(
+      serverId ||
+      ""
+    );
+
+  const excludedSocket =
+    String(
+      exceptSocketId ||
+      ""
+    );
+
+  if (
+    !wantedAccount ||
+    !wantedServer
+  ) {
+    return false;
+  }
+
+  for (
+    const [socketId, user]
+    of voiceUsers.entries()
+  ) {
+    if (
+      excludedSocket &&
+      String(socketId) ===
+        excludedSocket
+    ) {
+      continue;
+    }
+
+    if (
+      String(
+        user?.accountId ||
+        ""
+      ) === wantedAccount &&
+      String(
+        user?.serverId ||
+        ""
+      ) === wantedServer
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function peopleVoicePublicUser(
+  socketId,
+  user
+) {
+  const accountId =
+    String(
+      user?.accountId ||
+      ""
+    );
+
+  const roomCount =
+    accountId
+      ? peopleVoiceAccountServerIds(
+          accountId
+        ).size
+      : 1;
+
+  return {
+    id:
+      String(
+        socketId
+      ),
+    username:
+      user?.username,
+    muted:
+      Boolean(
+        user?.muted
+      ),
+    camera:
+      Boolean(
+        user?.camera
+      ),
+
+    /*
+      Vie privée :
+      on indique seulement qu'il existe un autre vocal.
+      Aucun serverId / nom / salon n'est envoyé au client.
+    */
+    otherVoice:
+      roomCount > 1
+  };
+}
+
+function peopleVoiceRefreshAccount(
+  accountId,
+  extraServerIds = []
+) {
+  const rooms =
+    peopleVoiceAccountServerIds(
+      accountId
+    );
+
+  for (
+    const value of
+    extraServerIds || []
+  ) {
+    const sid =
+      String(
+        value ||
+        ""
+      );
+
+    if (sid) {
+      rooms.add(
+        sid
+      );
+    }
+  }
+
+  for (
+    const sid of
+    rooms
+  ) {
+    emitVoiceState(
+      sid
+    );
+  }
+}
+// === PEOPLE_MULTI_VOICE_V1_END ===
+
 function peopleVoiceRoster(
   serverId
 ) {
@@ -8076,15 +8279,11 @@ function peopleVoiceRoster(
         sid
     )
     .map(
-      ([id, user]) => ({
-        id,
-        username:
-          user.username,
-        muted:
-          Boolean(user.muted),
-        camera:
-          Boolean(user.camera)
-      })
+      ([id, user]) =>
+        peopleVoicePublicUser(
+          id,
+          user
+        )
     );
 }
 
@@ -8117,6 +8316,15 @@ function leaveVoice(socket) {
       current.serverId || ""
     );
 
+  const accountId =
+    String(
+      current.accountId ||
+      userIds.get(
+        socket.id
+      ) ||
+      ""
+    );
+
   voiceUsers.delete(
     socket.id
   );
@@ -8128,8 +8336,23 @@ function leaveVoice(socket) {
       "peer-left",
       socket.id
     );
+  }
 
-    emitVoiceState(sid);
+  if (accountId) {
+    /*
+      Le vocal quitté + le vocal restant doivent tous
+      les deux recevoir le nouveau booléen otherVoice.
+    */
+    peopleVoiceRefreshAccount(
+      accountId,
+      [
+        sid
+      ]
+    );
+  } else if (sid) {
+    emitVoiceState(
+      sid
+    );
   }
 }
 
@@ -9163,9 +9386,20 @@ io.on("connection", (socket) => {
 
   socket.on(
     "voice-join",
-    ({ muted, camera } = {}) => {
+    (
+      {
+        muted,
+        camera
+      } = {},
+      ack = () => {}
+    ) => {
       const username =
         users.get(
+          socket.id
+        );
+
+      const accountId =
+        userIds.get(
           socket.id
         );
 
@@ -9176,36 +9410,75 @@ io.on("connection", (socket) => {
 
       if (
         !username ||
+        !accountId ||
         !serverId
       ) {
-        return;
+        return ack({
+          ok: false,
+          error:
+            "Session vocale invalide."
+        });
       }
 
-      const existingPeers =
-        [...voiceUsers.entries()]
-          .filter(
-            ([id, user]) =>
-              id !== socket.id &&
-              String(user.serverId) ===
-                String(serverId)
-          )
-          .map(
-            ([id, user]) => ({
-              id,
-              username:
-                user.username,
-              muted:
-                Boolean(user.muted),
-              camera:
-                Boolean(user.camera)
-            })
-          );
+      const sid =
+        String(
+          serverId
+        );
+
+      const aid =
+        String(
+          accountId
+        );
+
+      /*
+        Deux onglets ne doivent pas créer deux copies
+        du même compte dans LE MÊME vocal.
+      */
+      if (
+        peopleVoiceAccountInServer(
+          aid,
+          sid,
+          socket.id
+        )
+      ) {
+        return ack({
+          ok: false,
+          code:
+            "VOICE_ALREADY_HERE",
+          error:
+            "Tu es déjà dans ce vocal sur un autre onglet."
+        });
+      }
+
+      const currentRooms =
+        peopleVoiceAccountServerIds(
+          aid,
+          socket.id
+        );
+
+      if (
+        !currentRooms.has(
+          sid
+        ) &&
+        currentRooms.size >=
+          PEOPLE_MAX_VOICE_ROOMS_PER_ACCOUNT
+      ) {
+        return ack({
+          ok: false,
+          code:
+            "VOICE_LIMIT",
+          error:
+            "Tu es déjà dans 2 vocaux. Quitte-en un avant d'en rejoindre un autre."
+        });
+      }
 
       voiceUsers.set(
         socket.id,
         {
           serverId:
-            String(serverId),
+            sid,
+          accountId:
+            aid,
           username,
           muted:
             Boolean(muted),
@@ -9214,14 +9487,44 @@ io.on("connection", (socket) => {
         }
       );
 
+      /*
+        On calcule les peers APRÈS l'ajout :
+        otherVoice est immédiatement juste pour tout le monde.
+      */
+      const existingPeers =
+        peopleVoiceRoster(
+          sid
+        ).filter(
+          (user) =>
+            user.id !==
+            socket.id
+        );
+
       socket.emit(
         "voice-peers",
         existingPeers
       );
 
-      emitVoiceState(
-        serverId
+      /*
+        Si c'est le deuxième vocal du compte,
+        le premier vocal doit aussi être rafraîchi.
+      */
+      peopleVoiceRefreshAccount(
+        aid
       );
+
+      const roomCount =
+        peopleVoiceAccountServerIds(
+          aid
+        ).size;
+
+      ack({
+        ok: true,
+        voiceRooms:
+          roomCount,
+        otherVoice:
+          roomCount > 1
+      });
     }
   );
 

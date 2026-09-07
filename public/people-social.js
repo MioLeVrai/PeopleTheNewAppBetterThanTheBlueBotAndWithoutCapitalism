@@ -275,9 +275,17 @@
     name.textContent = person.username;
 
     const status = document.createElement("span");
-    status.textContent = person.online
-      ? "● En ligne"
-      : person.description || "Hors ligne";
+
+    /*
+      PEOPLE_PRESENCE_STATUS_ONLY_V1
+
+      La description est une bio de profil,
+      pas un statut de présence.
+    */
+    status.textContent =
+      person.online
+        ? "● En ligne"
+        : "Hors ligne";
 
     copy.append(name, status);
 

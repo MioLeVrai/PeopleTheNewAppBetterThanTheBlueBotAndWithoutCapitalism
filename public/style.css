@@ -4353,3 +4353,50 @@ body,
 }
 
 /* === PEOPLE_MEMBER_PRESENCE_V2_UI_END === */
+
+
+/* === PEOPLE_MULTI_VOICE_V1_UI_START === */
+
+.voice-user-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.voice-user-other-vocal {
+  overflow: hidden;
+  color: #8a79ca;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-user.other-voice {
+  background:
+    rgba(
+      103,
+      88,
+      157,
+      .075
+    );
+}
+
+.voice-user.other-voice:hover {
+  background:
+    rgba(
+      103,
+      88,
+      157,
+      .13
+    );
+}
+
+@media (max-width: 780px) {
+  .voice-user-other-vocal {
+    font-size: 8px;
+  }
+}
+
+/* === PEOPLE_MULTI_VOICE_V1_UI_END === */
