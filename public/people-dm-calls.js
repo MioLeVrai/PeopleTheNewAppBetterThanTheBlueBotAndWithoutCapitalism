@@ -408,6 +408,16 @@
   }
 
   function ringPulse(kind) {
+    // === PEOPLE_SETTINGS_RINGTONE_HOOK_V1 ===
+    if (
+      window.PeopleSounds
+        ?.playRingtonePulse?.(
+          kind
+        )
+    ) {
+      return;
+    }
+
     if (
       kind ===
       "incoming"

@@ -183,6 +183,14 @@
   }
 
   function playPingSound() {
+    // === PEOPLE_SETTINGS_SOUND_HOOK_V1 ===
+    if (
+      window.PeopleSounds
+        ?.playNotification?.()
+    ) {
+      return;
+    }
+
     try {
       ensurePingAudio();
       if (!pingAudioContext) return;

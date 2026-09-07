@@ -2110,6 +2110,14 @@ function dmTextLine(
   }
 
   function peopleDmPlayPing() {
+    // === PEOPLE_SETTINGS_DM_SOUND_HOOK_V1 ===
+    if (
+      window.PeopleSounds
+        ?.playNotification?.()
+    ) {
+      return;
+    }
+
     try {
       peopleDmUnlockPingAudio();
       if (!peopleDmPingAudioContext) return;
