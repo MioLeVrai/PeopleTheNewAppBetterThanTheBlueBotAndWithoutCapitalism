@@ -8137,7 +8137,7 @@ function peopleVoiceRoom(
 
 // === PEOPLE_MULTI_VOICE_V1_START ===
 const PEOPLE_MAX_VOICE_ROOMS_PER_ACCOUNT =
-  2;
+  1;
 
 function peopleVoiceAccountServerIds(
   accountId,
@@ -8200,8 +8200,9 @@ function peopleVoiceAccountServerIds(
 }
 
 // === PEOPLE_UNIFIED_VOICE_LIMIT_V3_START ===
+// === PEOPLE_SINGLE_VOICE_GLOBAL_V4 ===
 const PEOPLE_MAX_SIMULTANEOUS_VOICES =
-  2;
+  1;
 
 function peopleAccountDmCallCount(
   accountId,
@@ -8280,9 +8281,9 @@ function peopleAccountReservedVoiceCount(
   accountId
 ) {
   /*
-    Un appel qui sonne réserve déjà une place.
-    Sinon 3 appels pourraient sonner en parallèle,
-    puis être acceptés et dépasser la limite.
+    Un appel qui sonne reserve deja l'unique place vocale.
+    On ne peut donc pas rejoindre un vocal serveur
+    pendant qu'un appel MP est en attente.
   */
   return (
     peopleVoiceAccountServerIds(
@@ -8307,130 +8308,6 @@ function peopleAccountHasVoiceSlot(
     ) <
     PEOPLE_MAX_SIMULTANEOUS_VOICES
   );
-}
-
-function peopleDmCallPeerHasOtherVoice(
-  call,
-  peerAccountId
-) {
-  const active =
-    peopleAccountActiveVoiceCount(
-      peerAccountId
-    );
-
-  /*
-    Pendant un appel ACTIF, l'appel courant est déjà
-    compris dans "active". Il faut donc > 1.
-
-    Pendant la sonnerie, l'appel courant n'est pas
-    encore actif : > 0 signifie que la personne est
-    déjà dans un autre vocal.
-  */
-  return call?.status ===
-    "active"
-    ? active > 1
-    : active > 0;
-}
-
-function peopleDmCallEmitOtherVoiceState(
-  call
-) {
-  if (!call?.id) {
-    return;
-  }
-
-  const callerSocket =
-    String(
-      call.callerSocketId ||
-      ""
-    );
-
-  if (callerSocket) {
-    io.to(
-      callerSocket
-    ).emit(
-      "dm-call-other-voice",
-      {
-        callId:
-          call.id,
-        otherVoice:
-          peopleDmCallPeerHasOtherVoice(
-            call,
-            call.calleeAccountId
-          )
-      }
-    );
-  }
-
-  const calleeSockets =
-    call.calleeSocketId
-      ? [
-          String(
-            call.calleeSocketId
-          )
-        ]
-      : peopleDmCallAccountSocketIds(
-          call.calleeAccountId
-        );
-
-  peopleDmCallEmitSocketIds(
-    calleeSockets,
-    "dm-call-other-voice",
-    {
-      callId:
-        call.id,
-      otherVoice:
-        peopleDmCallPeerHasOtherVoice(
-          call,
-          call.callerAccountId
-        )
-    }
-  );
-}
-
-function peopleDmCallRefreshOtherVoiceForAccount(
-  accountId
-) {
-  const wanted =
-    String(
-      accountId ||
-      ""
-    );
-
-  if (!wanted) {
-    return;
-  }
-
-  for (
-    const call of
-    peopleDmCalls.values()
-  ) {
-    if (
-      call.status !==
-        "ringing" &&
-      call.status !==
-        "active"
-    ) {
-      continue;
-    }
-
-    if (
-      String(
-        call.callerAccountId ||
-        ""
-      ) !== wanted &&
-      String(
-        call.calleeAccountId ||
-        ""
-      ) !== wanted
-    ) {
-      continue;
-    }
-
-    peopleDmCallEmitOtherVoiceState(
-      call
-    );
-  }
 }
 // === PEOPLE_UNIFIED_VOICE_LIMIT_V3_END ===
 
@@ -8497,19 +8374,6 @@ function peopleVoicePublicUser(
   socketId,
   user
 ) {
-  const accountId =
-    String(
-      user?.accountId ||
-      ""
-    );
-
-  const roomCount =
-    accountId
-      ? peopleAccountActiveVoiceCount(
-          accountId
-        )
-      : 1;
-
   return {
     id:
       String(
@@ -8524,15 +8388,7 @@ function peopleVoicePublicUser(
     camera:
       Boolean(
         user?.camera
-      ),
-
-    /*
-      Vie privée :
-      on indique seulement qu'il existe un autre vocal.
-      Aucun serverId / nom / salon n'est envoyé au client.
-    */
-    otherVoice:
-      roomCount > 1
+      )
   };
 }
 
@@ -8570,15 +8426,6 @@ function peopleVoiceRefreshAccount(
       sid
     );
   }
-
-  /*
-    Si ce compte est aussi dans un appel MP,
-    son interlocuteur doit voir instantanément
-    "Actif dans un autre vocal".
-  */
-  peopleDmCallRefreshOtherVoiceForAccount(
-    accountId
-  );
 }
 // === PEOPLE_MULTI_VOICE_V1_END ===
 
@@ -8875,7 +8722,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Tu es déjà dans 2 vocaux/appels."
+              "Tu es déjà dans un vocal ou un appel."
           });
         }
 
@@ -8887,7 +8734,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Cette personne est déjà active dans 2 vocaux/appels."
+              "Cette personne est déjà dans un vocal ou un appel."
           });
         }
 
@@ -8964,11 +8811,7 @@ io.on("connection", (socket) => {
                 ),
               username:
                 call.callerUsername
-            },
-            peerOtherVoice:
-              peopleAccountActiveVoiceCount(
-                callerAccountId
-              ) > 0
+            }
           }
         );
 
@@ -8978,11 +8821,7 @@ io.on("connection", (socket) => {
           target:
             peoplePublicAccount(
               target
-            ),
-          peerOtherVoice:
-            peopleAccountActiveVoiceCount(
-              target.id
-            ) > 0
+            )
         });
       } catch (err) {
         console.error(
@@ -9140,12 +8979,7 @@ io.on("connection", (socket) => {
           initiator:
             true,
           peerCamera:
-            false,
-          peerOtherVoice:
-            peopleDmCallPeerHasOtherVoice(
-              call,
-              call.calleeAccountId
-            )
+            false
         }
       );
 
@@ -9163,12 +8997,7 @@ io.on("connection", (socket) => {
           initiator:
             false,
           peerCamera:
-            false,
-          peerOtherVoice:
-            peopleDmCallPeerHasOtherVoice(
-              call,
-              call.callerAccountId
-            )
+            false
         }
       );
 
@@ -9875,8 +9704,8 @@ io.on("connection", (socket) => {
           );
 
         /*
-          Un onglet = un vocal WebRTC.
-          Les deux vocaux simultanés utilisent donc 2 onglets/fenêtres.
+          Une seule session vocale People est autorisee
+          par compte, quel que soit l'onglet utilise.
         */
         if (currentVoice) {
           if (
@@ -9903,11 +9732,7 @@ io.on("connection", (socket) => {
               voiceRooms:
                 peopleVoiceAccountServerIds(
                   aid
-                ).size,
-              otherVoice:
-                peopleAccountActiveVoiceCount(
-                  aid
-                ) > 1
+                ).size
             });
           }
 
@@ -9916,7 +9741,7 @@ io.on("connection", (socket) => {
             code:
               "VOICE_TAB_BUSY",
             error:
-              "Cet onglet est déjà dans un vocal. Ouvre un autre onglet People pour rejoindre un deuxième vocal."
+              "Tu es déjà dans un vocal. Quitte-le avant d'en rejoindre un autre."
           });
         }
 
@@ -9932,7 +9757,7 @@ io.on("connection", (socket) => {
             code:
               "VOICE_ALREADY_HERE",
             error:
-              "Tu es déjà dans ce vocal sur un autre onglet."
+              "Ton compte est déjà connecté à un vocal."
           });
         }
 
@@ -9956,7 +9781,7 @@ io.on("connection", (socket) => {
             code:
               "VOICE_LIMIT",
             error:
-              "Tu es déjà dans 2 vocaux/appels. Quitte-en un avant d'en rejoindre un autre."
+              "Tu es déjà dans un vocal ou un appel. Quitte-en un avant d'en rejoindre un autre."
           });
         }
 
@@ -10000,8 +9825,7 @@ io.on("connection", (socket) => {
         );
 
         /*
-          Si c'est le deuxième vocal du compte,
-          cette fonction rafraîchit LES DEUX vocaux.
+          Rafraichit l'etat vocal du compte.
         */
         peopleVoiceRefreshAccount(
           aid
@@ -10018,9 +9842,7 @@ io.on("connection", (socket) => {
             sid,
           roster,
           voiceRooms:
-            roomCount,
-          otherVoice:
-            roomCount > 1
+            roomCount
         });
       } catch (err) {
         console.error(

@@ -580,7 +580,7 @@ function peopleSyncVoiceUiContext() {
         "🔊 quitter le vocal ";
     } else if (selected) {
       voiceStatus.textContent =
-        "Tu es déjà en vocal sur un autre serveur";
+        "Déjà connecté à un vocal";
 
       voiceStatus.classList.remove(
         "connected"
@@ -801,32 +801,6 @@ function renderVoiceUsers(roster) {
     copy.appendChild(
       name
     );
-
-    if (
-      user.otherVoice
-    ) {
-      row.classList.add(
-        "other-voice"
-      );
-
-      const otherVoice =
-        document.createElement(
-          "div"
-        );
-
-      otherVoice.className =
-        "voice-user-other-vocal";
-
-      otherVoice.textContent =
-        "Actif dans un autre vocal";
-
-      otherVoice.title =
-        "People ne révèle pas dans quel autre vocal cette personne se trouve.";
-
-      copy.appendChild(
-        otherVoice
-      );
-    }
 
     const icons = document.createElement("div");
     icons.className = "voice-media-icons";
@@ -2142,7 +2116,7 @@ voiceButton.addEventListener(
     }
 
     voiceStatus.textContent =
-      "Cet onglet est déjà dans un autre vocal. Ouvre un deuxième onglet People pour rejoindre celui-ci.";
+      "Tu es déjà dans un vocal. Quitte-le avant d'en rejoindre un autre.";
   }
 );
 

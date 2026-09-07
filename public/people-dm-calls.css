@@ -417,44 +417,4 @@ and (
 /* === PEOPLE_DM_CALLS_V1_END === */
 
 
-/* === PEOPLE_DM_CALL_OTHER_VOICE_V3_START === */
 
-.people-dm-call-other-voice {
-  margin-top: 5px !important;
-  padding:
-    4px
-    8px;
-  border-radius:
-    999px;
-  background:
-    rgba(
-      103,
-      88,
-      157,
-      .18
-    );
-  color:
-    #a99cda !important;
-  font-size:
-    10px !important;
-  font-weight:
-    750;
-  line-height:
-    1.2;
-}
-
-.people-dm-call-other-voice.hidden {
-  display:
-    none !important;
-}
-
-.people-dm-call-identity.with-video
-.people-dm-call-other-voice {
-  padding:
-    3px
-    6px;
-  font-size:
-    9px !important;
-}
-
-/* === PEOPLE_DM_CALL_OTHER_VOICE_V3_END === */
