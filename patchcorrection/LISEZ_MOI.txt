@@ -1,20 +1,44 @@
-PEOPLE - DECONNEXION VRAI COIN BAS DROIT
+PEOPLE - FIX PHOTO DE PROFIL + LOGOUT BAS GAUCHE
 
-Ce patch corrige uniquement la position de la porte de déconnexion.
+PHOTO DE PROFIL
 
-Avant :
-bottom: environ 78px
+Le recadrage existant reste en place.
 
-Après :
-right: 14px
-bottom: 14px
+Après le recadrage :
+1. People réencode la photo en JPEG.
+2. Format final : 384x384.
+3. Qualité JPEG diminuée automatiquement.
+4. Cible : environ 300 Ko ou moins.
+5. L'image est envoyée au serveur.
+6. L'image est affichée immédiatement.
+7. People retélécharge ensuite la PP depuis le serveur pour vérifier
+   qu'elle a vraiment été enregistrée.
+8. Le serveur vérifie également qu'il arrive à relire le fichier
+   juste après la sauvegarde.
 
-Sur mobile :
-right: 10px
-bottom: 10px
+Ça permet de distinguer :
+- problème d'affichage ;
+- problème d'upload ;
+- problème de stockage PostgreSQL.
 
-Un seul fichier modifié :
-public/style.css
+DECONNEXION
 
-Backup uniquement dans :
+Position temporaire :
+- bas à gauche ;
+- left: 14px ;
+- bottom: 14px ;
+- right: auto.
+
+Les anciens styles qui plaçaient la porte à droite sont donc neutralisés.
+
+PATCH CIBLE
+
+Fichiers touchés :
+- public/people-social.js : uniquement le bloc upload PP
+- public/index.html : une balise script
+- public/style.css : petit override de position
+- server.js : vérification après sauvegarde PP
+- ajout : public/people-avatar-upload-fix.js
+
+Backups uniquement dans :
 D:\crack\Discord 2\backup

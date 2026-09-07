@@ -1472,6 +1472,22 @@ function dmTextLine(
         }
 
         profileAvatarUploadButton.textContent =
+          "Compression...";
+
+        const uploadBlob =
+          await window
+            .PeopleAvatarUploadFix
+            ?.prepareForUpload(
+              compressed
+            );
+
+        if (!uploadBlob) {
+          throw new Error(
+            "La compression finale a échoué."
+          );
+        }
+
+        profileAvatarUploadButton.textContent =
           "Envoi...";
 
         const response =
@@ -1482,10 +1498,11 @@ function dmTextLine(
               credentials: "same-origin",
               headers: {
                 "Content-Type":
-                  compressed.type ||
-                  "image/webp"
+                  uploadBlob.type ||
+                  "image/jpeg"
               },
-              body: compressed
+              body:
+                uploadBlob
             }
           );
 
@@ -1496,22 +1513,50 @@ function dmTextLine(
             await response.json();
         } catch {}
 
-        if (!response.ok) {
+        if (
+          !response.ok ||
+          data?.ok === false
+        ) {
           throw new Error(
             data?.error ||
             "Impossible de changer la photo."
           );
         }
 
-        window.PeopleAvatars?.refresh(
-          currentProfile.username
-        );
+        window.PeopleAvatarUploadFix
+          ?.applyBlobToElement(
+            profileModalAvatar,
+            currentProfile.username,
+            uploadBlob
+          );
+
+        window.PeopleAvatarUploadFix
+          ?.applyBlobEverywhere(
+            currentProfile.username,
+            uploadBlob
+          );
+
+        profileAvatarUploadButton.textContent =
+          "Vérification...";
+
+        const verified =
+          await window
+            .PeopleAvatarUploadFix
+            ?.reloadFromServer(
+              currentProfile.username
+            );
+
+        if (!verified) {
+          throw new Error(
+            "La photo a été envoyée, mais People n'arrive pas à la relire. Recharge la page et regarde les logs Render si elle n'apparaît toujours pas."
+          );
+        }
 
         const kb =
           Math.max(
             1,
             Math.round(
-              compressed.size / 1024
+              uploadBlob.size / 1024
             )
           );
 

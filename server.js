@@ -2885,6 +2885,23 @@ app.put(
           req.body
         );
 
+      const verifiedAvatar =
+        await peopleLoadAvatar(
+          session.id
+        );
+
+      if (
+        !verifiedAvatar ||
+        !Buffer.isBuffer(
+          verifiedAvatar.data
+        ) ||
+        verifiedAvatar.data.length <= 0
+      ) {
+        throw new Error(
+          "AVATAR_VERIFY_FAILED"
+        );
+      }
+
       const account =
         await peopleFindAccountById(
           session.id
@@ -2927,6 +2944,17 @@ app.put(
           ok: false,
           error:
             "Format non accepte. JPEG, PNG, WebP ou GIF."
+        });
+      }
+
+      if (
+        err?.message ===
+        "AVATAR_VERIFY_FAILED"
+      ) {
+        return res.status(500).json({
+          ok: false,
+          error:
+            "La photo a été reçue mais n'a pas pu être relue depuis le stockage."
         });
       }
 
