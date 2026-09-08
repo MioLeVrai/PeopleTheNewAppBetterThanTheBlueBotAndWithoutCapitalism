@@ -232,6 +232,42 @@
             "Utilisateur"
           );
 
+    // === PEOPLE_REPLY_PROFILE_CLICK_V3 ===
+    if (
+      !reply.deleted &&
+      reply.username
+    ) {
+      author.classList.add(
+        "people-profile-trigger",
+        "people-profile-name-trigger"
+      );
+
+      author.dataset.peopleProfileUsername =
+        String(
+          reply.username
+        );
+
+      author.addEventListener(
+        "click",
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          window.dispatchEvent(
+            new CustomEvent(
+              "people-open-profile",
+              {
+                detail: {
+                  username:
+                    author.dataset.peopleProfileUsername
+                }
+              }
+            )
+          );
+        }
+      );
+    }
+
     const text =
       document.createElement("span");
 

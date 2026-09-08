@@ -81,6 +81,13 @@
       "inviteServerIcon"
     );
 
+  // === PEOPLE_INVITE_UNAVAILABLE_V1_START ===
+  const inviteIntro =
+    document.getElementById(
+      "inviteIntroText"
+    );
+  // === PEOPLE_INVITE_UNAVAILABLE_V1_END ===
+
   const inviteName =
     document.getElementById(
       "inviteServerName"
@@ -108,6 +115,7 @@
   let authenticated = false;
   let inviteCode = null;
   let invitePreview = null;
+  let inviteUnavailable = false;
 
   function initials(value) {
     return (
@@ -793,6 +801,85 @@
     );
   }
 
+  function resetInviteAvailableUi() {
+    inviteUnavailable =
+      false;
+
+    if (inviteIntro) {
+      inviteIntro.textContent =
+        "Tu as reçu une invitation pour rejoindre";
+
+      inviteIntro.classList.remove(
+        "hidden"
+      );
+    }
+
+    inviteName.classList.remove(
+      "people-invite-unavailable-message"
+    );
+
+    inviteMembers.classList.remove(
+      "hidden"
+    );
+
+    inviteError.classList.remove(
+      "hidden"
+    );
+
+    inviteJoin.textContent =
+      "Rejoindre le serveur";
+  }
+
+  function showInviteUnavailableUi() {
+    invitePreview =
+      null;
+
+    inviteUnavailable =
+      true;
+
+    inviteIcon.textContent =
+      "?";
+
+    if (inviteIntro) {
+      inviteIntro.textContent =
+        "";
+      inviteIntro.classList.add(
+        "hidden"
+      );
+    }
+
+    inviteName.textContent =
+      "Le serveur n'est plus disponible ou l'utilisateur a été banni.";
+
+    inviteName.classList.add(
+      "people-invite-unavailable-message"
+    );
+
+    inviteMembers.textContent =
+      "";
+
+    inviteMembers.classList.add(
+      "hidden"
+    );
+
+    inviteError.textContent =
+      "";
+
+    inviteError.classList.add(
+      "hidden"
+    );
+
+    inviteJoin.disabled =
+      false;
+
+    inviteJoin.textContent =
+      "Fermer";
+
+    inviteModal.classList.remove(
+      "hidden"
+    );
+  }
+
   async function showInvite() {
     if (
       !authenticated ||
@@ -802,6 +889,8 @@
     }
 
     try {
+      resetInviteAvailableUi();
+
       const data =
         await api(
           "/api/servers/invite/" +
@@ -847,18 +936,32 @@
         "hidden"
       );
     } catch (err) {
-      invitePreview = null;
-
-      inviteError.textContent =
-        err.message;
-
-      inviteModal.classList.remove(
-        "hidden"
+      console.warn(
+        "[People invite/unavailable]",
+        err?.message ||
+        err
       );
+
+      showInviteUnavailableUi();
     }
   }
 
   async function joinInvite() {
+    if (inviteUnavailable) {
+      closeInviteModal();
+
+      history.replaceState(
+        {},
+        "",
+        "/"
+      );
+
+      inviteCode =
+        null;
+
+      return;
+    }
+
     if (
       !inviteCode ||
       !invitePreview

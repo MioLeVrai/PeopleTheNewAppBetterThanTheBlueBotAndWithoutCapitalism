@@ -322,6 +322,149 @@ function addSystemMessage(
   }
 }
 
+// === PEOPLE_PROFILE_CLICK_EVERYWHERE_V3_START ===
+function peopleProfileUsername(
+  value
+) {
+  const username =
+    String(
+      value ||
+      ""
+    ).trim();
+
+  if (
+    !username ||
+    username.toLocaleLowerCase(
+      "fr-FR"
+    ) ===
+      "système" ||
+    username.toLocaleLowerCase(
+      "fr-FR"
+    ) ===
+      "systeme"
+  ) {
+    return "";
+  }
+
+  return username;
+}
+
+function peopleOpenProfileFromUi(
+  username
+) {
+  const clean =
+    peopleProfileUsername(
+      username
+    );
+
+  if (!clean) {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent(
+      "people-open-profile",
+      {
+        detail: {
+          username:
+            clean
+        }
+      }
+    )
+  );
+}
+
+function peopleBindProfileUi(
+  element,
+  username,
+  kind =
+    "name"
+) {
+  const clean =
+    peopleProfileUsername(
+      username
+    );
+
+  if (
+    !element ||
+    !clean
+  ) {
+    return;
+  }
+
+  element.dataset.peopleProfileUsername =
+    clean;
+
+  element.classList.add(
+    "people-profile-trigger"
+  );
+
+  element.classList.toggle(
+    "people-profile-name-trigger",
+    kind ===
+      "name"
+  );
+
+  element.classList.toggle(
+    "people-profile-avatar-trigger",
+    kind ===
+      "avatar"
+  );
+
+  if (
+    element.dataset.peopleProfileClickBound ===
+      "1"
+  ) {
+    return;
+  }
+
+  element.dataset.peopleProfileClickBound =
+    "1";
+
+  element.setAttribute(
+    "role",
+    "button"
+  );
+
+  element.setAttribute(
+    "tabindex",
+    "0"
+  );
+
+  element.addEventListener(
+    "click",
+    (event) => {
+      event.stopPropagation();
+
+      peopleOpenProfileFromUi(
+        element.dataset.peopleProfileUsername
+      );
+    }
+  );
+
+  element.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key !==
+          "Enter" &&
+        event.key !==
+          " "
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      peopleOpenProfileFromUi(
+        element.dataset.peopleProfileUsername
+      );
+    }
+  );
+}
+// === PEOPLE_PROFILE_CLICK_EVERYWHERE_V3_END ===
+
 // === PEOPLE_MESSAGE_GROUPING_V1_START ===
 const PEOPLE_GROUP_MAX_MESSAGES = 10;
 const PEOPLE_GROUP_MAX_GAP_MS =
@@ -500,6 +643,13 @@ function addChatMessage(
     data.username
   );
 
+  // === PEOPLE_SERVER_MESSAGE_PROFILE_V3 ===
+  peopleBindProfileUi(
+    av,
+    data.username,
+    "avatar"
+  );
+
   const body =
     document.createElement("div");
 
@@ -517,6 +667,12 @@ function addChatMessage(
 
   strong.textContent =
     data.username;
+
+  peopleBindProfileUi(
+    strong,
+    data.username,
+    "name"
+  );
 
   const time =
     document.createElement("time");
@@ -860,6 +1016,19 @@ function renderVoiceUsers(roster) {
       ? `${user.username} (toi)`
       : user.username;
 
+    // === PEOPLE_VOICE_PROFILE_V3 ===
+    peopleBindProfileUi(
+      av,
+      user.username,
+      "avatar"
+    );
+
+    peopleBindProfileUi(
+      name,
+      user.username,
+      "name"
+    );
+
     copy.appendChild(
       name
     );
@@ -937,6 +1106,19 @@ function ensureVideoTile(peerId, displayName, isLocal = false) {
       displayName
     );
   }
+
+  // === PEOPLE_VIDEO_PROFILE_V3 ===
+  peopleBindProfileUi(
+    bigAvatar,
+    displayName,
+    "avatar"
+  );
+
+  peopleBindProfileUi(
+    label,
+    displayName,
+    "name"
+  );
 
   return tile;
 }
@@ -2905,6 +3087,19 @@ function peopleRenderOnlineUsers(roster) {
               user.username ||
               "Invité"
             );
+
+      // === PEOPLE_MEMBER_PROFILE_V3 ===
+      peopleBindProfileUi(
+        av,
+        user.username,
+        "avatar"
+      );
+
+      peopleBindProfileUi(
+        name,
+        user.username,
+        "name"
+      );
 
       const status =
         document.createElement(

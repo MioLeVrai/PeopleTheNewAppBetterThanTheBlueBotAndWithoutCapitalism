@@ -18,3 +18,36 @@
 }
 /* === PEOPLE_FRIENDS_NAV_HOVER_V1_END === */
 
+/* === PEOPLE_PROFILE_CLICK_STYLE_V3_START === */
+.people-profile-trigger {
+  cursor: pointer;
+}
+
+.people-profile-name-trigger {
+  cursor: pointer;
+  text-decoration: none;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition:
+    opacity 110ms ease,
+    text-decoration-color 110ms ease;
+}
+
+.people-profile-name-trigger:hover {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: currentColor;
+  opacity: 0.88;
+}
+
+.people-profile-avatar-trigger {
+  cursor: pointer;
+}
+
+.people-profile-trigger:focus-visible {
+  outline: 2px solid rgba(138, 121, 202, 0.58);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* === PEOPLE_PROFILE_CLICK_STYLE_V3_END === */

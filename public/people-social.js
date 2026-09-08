@@ -268,6 +268,150 @@
     showFriends
   };
 
+  // === PEOPLE_PROFILE_SOCIAL_EVERYWHERE_V3_START ===
+  function peopleSocialProfileUsername(
+    value
+  ) {
+    const username =
+      String(
+        value ||
+        ""
+      ).trim();
+
+    if (
+      !username ||
+      username.toLocaleLowerCase(
+        "fr-FR"
+      ) ===
+        "système" ||
+      username.toLocaleLowerCase(
+        "fr-FR"
+      ) ===
+        "systeme"
+    ) {
+      return "";
+    }
+
+    return username;
+  }
+
+  function peopleBindSocialProfileUi(
+    element,
+    username,
+    kind =
+      "name"
+  ) {
+    const clean =
+      peopleSocialProfileUsername(
+        username
+      );
+
+    if (
+      !element ||
+      !clean
+    ) {
+      return;
+    }
+
+    element.dataset.peopleProfileUsername =
+      clean;
+
+    element.classList.add(
+      "people-profile-trigger"
+    );
+
+    element.classList.toggle(
+      "people-profile-name-trigger",
+      kind ===
+        "name"
+    );
+
+    element.classList.toggle(
+      "people-profile-avatar-trigger",
+      kind ===
+        "avatar"
+    );
+
+    if (
+      element.dataset.peopleProfileClickBound ===
+        "1"
+    ) {
+      return;
+    }
+
+    element.dataset.peopleProfileClickBound =
+      "1";
+
+    if (
+      element.tagName !==
+        "BUTTON"
+    ) {
+      element.setAttribute(
+        "role",
+        "button"
+      );
+
+      element.setAttribute(
+        "tabindex",
+        "0"
+      );
+    }
+
+    element.addEventListener(
+      "click",
+      (event) => {
+        event.stopPropagation();
+
+        void openProfile(
+          element.dataset.peopleProfileUsername
+        );
+      }
+    );
+
+    if (
+      element.tagName !==
+        "BUTTON"
+    ) {
+      element.addEventListener(
+        "keydown",
+        (event) => {
+          if (
+            event.key !==
+              "Enter" &&
+            event.key !==
+              " "
+          ) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          void openProfile(
+            element.dataset.peopleProfileUsername
+          );
+        }
+      );
+    }
+  }
+
+  window.addEventListener(
+    "people-open-profile",
+    (event) => {
+      const username =
+        peopleSocialProfileUsername(
+          event?.detail?.username
+        );
+
+      if (username) {
+        void openProfile(
+          username
+        );
+      }
+    }
+  );
+  // === PEOPLE_PROFILE_SOCIAL_EVERYWHERE_V3_END ===
+
   function updateUnreadBadge(total) {
     const count = Math.max(0, Number(total || 0));
 
@@ -305,6 +449,19 @@
 
     const name = document.createElement("strong");
     name.textContent = person.username;
+
+    // === PEOPLE_CARD_PROFILE_V3 ===
+    peopleBindSocialProfileUi(
+      av,
+      person.username,
+      "avatar"
+    );
+
+    peopleBindSocialProfileUi(
+      name,
+      person.username,
+      "name"
+    );
 
     const status = document.createElement("span");
     status.textContent =
@@ -382,6 +539,19 @@
 
     const name = document.createElement("strong");
     name.textContent = request.user.username;
+
+    // === PEOPLE_FRIEND_REQUEST_PROFILE_V3 ===
+    peopleBindSocialProfileUi(
+      av,
+      request.user.username,
+      "avatar"
+    );
+
+    peopleBindSocialProfileUi(
+      name,
+      request.user.username,
+      "name"
+    );
 
     const status = document.createElement("span");
     status.textContent =
@@ -1150,6 +1320,19 @@
       preview.textContent =
         conversation.lastMessage || "Message privé";
 
+      // === PEOPLE_DM_SIDEBAR_PROFILE_V3 ===
+      peopleBindSocialProfileUi(
+        av,
+        conversation.user.username,
+        "avatar"
+      );
+
+      peopleBindSocialProfileUi(
+        name,
+        conversation.user.username,
+        "name"
+      );
+
       copy.append(name, preview);
 
       row.append(av, copy);
@@ -1481,6 +1664,23 @@ function dmTextLine(
     strong.textContent =
       author?.username ||
       "Utilisateur";
+
+    // === PEOPLE_DM_MESSAGE_PROFILE_V3 ===
+    if (
+      author?.username
+    ) {
+      peopleBindSocialProfileUi(
+        av,
+        author.username,
+        "avatar"
+      );
+
+      peopleBindSocialProfileUi(
+        strong,
+        author.username,
+        "name"
+      );
+    }
 
     const time =
       document.createElement("time");
@@ -1859,6 +2059,19 @@ function dmTextLine(
           activeDmUser.username
         );
       }
+
+      // === PEOPLE_DM_HEADER_PROFILE_V3 ===
+      peopleBindSocialProfileUi(
+        dmHeaderAvatar,
+        activeDmUser.username,
+        "avatar"
+      );
+
+      peopleBindSocialProfileUi(
+        dmHeaderName,
+        activeDmUser.username,
+        "name"
+      );
 
       if (dmHeaderStatus) {
         dmHeaderStatus.textContent =
