@@ -574,7 +574,10 @@
     }
 
     notificationServiceWorkerPromise = navigator.serviceWorker
-      .register("/people-notifications-sw.js", { scope: "/" })
+      .register("/people-notifications-sw.js?v=20260908-4", {
+        scope: "/",
+        updateViaCache: "none"
+      })
       .then(async (registration) => {
         try {
           // ready garantit qu'un worker actif contrôle ou est prêt à servir la portée.
@@ -608,35 +611,77 @@
   }
 
   async function showBrowserNotification(title, options) {
-    // Priorité au Service Worker : c'est le chemin web le plus robuste pour
-    // produire une vraie notification système, même lorsque l'onglet n'est
-    // pas au premier plan.
+    // Le navigateur et les vrais pings passent par le MEME chemin :
+    // page -> postMessage -> Service Worker -> showNotification().
+    // Cela évite les différences entre un test manuel et un évènement Socket.IO.
     try {
       const registration = await ensureNotificationServiceWorker();
-      if (registration?.showNotification) {
-        await registration.showNotification(title, options);
+      const worker =
+        registration?.active ||
+        registration?.waiting ||
+        registration?.installing;
 
-        // Vérifie que le navigateur a réellement enregistré la notification.
-        try {
-          const created = await registration.getNotifications(
-            options?.tag ? { tag: options.tag } : undefined
-          );
+      if (worker) {
+        const result = await new Promise((resolve) => {
+          const channel = new MessageChannel();
+          let settled = false;
+
+          const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            try { channel.port1.close(); } catch {}
+            resolve(value);
+          };
+
+          const timer = setTimeout(() => {
+            finish({
+              ok: false,
+              error: "Service Worker sans réponse (ancienne version ou timeout)"
+            });
+          }, 2500);
+
+          channel.port1.onmessage = (event) => {
+            finish(event.data || { ok: false, error: "Réponse vide du Service Worker" });
+          };
+
+          try {
+            worker.postMessage(
+              {
+                type: "PEOPLE_SHOW_NOTIFICATION",
+                title,
+                options
+              },
+              [channel.port2]
+            );
+          } catch (error) {
+            finish({ ok: false, error: error?.message || String(error) });
+          }
+        });
+
+        if (result?.ok) {
           console.log(
-            "[People notifications] Notifications actives après showNotification :",
-            created.length
+            "[People notifications] Service Worker a affiché la notification :",
+            result.count,
+            "version:",
+            result.version || "?"
           );
-        } catch {}
+          return true;
+        }
 
-        return true;
+        console.warn(
+          "[People notifications] Le Service Worker n'a pas confirmé la notification :",
+          result?.error || result
+        );
       }
     } catch (error) {
       console.warn(
-        "[People notifications] showNotification via Service Worker impossible",
+        "[People notifications] Notification via Service Worker impossible",
         error
       );
     }
 
-    // Fallback pour les navigateurs desktop qui supportent le constructeur.
+    // Fallback immédiat si un ancien Service Worker est encore actif.
     try {
       const notification = new Notification(title, options);
       notification.onclick = () => {
@@ -649,7 +694,6 @@
           event
         );
       };
-      setTimeout(() => notification.close(), 7000);
       return true;
     } catch (error) {
       console.warn("[People notifications] Création de notification impossible", error);
