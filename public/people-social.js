@@ -1320,19 +1320,12 @@
       preview.textContent =
         conversation.lastMessage || "Message privé";
 
-      // === PEOPLE_DM_SIDEBAR_PROFILE_V3 ===
-      peopleBindSocialProfileUi(
-        av,
-        conversation.user.username,
-        "avatar"
-      );
-
-      peopleBindSocialProfileUi(
-        name,
-        conversation.user.username,
-        "name"
-      );
-
+      // === PEOPLE_DM_SIDEBAR_MP_PRIORITY_V1 ===
+      /*
+        Dans la liste des MP, PP + pseudo font partie de la ligne
+        de conversation : tout clic ouvre le MP.
+        Les profils restent cliquables ailleurs dans People.
+      */
       copy.append(name, preview);
 
       row.append(av, copy);
