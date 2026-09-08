@@ -102,6 +102,7 @@
     );
 
   let servers = [];
+  let serverById = new Map();
   let activeServer = null;
   let viewingHome = true;
   let authenticated = false;
@@ -318,8 +319,6 @@
     }
 
     await refreshServers();
-
-    renderRail();
   }
 
   function openServerContextMenu(
@@ -435,14 +434,50 @@
   document.addEventListener(
     "scroll",
     closeServerContextMenu,
-    true
+    {
+      capture: true,
+      passive: true
+    }
   );
   // === PEOPLE_SERVER_CONTEXT_MENU_V1_END ===
+
+  function updateRailSelection() {
+    if (!railList) {
+      return;
+    }
+
+    const activeId =
+      !viewingHome &&
+      activeServer
+        ? String(activeServer.id)
+        : "";
+
+    for (
+      const child of
+        railList.children
+    ) {
+      if (
+        !child.classList.contains(
+          "dynamic-server-button"
+        )
+      ) {
+        continue;
+      }
+
+      child.classList.toggle(
+        "active",
+        Boolean(activeId) &&
+        child.dataset.serverId ===
+          activeId
+      );
+    }
+  }
 
   function renderRail() {
     if (!railList) return;
 
-    railList.innerHTML = "";
+    const fragment =
+      document.createDocumentFragment();
 
     for (const server of servers) {
       const button =
@@ -473,32 +508,7 @@
           server.name
       );
 
-      button.classList.toggle(
-        "active",
-        !viewingHome &&
-        activeServer &&
-        String(activeServer.id) ===
-          String(server.id)
-      );
-
-      button.addEventListener(
-        "click",
-        () =>
-          openServer(
-            server
-          )
-      );
-
-      button.addEventListener(
-        "contextmenu",
-        (event) =>
-          openServerContextMenu(
-            event,
-            server
-          )
-      );
-
-      railList.appendChild(
+      fragment.appendChild(
         button
       );
     }
@@ -518,11 +528,75 @@
       empty.title =
         "Tu n'as rejoint aucun serveur";
 
-      railList.appendChild(
+      fragment.appendChild(
         empty
       );
     }
+
+    railList.replaceChildren(
+      fragment
+    );
+
+    updateRailSelection();
   }
+
+  function getRailServer(
+    target
+  ) {
+    const button =
+      target instanceof Element
+        ? target.closest(
+            ".dynamic-server-button"
+          )
+        : null;
+
+    if (
+      !button ||
+      !railList?.contains(button)
+    ) {
+      return null;
+    }
+
+    return (
+      serverById.get(
+        String(
+          button.dataset.serverId ||
+            ""
+        )
+      ) || null
+    );
+  }
+
+  railList?.addEventListener(
+    "click",
+    (event) => {
+      const server =
+        getRailServer(
+          event.target
+        );
+
+      if (server) {
+        openServer(server);
+      }
+    }
+  );
+
+  railList?.addEventListener(
+    "contextmenu",
+    (event) => {
+      const server =
+        getRailServer(
+          event.target
+        );
+
+      if (server) {
+        openServerContextMenu(
+          event,
+          server
+        );
+      }
+    }
+  );
 
   function updateServerChrome(
     server
@@ -574,16 +648,29 @@
         ? data.servers
         : [];
 
-    if (
-      activeServer &&
-      !servers.some(
-        (server) =>
-          String(server.id) ===
+    serverById =
+      new Map(
+        servers.map(
+          (server) => [
+            String(server.id),
+            server
+          ]
+        )
+      );
+
+    if (activeServer) {
+      const refreshed =
+        serverById.get(
           String(activeServer.id)
-      )
-    ) {
-      activeServer = null;
-      viewingHome = true;
+        );
+
+      if (refreshed) {
+        activeServer =
+          refreshed;
+      } else {
+        activeServer = null;
+        viewingHome = true;
+      }
     }
 
     renderRail();
@@ -624,7 +711,7 @@
         activeServer
       );
 
-      renderRail();
+      updateRailSelection();
 
       window
         .PeopleSocialNavigation
@@ -651,10 +738,9 @@
       "hidden"
     );
 
-    setTimeout(
+    requestAnimationFrame(
       () =>
-        createNameInput.focus(),
-      20
+        createNameInput.focus()
     );
   }
 
@@ -873,7 +959,7 @@
     "click",
     () => {
       viewingHome = true;
-      renderRail();
+      updateRailSelection();
     }
   );
 

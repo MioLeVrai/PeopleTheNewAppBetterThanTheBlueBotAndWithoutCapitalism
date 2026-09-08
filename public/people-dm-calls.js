@@ -1,3 +1,4 @@
+/* ===== people-dm-calls.js — version stable d'origine ===== */
 (() => {
   "use strict";
 
@@ -306,18 +307,6 @@
       "peopleDmCallHangup"
     );
 
-  const muteButtonIcon =
-    muteButton.querySelector("span");
-
-  const muteButtonLabel =
-    muteButton.querySelector("small");
-
-  const cameraButtonIcon =
-    cameraButton.querySelector("span");
-
-  const cameraButtonLabel =
-    cameraButton.querySelector("small");
-
   function unlockCallAudio() {
     try {
       if (!audioContext) {
@@ -513,8 +502,6 @@
       "hidden"
     );
 
-    peopleDmCallPublishState();
-
     requestAnimationFrame(
       () => {
         overlay.classList.add(
@@ -535,7 +522,6 @@
           overlay.classList.add(
             "hidden"
           );
-          peopleDmCallPublishState();
         }
       },
       190
@@ -566,8 +552,6 @@
         avatar,
         name
       );
-
-    peopleDmCallPublishState();
   }
 
   function setStatus(
@@ -600,14 +584,6 @@
       camera:
         Boolean(
           cameraEnabled
-        ),
-      remoteCamera:
-        Boolean(
-          call?.remoteCamera
-        ),
-      visible:
-        !overlay.classList.contains(
-          "hidden"
         )
     };
   }
@@ -694,12 +670,16 @@
       micMuted
     );
 
-    muteButtonIcon.textContent =
+    muteButton.querySelector(
+      "span"
+    ).textContent =
       micMuted
         ? "🔇"
         : "🎙️";
 
-    muteButtonLabel.textContent =
+    muteButton.querySelector(
+      "small"
+    ).textContent =
       micMuted
         ? "Muet"
         : "Micro";
@@ -714,12 +694,16 @@
       cameraEnabled
     );
 
-    cameraButtonIcon.textContent =
+    cameraButton.querySelector(
+      "span"
+    ).textContent =
       cameraEnabled
         ? "📹"
         : "📷";
 
-    cameraButtonLabel.textContent =
+    cameraButton.querySelector(
+      "small"
+    ).textContent =
       cameraEnabled
         ? "Cam active"
         : "Caméra";
@@ -732,79 +716,14 @@
     peopleDmCallPublishState();
   }
 
-  function mediaElementHasTracks(
-    element,
-    tracks
-  ) {
-    const current =
-      element.srcObject
-        ?.getTracks?.() ||
-      [];
-
-    if (
-      current.length !==
-      tracks.length
-    ) {
-      return false;
-    }
-
-    const currentIds =
-      new Set(
-        current.map(
-          (track) => track.id
-        )
-      );
-
-    return tracks.every(
-      (track) =>
-        currentIds.has(
-          track.id
-        )
-    );
-  }
-
-  function setMediaElementTracks(
-    element,
-    tracks
-  ) {
-    if (!tracks.length) {
-      if (element.srcObject) {
-        try {
-          element.srcObject =
-            null;
-        } catch {}
-        return true;
-      }
-
-      return false;
-    }
-
-    if (
-      mediaElementHasTracks(
-        element,
-        tracks
-      )
-    ) {
-      return false;
-    }
-
-    element.srcObject =
-      new MediaStream(
-        tracks
-      );
-
-    return true;
-  }
-
   function syncLocalPreview() {
     if (
       cameraEnabled &&
       cameraTrack &&
       localStream
     ) {
-      const changed =
-        setMediaElementTracks(
-          localVideo,
+      localVideo.srcObject =
+        new MediaStream(
           [cameraTrack]
         );
 
@@ -812,14 +731,9 @@
         "hidden"
       );
 
-      if (
-        changed ||
-        localVideo.paused
-      ) {
-        localVideo
-          .play()
-          .catch(() => {});
-      }
+      localVideo
+        .play()
+        .catch(() => {});
 
       return;
     }
@@ -836,23 +750,6 @@
 
   function syncRemoteMedia() {
     if (!remoteStream) {
-      setMediaElementTracks(
-        remoteAudio,
-        []
-      );
-      setMediaElementTracks(
-        remoteVideo,
-        []
-      );
-
-      remoteVideo.classList.add(
-        "hidden"
-      );
-      identity.classList.remove(
-        "with-video"
-      );
-
-      peopleDmCallPublishState();
       return;
     }
 
@@ -865,9 +762,8 @@
             "live"
         );
 
-    const audioChanged =
-      setMediaElementTracks(
-        remoteAudio,
+    remoteAudio.srcObject =
+      new MediaStream(
         audioTracks
       );
 
@@ -876,17 +772,9 @@
         remoteAudio
       );
 
-    if (
-      audioTracks.length &&
-      (
-        audioChanged ||
-        remoteAudio.paused
-      )
-    ) {
-      remoteAudio
-        .play()
-        .catch(() => {});
-    }
+    remoteAudio
+      .play()
+      .catch(() => {});
 
     const videoTracks =
       remoteStream
@@ -901,9 +789,8 @@
       videoTracks.length &&
       call?.remoteCamera
     ) {
-      const videoChanged =
-        setMediaElementTracks(
-          remoteVideo,
+      remoteVideo.srcObject =
+        new MediaStream(
           videoTracks
         );
 
@@ -911,23 +798,18 @@
         "hidden"
       );
 
-      if (
-        videoChanged ||
-        remoteVideo.paused
-      ) {
-        remoteVideo
-          .play()
-          .catch(() => {});
-      }
+      remoteVideo
+        .play()
+        .catch(() => {});
 
       identity.classList.add(
         "with-video"
       );
     } else {
-      setMediaElementTracks(
-        remoteVideo,
-        []
-      );
+      try {
+        remoteVideo.srcObject =
+          null;
+      } catch {}
 
       remoteVideo.classList.add(
         "hidden"
@@ -937,8 +819,6 @@
         "with-video"
       );
     }
-
-    peopleDmCallPublishState();
   }
 
   async function ensureLocalAudio() {
@@ -2364,7 +2244,7 @@
   // === PEOPLE_DM_CALLS_V1_END ===
 })();
 
-/* ===== UI V2 intégrée ===== */
+/* ===== people-dm-calls-v2.js — version stable d'origine ===== */
 (() => {
   "use strict";
 
@@ -2673,6 +2553,16 @@
     );
 
   placementObserver.observe(
+    overlay,
+    {
+      attributes: true,
+      attributeFilter: [
+        "class"
+      ]
+    }
+  );
+
+  placementObserver.observe(
     dmView,
     {
       attributes: true,
@@ -2766,11 +2656,11 @@
     );
   }
 
-  function readPref(key) {
+  function loadPref() {
     try {
       const raw =
         localStorage.getItem(
-          key
+          prefKey()
         );
 
       if (!raw) {
@@ -2810,92 +2700,73 @@
     }
   }
 
-  let currentPrefKey =
-    prefKey();
-
-  let currentPref =
-    readPref(
-      currentPrefKey
-    );
-
-  function saveCurrentPref() {
+  function savePref(pref) {
     try {
       localStorage.setItem(
-        currentPrefKey,
+        prefKey(),
         JSON.stringify(
-          currentPref
+          pref
         )
       );
     } catch {}
   }
 
   function applyPref() {
+    const pref =
+      loadPref();
+
     remoteAudio.volume =
       Math.max(
         0,
         Math.min(
           1,
-          currentPref.volume /
+          pref.volume /
           100
         )
       );
 
     remoteAudio.muted =
-      currentPref.muted;
+      pref.muted;
 
     volumeRange.value =
       String(
-        currentPref.volume
+        pref.volume
       );
 
     volumeValue.textContent =
       Math.round(
-        currentPref.volume
+        pref.volume
       ) + "%";
 
     volumeMute.textContent =
-      currentPref.muted
+      pref.muted
         ? "🔇"
         : "🔊";
 
     volumeMute.classList.toggle(
       "is-muted",
-      currentPref.muted
+      pref.muted
     );
 
     volumeMute.title =
-      currentPref.muted
+      pref.muted
         ? "Réactiver le son de la personne"
         : "Couper le son de la personne";
-  }
-
-  function refreshPrefForPartner() {
-    const nextKey =
-      prefKey();
-
-    if (
-      nextKey !==
-      currentPrefKey
-    ) {
-      currentPrefKey =
-        nextKey;
-
-      currentPref =
-        readPref(
-          currentPrefKey
-        );
-    }
-
-    applyPref();
   }
 
   volumeMute.addEventListener(
     "click",
     () => {
-      currentPref.muted =
-        !currentPref.muted;
+      const pref =
+        loadPref();
 
-      saveCurrentPref();
+      pref.muted =
+        !pref.muted;
+
+      savePref(
+        pref
+      );
+
       applyPref();
     }
   );
@@ -2903,54 +2774,76 @@
   volumeRange.addEventListener(
     "input",
     () => {
-      currentPref.volume =
+      const pref =
+        loadPref();
+
+      pref.volume =
         Number(
           volumeRange.value
         );
 
-      remoteAudio.volume =
-        Math.max(
-          0,
-          Math.min(
-            1,
-            currentPref.volume /
-            100
-          )
-        );
+      savePref(
+        pref
+      );
 
-      volumeValue.textContent =
-        Math.round(
-          currentPref.volume
-        ) + "%";
+      applyPref();
     }
   );
 
-  volumeRange.addEventListener(
-    "change",
-    saveCurrentPref
+  const nameObserver =
+    new MutationObserver(
+      () => {
+        applyPref();
+        syncPlacement();
+      }
+    );
+
+  nameObserver.observe(
+    callName,
+    {
+      childList: true,
+      subtree: true,
+      characterData: true
+    }
   );
 
-  window.addEventListener(
-    "people-dm-call-state",
-    () => {
-      refreshPrefForPartner();
-      schedulePlacement();
+  const audioObserver =
+    new MutationObserver(
+      applyPref
+    );
+
+  audioObserver.observe(
+    remoteAudio,
+    {
+      attributes: true,
+      attributeFilter: [
+        "src"
+      ]
     }
   );
 
   /*
-    volume/muted restent attachés au même élément <audio>
-    quand WebRTC remplace srcObject. Le polling périodique
-    de V2 n'est donc pas nécessaire.
+    WebRTC peut réattribuer srcObject sans mutation DOM.
+    On réapplique donc le réglage très légèrement.
   */
+  setInterval(
+    () => {
+      if (
+        overlayVisible()
+      ) {
+        applyPref();
+      }
+    },
+    1200
+  );
 
-  refreshPrefForPartner();
+  applyPref();
   syncPlacement();
 
   // === PEOPLE_DM_CALLS_V2_CLIENT_END ===
 })();
 
-/* ===== UI V3 intégrée ===== */
+/* ===== people-dm-calls-v3.js — version stable d'origine ===== */
 (() => {
   "use strict";
 
@@ -3148,9 +3041,6 @@
     }
   }
 
-  let currentInlineHeight =
-    300;
-
   function applyHeight(
     value,
     {
@@ -3161,9 +3051,6 @@
       clampHeight(
         value
       );
-
-    currentInlineHeight =
-      height;
 
     card.style.setProperty(
       "--people-dm-call-inline-height",
@@ -3185,29 +3072,6 @@
   );
 
   let resizeState = null;
-  let resizeFrame = 0;
-  let pendingResizeHeight = null;
-
-  function flushResizeFrame() {
-    resizeFrame = 0;
-
-    if (
-      pendingResizeHeight ===
-      null
-    ) {
-      return;
-    }
-
-    const next =
-      pendingResizeHeight;
-
-    pendingResizeHeight =
-      null;
-
-    applyHeight(
-      next
-    );
-  }
 
   resizeHandle.addEventListener(
     "pointerdown",
@@ -3255,19 +3119,16 @@
         return;
       }
 
-      pendingResizeHeight =
+      const next =
         resizeState.startHeight +
         (
           event.clientY -
           resizeState.startY
         );
 
-      if (!resizeFrame) {
-        resizeFrame =
-          requestAnimationFrame(
-            flushResizeFrame
-          );
-      }
+      applyHeight(
+        next
+      );
     }
   );
 
@@ -3284,26 +3145,13 @@
       return;
     }
 
-    if (resizeFrame) {
-      cancelAnimationFrame(
-        resizeFrame
-      );
-      resizeFrame = 0;
-    }
-
-    if (
-      pendingResizeHeight !==
-      null
-    ) {
-      applyHeight(
-        pendingResizeHeight
-      );
-      pendingResizeHeight =
-        null;
-    }
+    const currentHeight =
+      card
+        .getBoundingClientRect()
+        .height;
 
     applyHeight(
-      currentInlineHeight,
+      currentHeight,
       {
         save: true
       }
@@ -3461,45 +3309,10 @@
     false;
 
   let dragState = null;
-  let dragFrame = 0;
-  let pendingDragPosition = null;
 
-  function flushDragFrame() {
-    dragFrame = 0;
-
-    if (!pendingDragPosition) {
-      return;
-    }
-
-    const {
-      left,
-      top
-    } =
-      pendingDragPosition;
-
-    pendingDragPosition =
-      null;
-
-    pip.style.left =
-      left + "px";
-
-    pip.style.top =
-      top + "px";
-
-    pip.style.right =
-      "auto";
-
-    pip.style.bottom =
-      "auto";
-  }
-
-  function syncPipVideoSource(
-    enabled
-  ) {
+  function syncPipVideoSource() {
     const source =
-      enabled
-        ? remoteVideo.srcObject
-        : null;
+      remoteVideo.srcObject;
 
     if (
       source &&
@@ -3512,15 +3325,10 @@
       pipVideo
         .play()
         .catch(() => {});
-      return;
     }
 
-    if (
-      !source &&
-      pipVideo.srcObject
-    ) {
+    if (!source) {
       try {
-        pipVideo.pause();
         pipVideo.srcObject =
           null;
       } catch {}
@@ -3623,6 +3431,8 @@
     previousRemoteCamera =
       remoteCamera;
 
+    syncPipVideoSource();
+
     const shouldShow =
       remoteCamera &&
       !currentDmMatchesCall() &&
@@ -3631,15 +3441,6 @@
     pip.classList.toggle(
       "hidden",
       !shouldShow
-    );
-
-    /*
-      Important perf : quand le PIP est caché, on ne garde pas
-      une deuxième balise <video> en train de décoder le même
-      flux distant que la vidéo principale.
-    */
-    syncPipVideoSource(
-      shouldShow
     );
 
     pipTitle.textContent =
@@ -3690,11 +3491,7 @@
           rect.left,
         offsetY:
           event.clientY -
-          rect.top,
-        width:
-          rect.width,
-        height:
-          rect.height
+          rect.top
       };
 
       pipHeader.setPointerCapture?.(
@@ -3720,11 +3517,14 @@
         return;
       }
 
+      const rect =
+        pip.getBoundingClientRect();
+
       const maxLeft =
         Math.max(
           8,
           window.innerWidth -
-          dragState.width -
+          rect.width -
           8
         );
 
@@ -3732,37 +3532,41 @@
         Math.max(
           8,
           window.innerHeight -
-          dragState.height -
+          rect.height -
           8
         );
 
-      pendingDragPosition = {
-        left:
-          Math.max(
-            8,
-            Math.min(
-              maxLeft,
-              event.clientX -
-              dragState.offsetX
-            )
-          ),
-        top:
-          Math.max(
-            8,
-            Math.min(
-              maxTop,
-              event.clientY -
-              dragState.offsetY
-            )
+      const left =
+        Math.max(
+          8,
+          Math.min(
+            maxLeft,
+            event.clientX -
+            dragState.offsetX
           )
-      };
+        );
 
-      if (!dragFrame) {
-        dragFrame =
-          requestAnimationFrame(
-            flushDragFrame
-          );
-      }
+      const top =
+        Math.max(
+          8,
+          Math.min(
+            maxTop,
+            event.clientY -
+            dragState.offsetY
+          )
+        );
+
+      pip.style.left =
+        left + "px";
+
+      pip.style.top =
+        top + "px";
+
+      pip.style.right =
+        "auto";
+
+      pip.style.bottom =
+        "auto";
     }
   );
 
@@ -3777,15 +3581,6 @@
     ) {
       return;
     }
-
-    if (dragFrame) {
-      cancelAnimationFrame(
-        dragFrame
-      );
-      dragFrame = 0;
-    }
-
-    flushDragFrame();
 
     try {
       pipHeader.releasePointerCapture?.(
@@ -3843,20 +3638,24 @@
       scheduleSync
     );
 
-  /*
-    Les changements internes de l'appel sont publiés par V1 via
-    people-dm-call-state. Ici on observe seulement la navigation
-    dans les MP, car elle appartient au reste de l'application.
-  */
-  stateObserver.observe(
-    dmView,
-    {
-      attributes: true,
-      attributeFilter: [
-        "class"
-      ]
-    }
-  );
+  for (
+    const element of [
+      overlay,
+      dmView,
+      activeActions,
+      remoteVideo
+    ]
+  ) {
+    stateObserver.observe(
+      element,
+      {
+        attributes: true,
+        attributeFilter: [
+          "class"
+        ]
+      }
+    );
+  }
 
   stateObserver.observe(
     dmHeaderName,
@@ -3867,9 +3666,31 @@
     }
   );
 
-  window.addEventListener(
-    "people-dm-call-state",
-    scheduleSync
+  stateObserver.observe(
+    callName,
+    {
+      childList: true,
+      subtree: true,
+      characterData: true
+    }
+  );
+
+  /*
+    srcObject n'est pas un attribut DOM.
+    Vérification légère uniquement pendant l'appel.
+  */
+  setInterval(
+    () => {
+      if (
+        !overlay.classList
+          .contains(
+            "hidden"
+          )
+      ) {
+        syncPip();
+      }
+    },
+    700
   );
 
   scheduleSync();
