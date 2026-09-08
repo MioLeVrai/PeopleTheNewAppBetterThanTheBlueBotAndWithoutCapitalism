@@ -2,20 +2,22 @@
 
 /* === PEOPLE_FRIENDS_NAV_HOVER_V1_START === */
 /* === PEOPLE_FRIENDS_NAV_THEME_V2 === */
+/* === PEOPLE_FRIENDS_NAV_DARKER_V3 === */
 /*
-  Amis garde un fond visible au repos,
-  mais utilise désormais exactement la palette violette People.
+  Amis doit être PLUS sombre que la sidebar au repos.
+  Au hover il s'éclaircit légèrement, sans devenir plus clair
+  que l'ancien style bleu/gris.
   Aucun changement de couleur du texte.
 */
 #friendsNavButton,
 #friendsNavButton.active {
-  background: var(--people-surface, #211d30) !important;
+  background: #15121f !important;
   transition: background-color 120ms ease !important;
 }
 
 #friendsNavButton:hover,
 #friendsNavButton.active:hover {
-  background: var(--people-hover, #2b253f) !important;
+  background: #1d1829 !important;
 }
 /* === PEOPLE_FRIENDS_NAV_HOVER_V1_END === */
 

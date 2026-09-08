@@ -115,6 +115,11 @@
   let authenticated = false;
   let inviteCode = null;
   let invitePreview = null;
+
+  // === PEOPLE_SERVER_CREATE_LOCK_V1_START ===
+  let peopleServerCreatePending =
+    false;
+  // === PEOPLE_SERVER_CREATE_LOCK_V1_END ===
   let inviteUnavailable = false;
 
   function initials(value) {
@@ -1383,6 +1388,35 @@
     async (event) => {
       event.preventDefault();
 
+      /*
+        Double-clic / double-submit :
+        le premier passage pose ce verrou immédiatement,
+        avant toute requête réseau.
+      */
+      if (peopleServerCreatePending) {
+        return;
+      }
+
+      peopleServerCreatePending =
+        true;
+
+      const submitButton =
+        createForm.querySelector(
+          'button[type="submit"]'
+        );
+
+      const previousLabel =
+        submitButton?.textContent ||
+        "Créer";
+
+      if (submitButton) {
+        submitButton.disabled =
+          true;
+
+        submitButton.textContent =
+          "Création…";
+      }
+
       createError.textContent =
         "";
 
@@ -1393,6 +1427,17 @@
       } catch (err) {
         createError.textContent =
           err.message;
+      } finally {
+        peopleServerCreatePending =
+          false;
+
+        if (submitButton) {
+          submitButton.disabled =
+            false;
+
+          submitButton.textContent =
+            previousLabel;
+        }
       }
     }
   );
