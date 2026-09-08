@@ -3184,8 +3184,10 @@ async function peopleSimpleAdminDeleteLocal(
       );
 
   /*
-    On ne détruit PAS les serveurs créés par ce compte.
-    Ils restent présents sans propriétaire.
+    Ici on ne détruit pas directement les serveurs créés
+    par ce compte. Ils restent sans propriétaire si des
+    membres sont encore présents ; le nettoyage global
+    supprimera ensuite ceux qui sont devenus totalement vides.
   */
   serverData.servers =
     serverData.servers.map(
@@ -3255,6 +3257,9 @@ async function peopleSimpleAdminDeleteAccount(
   peopleSimpleAdminKickAccount(
     accountId
   );
+
+  // === PEOPLE_DELETE_EMPTY_AFTER_ACCOUNT_DELETE_V1 ===
+  await peopleDeleteAllEmptyServers();
 
   return {
     id:
@@ -6143,6 +6148,447 @@ async function peopleServerMemberCount(
     ).length;
 }
 
+// === PEOPLE_DELETE_EMPTY_SERVERS_V1_START ===
+
+async function peopleDeleteServerIfEmpty(
+  serverId
+) {
+  const id =
+    String(
+      serverId ||
+      ""
+    ).trim();
+
+  if (!id) {
+    return false;
+  }
+
+  const server =
+    await peopleGetServer(
+      id
+    );
+
+  /*
+    Le serveur officiel People est permanent.
+    Seuls les serveurs créés par les utilisateurs
+    peuvent disparaître automatiquement.
+  */
+  if (
+    !server ||
+    server.official
+  ) {
+    return false;
+  }
+
+  if (peoplePool) {
+    if (
+      !/^\d+$/.test(
+        id
+      )
+    ) {
+      return false;
+    }
+
+    const client =
+      await peoplePool.connect();
+
+    try {
+      await client.query(
+        "BEGIN"
+      );
+
+      const locked =
+        await client.query(
+          "SELECT id, is_official FROM people_servers " +
+          "WHERE id = $1 FOR UPDATE",
+          [
+            id
+          ]
+        );
+
+      const row =
+        locked.rows[0];
+
+      if (
+        !row ||
+        row.is_official
+      ) {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        return false;
+      }
+
+      const countResult =
+        await client.query(
+          "SELECT COUNT(*)::int AS count " +
+          "FROM people_server_members " +
+          "WHERE server_id = $1",
+          [
+            id
+          ]
+        );
+
+      const memberCount =
+        Number(
+          countResult.rows[0]?.count ||
+          0
+        );
+
+      if (
+        memberCount >
+        0
+      ) {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        return false;
+      }
+
+      /*
+        Les images liées aux messages sont déjà en ON DELETE CASCADE.
+        On supprime explicitement les messages avant le serveur
+        pour rester compatible avec les anciennes bases People.
+      */
+      await client.query(
+        "DELETE FROM people_general_messages " +
+        "WHERE server_id = $1",
+        [
+          id
+        ]
+      );
+
+      const removed =
+        await client.query(
+          "DELETE FROM people_servers " +
+          "WHERE id = $1 AND is_official = FALSE " +
+          "RETURNING id",
+          [
+            id
+          ]
+        );
+
+      if (
+        !removed.rows[0]
+      ) {
+        await client.query(
+          "ROLLBACK"
+        );
+
+        return false;
+      }
+
+      await client.query(
+        "COMMIT"
+      );
+    } catch (err) {
+      await client
+        .query(
+          "ROLLBACK"
+        )
+        .catch(
+          () => {}
+        );
+
+      throw err;
+    } finally {
+      client.release();
+    }
+  } else {
+    const data =
+      peopleReadLocalServers();
+
+    const localServer =
+      data.servers.find(
+        (item) =>
+          String(
+            item.id
+          ) === id
+      );
+
+    if (
+      !localServer ||
+      Boolean(
+        localServer.official
+      )
+    ) {
+      return false;
+    }
+
+    const memberCount =
+      data.members.filter(
+        (member) =>
+          String(
+            member.serverId ??
+            member.server_id ??
+            ""
+          ) === id
+      ).length;
+
+    if (
+      memberCount >
+      0
+    ) {
+      return false;
+    }
+
+    const messages =
+      peopleReadLocalGeneral();
+
+    const removedMessages =
+      messages.filter(
+        (message) =>
+          String(
+            message.serverId ??
+            message.server_id ??
+            ""
+          ) === id
+      );
+
+    for (
+      const message of
+      removedMessages
+    ) {
+      peopleDeleteLocalBoundMessageImage(
+        "general",
+        message.id
+      );
+    }
+
+    peopleWriteLocalGeneral(
+      messages.filter(
+        (message) =>
+          String(
+            message.serverId ??
+            message.server_id ??
+            ""
+          ) !== id
+      )
+    );
+
+    data.servers =
+      data.servers.filter(
+        (item) =>
+          String(
+            item.id
+          ) !== id
+      );
+
+    data.members =
+      data.members.filter(
+        (member) =>
+          String(
+            member.serverId ??
+            member.server_id ??
+            ""
+          ) !== id
+      );
+
+    peopleWriteLocalServers(
+      data
+    );
+  }
+
+  /*
+    Nettoyage défensif des sockets :
+    normalement il n'existe déjà plus aucun membre,
+    mais une socket peut encore avoir cet ancien serveur sélectionné.
+  */
+  io.to(
+    peopleServerRoom(
+      id
+    )
+  ).emit(
+    "server-deleted",
+    {
+      serverId:
+        id
+    }
+  );
+
+  for (
+    const [
+      socketId,
+      currentServerId
+    ]
+    of [
+      ...socketServerIds.entries()
+    ]
+  ) {
+    if (
+      String(
+        currentServerId ||
+        ""
+      ) !== id
+    ) {
+      continue;
+    }
+
+    const socket =
+      io.sockets.sockets.get(
+        socketId
+      );
+
+    if (socket) {
+      leaveVoice(
+        socket
+      );
+
+      await socket.leave(
+        peopleServerRoom(
+          id
+        )
+      );
+
+      socket.emit(
+        "server-membership-left",
+        {
+          serverId:
+            id,
+          deleted:
+            true
+        }
+      );
+    }
+
+    socketServerIds.delete(
+      socketId
+    );
+  }
+
+  for (
+    const [
+      voiceSocketId,
+      voiceUser
+    ]
+    of [
+      ...voiceUsers.entries()
+    ]
+  ) {
+    if (
+      String(
+        voiceUser?.serverId ||
+        ""
+      ) !== id
+    ) {
+      continue;
+    }
+
+    const socket =
+      io.sockets.sockets.get(
+        voiceSocketId
+      );
+
+    if (socket) {
+      leaveVoice(
+        socket
+      );
+    }
+  }
+
+  console.log(
+    "[People] Serveur vide supprimé : " +
+    id
+  );
+
+  return true;
+}
+
+async function peopleDeleteAllEmptyServers() {
+  let ids =
+    [];
+
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "SELECT s.id " +
+        "FROM people_servers s " +
+        "WHERE s.is_official = FALSE " +
+        "AND NOT EXISTS (" +
+        "SELECT 1 FROM people_server_members m " +
+        "WHERE m.server_id = s.id" +
+        ")"
+      );
+
+    ids =
+      result.rows.map(
+        (row) =>
+          String(
+            row.id
+          )
+      );
+  } else {
+    const data =
+      peopleReadLocalServers();
+
+    const used =
+      new Set(
+        data.members.map(
+          (member) =>
+            String(
+              member.serverId ??
+              member.server_id ??
+              ""
+            )
+        )
+      );
+
+    ids =
+      data.servers
+        .filter(
+          (server) =>
+            !Boolean(
+              server.official
+            ) &&
+            !used.has(
+              String(
+                server.id
+              )
+            )
+        )
+        .map(
+          (server) =>
+            String(
+              server.id
+            )
+        );
+  }
+
+  let deleted =
+    0;
+
+  for (
+    const id of
+    ids
+  ) {
+    if (
+      await peopleDeleteServerIfEmpty(
+        id
+      )
+    ) {
+      deleted +=
+        1;
+    }
+  }
+
+  if (
+    deleted >
+    0
+  ) {
+    console.log(
+      "[People] " +
+      deleted +
+      " serveur(s) vide(s) nettoyé(s)."
+    );
+  }
+
+  return deleted;
+}
+
+// === PEOPLE_DELETE_EMPTY_SERVERS_V1_END ===
+
 async function peopleListServersForUser(
   accountId
 ) {
@@ -7564,15 +8010,30 @@ app.delete(
         });
       }
 
+      // === PEOPLE_OWNER_CAN_LEAVE_USER_SERVER_V1 ===
+      const leavingOwner =
+        Boolean(
+          server.ownerId &&
+          String(
+            server.ownerId
+          ) ===
+            String(
+              session.id
+            )
+        );
+
+      /*
+        Le serveur officiel People reste permanent.
+        Pour un serveur utilisateur, le propriétaire peut partir.
+      */
       if (
-        server.ownerId &&
-        String(server.ownerId) ===
-          String(session.id)
+        server.official &&
+        leavingOwner
       ) {
         return res.status(400).json({
           ok: false,
           error:
-            "Tu ne peux pas quitter un serveur dont tu es propriétaire pour l'instant."
+            "Le propriétaire du serveur officiel People ne peut pas le quitter."
         });
       }
 
@@ -7585,6 +8046,20 @@ app.delete(
             String(session.id)
           ]
         );
+
+        // === PEOPLE_OWNER_CLEAR_ON_LEAVE_V1 ===
+        if (leavingOwner) {
+          await peoplePool.query(
+            "UPDATE people_servers " +
+            "SET owner_id = NULL " +
+            "WHERE id = $1 AND is_official = FALSE",
+            [
+              String(
+                server.id
+              )
+            ]
+          );
+        }
       } else {
         const data =
           peopleReadLocalServers();
@@ -7599,6 +8074,32 @@ app.delete(
                   String(session.id)
               )
           );
+
+        if (leavingOwner) {
+          const storedServer =
+            data.servers.find(
+              (item) =>
+                String(
+                  item.id
+                ) ===
+                  String(
+                    server.id
+                  )
+            );
+
+          if (
+            storedServer &&
+            !Boolean(
+              storedServer.official
+            )
+          ) {
+            storedServer.ownerId =
+              null;
+
+            storedServer.owner_id =
+              null;
+          }
+        }
 
         peopleWriteLocalServers(
           data
@@ -7695,20 +8196,30 @@ app.delete(
         }
       }
 
-      emitOnlineUsers(
-        server.id
-      );
+      // === PEOPLE_DELETE_EMPTY_AFTER_LEAVE_V1 ===
+      const serverDeleted =
+        await peopleDeleteServerIfEmpty(
+          server.id
+        );
 
-      await peopleEmitServerMembershipMessage(
-        server.id,
-        session.id,
-        "leave"
-      );
+      if (!serverDeleted) {
+        emitOnlineUsers(
+          server.id
+        );
+
+        await peopleEmitServerMembershipMessage(
+          server.id,
+          session.id,
+          "leave"
+        );
+      }
 
       res.json({
         ok: true,
         serverId:
-          String(server.id)
+          String(server.id),
+        deleted:
+          serverDeleted
       });
     } catch (err) {
       console.error(
@@ -8879,6 +9390,48 @@ async function emitOnlineUsers(
   }
 }
 
+// === PEOPLE_GLOBAL_PRESENCE_EVENT_V1_START ===
+function peopleEmitGlobalPresence(
+  accountId
+) {
+  const uid =
+    String(
+      accountId ||
+      ""
+    );
+
+  if (!uid) {
+    return;
+  }
+
+  const payload = {
+    accountId:
+      uid,
+    online:
+      peopleAccountIsOnline(
+        uid
+      )
+  };
+
+  /*
+    Envoi uniquement aux sockets People authentifiées.
+    La présence était déjà publique dans l'annuaire/profils ;
+    cet événement ne rajoute aucune donnée privée.
+  */
+  for (
+    const socketId of
+    userIds.keys()
+  ) {
+    io.to(
+      socketId
+    ).emit(
+      "people-presence-changed",
+      payload
+    );
+  }
+}
+// === PEOPLE_GLOBAL_PRESENCE_EVENT_V1_END ===
+
 async function peopleRefreshPresenceForAccount(
   accountId
 ) {
@@ -8888,6 +9441,11 @@ async function peopleRefreshPresenceForAccount(
   if (!uid) {
     return;
   }
+
+  // === PEOPLE_GLOBAL_PRESENCE_REFRESH_V1 ===
+  peopleEmitGlobalPresence(
+    uid
+  );
 
   try {
     const servers =
@@ -10978,6 +11536,8 @@ const PORT = Number(process.env.PORT) || 3000;
 peopleInitAccounts()
   .then(() => peopleInitSocial())
   .then(() => peopleInitServersV1())
+  // === PEOPLE_DELETE_EMPTY_ON_STARTUP_V1 ===
+  .then(() => peopleDeleteAllEmptyServers())
   .then(() => {
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`People lance sur http://localhost:${PORT}`);

@@ -3022,6 +3022,79 @@ function dmTextLine(
       );
   }
 
+  // === PEOPLE_DM_LIVE_PRESENCE_V1_START ===
+  socket.on(
+    "people-presence-changed",
+    (payload = {}) => {
+      if (
+        !socialReady ||
+        !me
+      ) {
+        return;
+      }
+
+      const accountId =
+        String(
+          payload?.accountId ||
+          ""
+        );
+
+      if (!accountId) {
+        return;
+      }
+
+      const online =
+        payload?.online ===
+        true;
+
+      /*
+        MP actuellement affiché :
+        pas de requête HTTP supplémentaire,
+        on change directement le statut déjà chargé.
+      */
+      if (
+        activeDmUser &&
+        String(
+          activeDmUser.id ||
+          ""
+        ) === accountId
+      ) {
+        activeDmUser.online =
+          online;
+
+        if (dmHeaderStatus) {
+          dmHeaderStatus.textContent =
+            online
+              ? "En ligne"
+              : "Hors ligne";
+        }
+      }
+
+      /*
+        Si le profil de cette même personne est ouvert,
+        son indicateur suit lui aussi la présence en direct.
+      */
+      if (
+        currentProfile &&
+        String(
+          currentProfile.id ||
+          ""
+        ) === accountId
+      ) {
+        currentProfile.online =
+          online;
+
+        if (profileModalOnline) {
+          profileModalOnline.textContent =
+            online
+              ? "● En ligne"
+              : "Hors ligne";
+        }
+      }
+    }
+  );
+  // === PEOPLE_DM_LIVE_PRESENCE_V1_END ===
+
   socket.on(
     "online-users",
     () => {
