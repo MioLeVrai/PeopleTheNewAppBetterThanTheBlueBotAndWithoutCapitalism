@@ -289,6 +289,23 @@
     username,
     blob
   ) {
+    if (
+      window.PeopleAvatars
+        ?.applyBlobEverywhere
+    ) {
+      return window
+        .PeopleAvatars
+        .applyBlobEverywhere(
+          username,
+          blob
+        );
+    }
+
+    /*
+      Fallback de compatibilité si le core avatar n'est pas
+      encore chargé. Une seule Blob URL est partagée au lieu
+      d'en créer une par élément.
+    */
     const wanted =
       String(
         username || ""
@@ -298,67 +315,111 @@
           "fr-FR"
         );
 
-    if (!wanted) {
-      return;
+    if (
+      !wanted ||
+      !blob ||
+      blob.size <= 0
+    ) {
+      return false;
     }
 
-    document
-      .querySelectorAll(
-        "[data-people-avatar-username]"
-      )
-      .forEach(
-        (element) => {
-          const current =
-            String(
-              element.dataset
-                .peopleAvatarUsername ||
-              ""
+    const selector =
+      window.CSS?.escape
+        ? '[data-people-avatar-key="' +
+          window.CSS.escape(
+            wanted
+          ) +
+          '"]'
+        : null;
+
+    const elements =
+      selector
+        ? document
+            .querySelectorAll(
+              selector
             )
-              .trim()
-              .toLocaleLowerCase(
-                "fr-FR"
-              );
-
-          if (
-            current !== wanted
-          ) {
-            return;
-          }
-
-          const url =
-            URL.createObjectURL(
-              blob
-            );
-
-          const image =
-            document.createElement(
-              "img"
-            );
-
-          image.className =
-            "people-avatar-image";
-
-          image.alt =
-            "Photo de profil de " +
-            username;
-
-          image.onload = () => {
-            setTimeout(
-              () =>
-                URL.revokeObjectURL(
-                  url
-                ),
-              600
-            );
-          };
-
-          image.src = url;
-
-          element.replaceChildren(
-            image
+        : [
+            ...document
+              .querySelectorAll(
+                "[data-people-avatar-username]"
+              )
+          ].filter(
+            (element) =>
+              String(
+                element.dataset
+                  .peopleAvatarUsername ||
+                ""
+              )
+                .trim()
+                .toLocaleLowerCase(
+                  "fr-FR"
+                ) === wanted
           );
-        }
+
+    if (!elements.length) {
+      return true;
+    }
+
+    const url =
+      URL.createObjectURL(
+        blob
       );
+
+    let remaining =
+      elements.length;
+
+    const release = () => {
+      remaining -= 1;
+
+      if (remaining <= 0) {
+        URL.revokeObjectURL(
+          url
+        );
+      }
+    };
+
+    elements.forEach(
+      (element) => {
+        const image =
+          document.createElement(
+            "img"
+          );
+
+        image.className =
+          "people-avatar-image";
+
+        image.alt =
+          "Photo de profil de " +
+          username;
+
+        image.decoding =
+          "async";
+
+        image.addEventListener(
+          "load",
+          release,
+          {
+            once: true
+          }
+        );
+
+        image.addEventListener(
+          "error",
+          release,
+          {
+            once: true
+          }
+        );
+
+        image.src = url;
+
+        element.replaceChildren(
+          image
+        );
+      }
+    );
+
+    return true;
   }
 
   async function prepare(

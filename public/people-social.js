@@ -130,6 +130,40 @@
   let conversations = [];
   let directoryTimer = null;
   let socialReady = false;
+  const PEOPLE_DATE_TIME_FORMATTER =
+    new Intl.DateTimeFormat(
+      "fr-FR",
+      {
+        dateStyle: "short",
+        timeStyle: "short"
+      }
+    );
+
+  const PEOPLE_DATE_FORMATTER =
+    new Intl.DateTimeFormat(
+      "fr-FR",
+      {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      }
+    );
+
+  const PEOPLE_AVATAR_ACCEPTED_TYPES =
+    new Set([
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif"
+    ]);
+
+  let conversationsRefreshPromise = null;
+  let conversationsRefreshQueued = false;
+  let friendSurfacesRefreshPromise = null;
+  let friendSurfacesRefreshQueued = false;
+  let onlineUsersRefreshTimer = null;
+  let directoryRequestVersion = 0;
+  let conversationsByUsername = new Map();
 
   function esc(value) {
     return String(value || "");
@@ -144,18 +178,10 @@
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "—";
 
-    return new Intl.DateTimeFormat(
-      "fr-FR",
+    return (
       withTime
-        ? {
-            dateStyle: "short",
-            timeStyle: "short"
-          }
-        : {
-            day: "numeric",
-            month: "long",
-            year: "numeric"
-          }
+        ? PEOPLE_DATE_TIME_FORMATTER
+        : PEOPLE_DATE_FORMATTER
     ).format(date);
   }
 
@@ -209,7 +235,7 @@
     } catch {}
   }
 
-  function showFriends() {
+  function showFriends(options = null) {
     setMode("home");
     homeMain?.classList.remove("dm-open");
     activeDmUser = null;
@@ -226,9 +252,13 @@
       .querySelectorAll(".dm-conversation-row.active")
       .forEach((row) => row.classList.remove("active"));
 
-    refreshFriendRequests();
-    refreshFriends();
-    refreshDirectory(
+    if (options?.refresh === false) {
+      return;
+    }
+
+    void refreshFriendRequests();
+    void refreshFriends();
+    void refreshDirectory(
       peopleSearchInput?.value || ""
     );
   }
@@ -261,6 +291,7 @@
     const av = document.createElement("button");
     av.type = "button";
     av.className = "people-card-avatar";
+    av.dataset.peopleSocialAction = "profile";
     window.PeopleAvatars?.apply(
       av,
       person.username
@@ -270,18 +301,12 @@
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "people-card-copy";
+    copy.dataset.peopleSocialAction = "profile";
 
     const name = document.createElement("strong");
     name.textContent = person.username;
 
     const status = document.createElement("span");
-
-    /*
-      PEOPLE_PRESENCE_STATUS_ONLY_V1
-
-      La description est une bio de profil,
-      pas un statut de présence.
-    */
     status.textContent =
       person.online
         ? "● En ligne"
@@ -293,6 +318,7 @@
     dm.type = "button";
     dm.className = "people-card-action";
     dm.textContent = "MP";
+    dm.dataset.peopleSocialAction = "dm";
 
     const friend = document.createElement("button");
     friend.type = "button";
@@ -304,10 +330,16 @@
 
     if (isFriend) {
       friend.textContent = "Retirer";
+      friend.dataset.peopleSocialAction =
+        "remove-friend";
     } else if (
       person.friendRequest === "incoming"
     ) {
       friend.textContent = "Accepter";
+      friend.dataset.peopleSocialAction =
+        "accept-friend";
+      friend.dataset.requestId =
+        String(person.friendRequestId || "");
     } else if (
       person.friendRequest === "outgoing"
     ) {
@@ -315,67 +347,9 @@
       friend.disabled = true;
     } else {
       friend.textContent = "Ajouter";
+      friend.dataset.peopleSocialAction =
+        "add-friend";
     }
-
-    av.addEventListener(
-      "click",
-      () => openProfile(person.username)
-    );
-
-    copy.addEventListener(
-      "click",
-      () => openProfile(person.username)
-    );
-
-    dm.addEventListener(
-      "click",
-      () => openDm(person.username)
-    );
-
-    friend.addEventListener("click", async () => {
-      if (friend.disabled) return;
-
-      try {
-        if (isFriend) {
-          await api(
-            "/api/social/friends/" +
-              encodeURIComponent(person.username),
-            { method: "DELETE" }
-          );
-        } else if (
-          person.friendRequest === "incoming" &&
-          person.friendRequestId
-        ) {
-          await api(
-            "/api/social/friend-requests/" +
-              encodeURIComponent(
-                person.friendRequestId
-              ) +
-              "/accept",
-            { method: "POST" }
-          );
-        } else {
-          await api(
-            "/api/social/friends/" +
-              encodeURIComponent(person.username),
-            { method: "POST" }
-          );
-        }
-
-        await refreshFriendSurfaces();
-
-        if (
-          currentProfile &&
-          currentProfile.username ===
-            person.username
-        ) {
-          openProfile(person.username);
-        }
-      } catch (err) {
-        alert(err.message);
-        await refreshFriendSurfaces();
-      }
-    });
 
     row.append(av, copy, dm, friend);
     return row;
@@ -387,10 +361,15 @@
   ) {
     const row = document.createElement("div");
     row.className = "friend-request-row";
+    row.dataset.username =
+      request.user.username;
+    row.dataset.requestId =
+      String(request.id || "");
 
     const av = document.createElement("button");
     av.type = "button";
     av.className = "friend-request-avatar";
+    av.dataset.friendRequestAction = "profile";
     window.PeopleAvatars?.apply(
       av,
       request.user.username
@@ -399,6 +378,7 @@
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "friend-request-copy";
+    copy.dataset.friendRequestAction = "profile";
 
     const name = document.createElement("strong");
     name.textContent = request.user.username;
@@ -411,16 +391,6 @@
 
     copy.append(name, status);
 
-    av.addEventListener(
-      "click",
-      () => openProfile(request.user.username)
-    );
-
-    copy.addEventListener(
-      "click",
-      () => openProfile(request.user.username)
-    );
-
     const actions = document.createElement("div");
     actions.className = "friend-request-actions";
 
@@ -429,40 +399,13 @@
       accept.type = "button";
       accept.className = "friend-request-accept";
       accept.textContent = "Accepter";
+      accept.dataset.friendRequestAction = "accept";
 
       const refuse = document.createElement("button");
       refuse.type = "button";
       refuse.className = "friend-request-refuse";
       refuse.textContent = "Refuser";
-
-      accept.addEventListener("click", async () => {
-        try {
-          await api(
-            "/api/social/friend-requests/" +
-              encodeURIComponent(request.id) +
-              "/accept",
-            { method: "POST" }
-          );
-
-          await refreshFriendSurfaces();
-        } catch (err) {
-          alert(err.message);
-        }
-      });
-
-      refuse.addEventListener("click", async () => {
-        try {
-          await api(
-            "/api/social/friend-requests/" +
-              encodeURIComponent(request.id),
-            { method: "DELETE" }
-          );
-
-          await refreshFriendSurfaces();
-        } catch (err) {
-          alert(err.message);
-        }
-      });
+      refuse.dataset.friendRequestAction = "delete";
 
       actions.append(accept, refuse);
     } else {
@@ -470,20 +413,7 @@
       cancel.type = "button";
       cancel.className = "friend-request-refuse";
       cancel.textContent = "Annuler";
-
-      cancel.addEventListener("click", async () => {
-        try {
-          await api(
-            "/api/social/friend-requests/" +
-              encodeURIComponent(request.id),
-            { method: "DELETE" }
-          );
-
-          await refreshFriendSurfaces();
-        } catch (err) {
-          alert(err.message);
-        }
-      });
+      cancel.dataset.friendRequestAction = "delete";
 
       actions.appendChild(cancel);
     }
@@ -491,6 +421,193 @@
     row.append(av, copy, actions);
     return row;
   }
+
+
+  async function handlePersonCardClick(event) {
+    const actionButton =
+      event.target?.closest?.(
+        "[data-people-social-action]"
+      );
+
+    if (!actionButton) return;
+
+    const row =
+      actionButton.closest(
+        ".people-card"
+      );
+
+    const username =
+      String(
+        row?.dataset?.username ||
+        ""
+      ).trim();
+
+    if (!username) return;
+
+    const action =
+      actionButton.dataset
+        .peopleSocialAction;
+
+    if (action === "profile") {
+      void openProfile(username);
+      return;
+    }
+
+    if (action === "dm") {
+      void openDm(username);
+      return;
+    }
+
+    if (actionButton.disabled) {
+      return;
+    }
+
+    actionButton.disabled = true;
+
+    try {
+      if (action === "remove-friend") {
+        await api(
+          "/api/social/friends/" +
+            encodeURIComponent(username),
+          { method: "DELETE" }
+        );
+      } else if (action === "accept-friend") {
+        const requestId =
+          actionButton.dataset.requestId;
+
+        if (!requestId) return;
+
+        await api(
+          "/api/social/friend-requests/" +
+            encodeURIComponent(requestId) +
+            "/accept",
+          { method: "POST" }
+        );
+      } else if (action === "add-friend") {
+        await api(
+          "/api/social/friends/" +
+            encodeURIComponent(username),
+          { method: "POST" }
+        );
+      } else {
+        return;
+      }
+
+      await refreshFriendSurfaces();
+
+      if (
+        currentProfile &&
+        currentProfile.username ===
+          username
+      ) {
+        await openProfile(username);
+      }
+    } catch (err) {
+      alert(err.message);
+      await refreshFriendSurfaces();
+    } finally {
+      if (actionButton.isConnected) {
+        actionButton.disabled = false;
+      }
+    }
+  }
+
+  async function handleFriendRequestClick(
+    event
+  ) {
+    const actionButton =
+      event.target?.closest?.(
+        "[data-friend-request-action]"
+      );
+
+    if (!actionButton) return;
+
+    const row =
+      actionButton.closest(
+        ".friend-request-row"
+      );
+
+    const username =
+      String(
+        row?.dataset?.username ||
+        ""
+      ).trim();
+
+    const requestId =
+      String(
+        row?.dataset?.requestId ||
+        ""
+      ).trim();
+
+    const action =
+      actionButton.dataset
+        .friendRequestAction;
+
+    if (
+      action === "profile"
+    ) {
+      if (username) {
+        void openProfile(username);
+      }
+      return;
+    }
+
+    if (
+      !requestId ||
+      actionButton.disabled
+    ) {
+      return;
+    }
+
+    actionButton.disabled = true;
+
+    try {
+      if (action === "accept") {
+        await api(
+          "/api/social/friend-requests/" +
+            encodeURIComponent(requestId) +
+            "/accept",
+          { method: "POST" }
+        );
+      } else if (action === "delete") {
+        await api(
+          "/api/social/friend-requests/" +
+            encodeURIComponent(requestId),
+          { method: "DELETE" }
+        );
+      } else {
+        return;
+      }
+
+      await refreshFriendSurfaces();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      if (actionButton.isConnected) {
+        actionButton.disabled = false;
+      }
+    }
+  }
+
+  friendsList?.addEventListener(
+    "click",
+    handlePersonCardClick
+  );
+
+  peopleDirectory?.addEventListener(
+    "click",
+    handlePersonCardClick
+  );
+
+  incomingFriendRequests?.addEventListener(
+    "click",
+    handleFriendRequestClick
+  );
+
+  outgoingFriendRequests?.addEventListener(
+    "click",
+    handleFriendRequestClick
+  );
 
   // === PEOPLE_AVATAR_PRELOAD_SOCIAL_V1 ===
   function peoplePreloadSocialAvatars(
@@ -541,18 +658,20 @@
           String(incoming.length);
       }
 
-      incomingFriendRequests.innerHTML = "";
-      outgoingFriendRequests.innerHTML = "";
+      const incomingFragment =
+        document.createDocumentFragment();
+      const outgoingFragment =
+        document.createDocumentFragment();
 
       if (!incoming.length) {
         const empty = document.createElement("div");
         empty.className = "home-empty";
         empty.textContent =
           "Aucune demande reçue.";
-        incomingFriendRequests.appendChild(empty);
+        incomingFragment.appendChild(empty);
       } else {
         for (const request of incoming) {
-          incomingFriendRequests.appendChild(
+          incomingFragment.appendChild(
             makeFriendRequestRow(
               request,
               "incoming"
@@ -566,10 +685,10 @@
         empty.className = "home-empty";
         empty.textContent =
           "Aucune demande en attente.";
-        outgoingFriendRequests.appendChild(empty);
+        outgoingFragment.appendChild(empty);
       } else {
         for (const request of outgoing) {
-          outgoingFriendRequests.appendChild(
+          outgoingFragment.appendChild(
             makeFriendRequestRow(
               request,
               "outgoing"
@@ -577,25 +696,54 @@
           );
         }
       }
-    } catch (err) {
-      incomingFriendRequests.innerHTML = "";
-      outgoingFriendRequests.innerHTML = "";
 
+      incomingFriendRequests.replaceChildren(
+        incomingFragment
+      );
+      outgoingFriendRequests.replaceChildren(
+        outgoingFragment
+      );
+    } catch (err) {
       const empty = document.createElement("div");
       empty.className = "home-empty";
       empty.textContent = err.message;
-      incomingFriendRequests.appendChild(empty);
+
+      incomingFriendRequests.replaceChildren(
+        empty
+      );
+      outgoingFriendRequests.replaceChildren();
     }
   }
 
   async function refreshFriendSurfaces() {
-    await Promise.all([
-      refreshFriendRequests(),
-      refreshFriends(),
-      refreshDirectory(
-        peopleSearchInput?.value || ""
-      )
-    ]);
+    if (friendSurfacesRefreshPromise) {
+      friendSurfacesRefreshQueued = true;
+      return friendSurfacesRefreshPromise;
+    }
+
+    friendSurfacesRefreshPromise =
+      (async () => {
+        do {
+          friendSurfacesRefreshQueued = false;
+
+          await Promise.all([
+            refreshFriendRequests(),
+            refreshFriends(),
+            refreshDirectory(
+              peopleSearchInput?.value || ""
+            )
+          ]);
+        } while (
+          friendSurfacesRefreshQueued &&
+          socialReady
+        );
+      })();
+
+    try {
+      await friendSurfacesRefreshPromise;
+    } finally {
+      friendSurfacesRefreshPromise = null;
+    }
   }
 
   async function refreshFriends() {
@@ -614,32 +762,33 @@
         )
       );
 
-      friendsList.innerHTML = "";
-
       if (friendsCount) {
         friendsCount.textContent = String(list.length);
       }
+
+      const fragment =
+        document.createDocumentFragment();
 
       if (!list.length) {
         const empty = document.createElement("div");
         empty.className = "home-empty";
         empty.textContent =
           "Aucun ami pour l'instant. Cherche quelqu'un juste au-dessus.";
-        friendsList.appendChild(empty);
-        return;
+        fragment.appendChild(empty);
+      } else {
+        for (const person of list) {
+          fragment.appendChild(
+            makePersonCard(person, true)
+          );
+        }
       }
 
-      for (const person of list) {
-        friendsList.appendChild(
-          makePersonCard(person, true)
-        );
-      }
+      friendsList.replaceChildren(fragment);
     } catch (err) {
-      friendsList.innerHTML = "";
       const empty = document.createElement("div");
       empty.className = "home-empty";
       empty.textContent = err.message;
-      friendsList.appendChild(empty);
+      friendsList.replaceChildren(empty);
     }
   }
 
@@ -651,6 +800,9 @@
         .trim()
         .slice(0, 50);
 
+    const requestVersion =
+      ++directoryRequestVersion;
+
     try {
       const data = await api(
         "/api/social/people?q=" +
@@ -658,6 +810,13 @@
             cleanQuery
           )
       );
+
+      if (
+        requestVersion !==
+        directoryRequestVersion
+      ) {
+        return;
+      }
 
       const list =
         Array.isArray(data.people)
@@ -671,30 +830,20 @@
         )
       );
 
-      peopleDirectory.innerHTML =
-        "";
-
       if (!list.length) {
-        if (
-          !cleanQuery
-        ) {
-          if (
+        if (!cleanQuery) {
+          if (peopleDirectorySection) {
             peopleDirectorySection
-          ) {
-            peopleDirectorySection
-              .style.display =
-              "none";
+              .style.display = "none";
           }
 
+          peopleDirectory.replaceChildren();
           return;
         }
 
-        if (
+        if (peopleDirectorySection) {
           peopleDirectorySection
-        ) {
-          peopleDirectorySection
-            .style.display =
-            "";
+            .style.display = "";
         }
 
         const empty =
@@ -708,38 +857,41 @@
         empty.textContent =
           "Aucun compte trouvé.";
 
-        peopleDirectory.appendChild(
+        peopleDirectory.replaceChildren(
           empty
         );
 
         return;
       }
 
-      if (
+      if (peopleDirectorySection) {
         peopleDirectorySection
-      ) {
-        peopleDirectorySection
-          .style.display =
-          "";
+          .style.display = "";
       }
 
-      for (
-        const person
-        of list
-      ) {
-        peopleDirectory.appendChild(
+      const fragment =
+        document.createDocumentFragment();
+
+      for (const person of list) {
+        fragment.appendChild(
           makePersonCard(
             person
           )
         );
       }
-    } catch (err) {
-      peopleDirectory.innerHTML =
-        "";
 
+      peopleDirectory.replaceChildren(
+        fragment
+      );
+    } catch (err) {
       if (
-        peopleDirectorySection
+        requestVersion !==
+        directoryRequestVersion
       ) {
+        return;
+      }
+
+      if (peopleDirectorySection) {
         peopleDirectorySection
           .style.display =
           cleanQuery
@@ -748,6 +900,7 @@
       }
 
       if (!cleanQuery) {
+        peopleDirectory.replaceChildren();
         return;
       }
 
@@ -762,7 +915,7 @@
       empty.textContent =
         err.message;
 
-      peopleDirectory.appendChild(
+      peopleDirectory.replaceChildren(
         empty
       );
     }
@@ -953,13 +1106,15 @@
   function renderConversationList() {
     if (!dmConversationList) return;
 
-    dmConversationList.innerHTML = "";
+    const fragment =
+      document.createDocumentFragment();
 
     if (!conversations.length) {
       const empty = document.createElement("div");
       empty.className = "dm-sidebar-empty";
       empty.textContent = "Aucun MP pour l'instant";
-      dmConversationList.appendChild(empty);
+      fragment.appendChild(empty);
+      dmConversationList.replaceChildren(fragment);
       return;
     }
 
@@ -967,6 +1122,8 @@
       const row = document.createElement("button");
       row.type = "button";
       row.className = "dm-conversation-row";
+      row.dataset.username =
+        conversation.user.username;
 
       if (
         activeDmUser &&
@@ -1007,51 +1164,128 @@
         row.appendChild(badge);
       }
 
-      row.addEventListener(
-        "click",
-        () => openDm(conversation.user.username)
-      );
-
-      row.addEventListener(
-        "contextmenu",
-        (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-
-          showDmContextMenu(
-            conversation,
-            event.clientX,
-            event.clientY
-          );
-        }
-      );
-
-      dmConversationList.appendChild(row);
+      fragment.appendChild(row);
     }
+
+    dmConversationList.replaceChildren(
+      fragment
+    );
   }
+
+
+  dmConversationList?.addEventListener(
+    "click",
+    (event) => {
+      const row =
+        event.target?.closest?.(
+          ".dm-conversation-row"
+        );
+
+      const username =
+        String(
+          row?.dataset?.username ||
+          ""
+        ).trim();
+
+      if (username) {
+        void openDm(username);
+      }
+    }
+  );
+
+  dmConversationList?.addEventListener(
+    "contextmenu",
+    (event) => {
+      const row =
+        event.target?.closest?.(
+          ".dm-conversation-row"
+        );
+
+      const username =
+        String(
+          row?.dataset?.username ||
+          ""
+        ).trim();
+
+      if (!username) return;
+
+      const conversation =
+        conversationsByUsername.get(
+          username
+        );
+
+      if (!conversation) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      showDmContextMenu(
+        conversation,
+        event.clientX,
+        event.clientY
+      );
+    }
+  );
 
   async function refreshConversations() {
     if (!socialReady) return;
 
+    if (conversationsRefreshPromise) {
+      conversationsRefreshQueued = true;
+      return conversationsRefreshPromise;
+    }
+
+    conversationsRefreshPromise =
+      (async () => {
+        do {
+          conversationsRefreshQueued = false;
+
+          try {
+            const data = await api(
+              "/api/dm/conversations"
+            );
+
+            conversations =
+              Array.isArray(data.conversations)
+                ? data.conversations
+                : [];
+
+            conversationsByUsername =
+              new Map(
+                conversations.map(
+                  (conversation) => [
+                    String(
+                      conversation?.user?.username ||
+                      ""
+                    ),
+                    conversation
+                  ]
+                )
+              );
+
+            peoplePreloadSocialAvatars(
+              conversations.map(
+                (conversation) =>
+                  conversation?.user?.username
+              )
+            );
+
+            updateUnreadBadge(
+              data.unreadTotal || 0
+            );
+            renderConversationList();
+          } catch {}
+        } while (
+          conversationsRefreshQueued &&
+          socialReady
+        );
+      })();
+
     try {
-      const data = await api(
-        "/api/dm/conversations"
-      );
-
-      conversations = Array.isArray(data.conversations)
-        ? data.conversations
-        : [];
-
-      peoplePreloadSocialAvatars(
-        conversations.map(
-          (conversation) =>
-            conversation?.user?.username
-        )
-      );
-
-      updateUnreadBadge(data.unreadTotal || 0);
-      renderConversationList();
-    } catch {}
+      await conversationsRefreshPromise;
+    } finally {
+      conversationsRefreshPromise = null;
+    }
   }
 
 // === PEOPLE_DM_GROUPING_V1_START ===
@@ -1225,13 +1459,8 @@ function dmTextLine(
     );
 
     if (author?.username) {
-      av.addEventListener(
-        "click",
-        () =>
-          openProfile(
-            author.username
-          )
-      );
+      av.dataset.peopleProfileUsername =
+        author.username;
     }
 
     const body =
@@ -1286,6 +1515,28 @@ function dmTextLine(
     };
   }
 
+
+
+  dmMessages?.addEventListener(
+    "click",
+    (event) => {
+      const avatar =
+        event.target?.closest?.(
+          ".dm-message-avatar[data-people-profile-username]"
+        );
+
+      const username =
+        String(
+          avatar?.dataset
+            ?.peopleProfileUsername ||
+          ""
+        ).trim();
+
+      if (username) {
+        void openProfile(username);
+      }
+    }
+  );
 
   // === PEOPLE_DM_CALL_HISTORY_V2_START ===
   function peopleParseDmCallEvent(
@@ -1504,11 +1755,16 @@ function dmTextLine(
   }
   // === PEOPLE_DM_CALL_HISTORY_V2_END ===
 
-  function renderDmMessageGroups(list) {
+  function renderDmMessageGroups(
+    list,
+    target = dmMessages
+  ) {
     const messagesList =
       Array.isArray(list)
         ? list
         : [];
+
+    if (!target) return;
 
     let group = null;
 
@@ -1519,7 +1775,7 @@ function dmTextLine(
         );
 
       if (callEvent) {
-        dmMessages.appendChild(
+        target.appendChild(
           peopleDmCallHistoryElement(
             message,
             callEvent
@@ -1560,7 +1816,7 @@ function dmTextLine(
       const built =
         dmMessageElement(message);
 
-      dmMessages.appendChild(
+      target.appendChild(
         built.row
       );
 
@@ -1616,7 +1872,8 @@ function dmTextLine(
           activeDmUser.username;
       }
 
-      dmMessages.innerHTML = "";
+      const fragment =
+        document.createDocumentFragment();
 
       const welcome = document.createElement("div");
       welcome.className = "dm-welcome";
@@ -1631,13 +1888,21 @@ function dmTextLine(
         "Les messages privés sont enregistrés sur People.";
 
       welcome.append(title, subtitle);
-      dmMessages.appendChild(welcome);
+      fragment.appendChild(welcome);
 
       renderDmMessageGroups(
-        data.messages || []
+        data.messages || [],
+        fragment
       );
 
-      dmMessages.scrollTop = dmMessages.scrollHeight;
+      dmMessages.replaceChildren(
+        fragment
+      );
+
+      requestAnimationFrame(() => {
+        dmMessages.scrollTop =
+          dmMessages.scrollHeight;
+      });
 
       await api(
         "/api/dm/" +
@@ -1649,11 +1914,10 @@ function dmTextLine(
       await refreshConversations();
     } catch (err) {
       if (dmMessages) {
-        dmMessages.innerHTML = "";
         const empty = document.createElement("div");
         empty.className = "home-empty";
         empty.textContent = err.message;
-        dmMessages.appendChild(empty);
+        dmMessages.replaceChildren(empty);
       }
     }
   }
@@ -1817,7 +2081,7 @@ function dmTextLine(
         refreshDirectory("")
       ]);
 
-      showFriends();
+      showFriends({ refresh: false });
     } catch {
       socialReady = false;
     }
@@ -2000,13 +2264,8 @@ function dmTextLine(
 
       if (!file) return;
 
-      const accepted =
-        new Set([
-          "image/jpeg",
-          "image/png",
-          "image/webp",
-          "image/gif"
-        ]);
+        const accepted =
+          PEOPLE_AVATAR_ACCEPTED_TYPES;
 
       if (!accepted.has(file.type)) {
         alert(
@@ -2742,14 +3001,32 @@ function dmTextLine(
     }
   });
 
+  function scheduleOnlineUsersRefresh() {
+    if (onlineUsersRefreshTimer) {
+      return;
+    }
+
+    onlineUsersRefreshTimer =
+      setTimeout(
+        () => {
+          onlineUsersRefreshTimer = null;
+
+          void Promise.all([
+            refreshFriends(),
+            refreshDirectory(
+              peopleSearchInput?.value || ""
+            )
+          ]);
+        },
+        120
+      );
+  }
+
   socket.on(
     "online-users",
     () => {
       if (socialReady) {
-        refreshFriends();
-        refreshDirectory(
-          peopleSearchInput?.value || ""
-        );
+        scheduleOnlineUsersRefresh();
       }
     }
   );

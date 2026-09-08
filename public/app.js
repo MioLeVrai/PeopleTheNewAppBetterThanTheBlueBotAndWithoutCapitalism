@@ -203,8 +203,21 @@ function timeText(ts) {
   });
 }
 
+let peopleScrollBottomFrame = 0;
+
 function scrollBottom() {
-  messages.scrollTop = messages.scrollHeight;
+  if (peopleScrollBottomFrame) {
+    return;
+  }
+
+  peopleScrollBottomFrame =
+    requestAnimationFrame(
+      () => {
+        peopleScrollBottomFrame = 0;
+        messages.scrollTop =
+          messages.scrollHeight;
+      }
+    );
 }
 
 // === PEOPLE_GENERAL_HISTORY_V1_START ===
@@ -212,9 +225,29 @@ function scrollBottom() {
 function peoplePreloadAppAvatars(
   usernames
 ) {
+  const uniqueUsernames =
+    [
+      ...new Set(
+        (
+          Array.isArray(usernames)
+            ? usernames
+            : []
+        )
+          .map(
+            (name) =>
+              String(name || "").trim()
+          )
+          .filter(Boolean)
+      )
+    ];
+
+  if (!uniqueUsernames.length) {
+    return;
+  }
+
   void window.PeopleAvatars
     ?.preloadMany(
-      usernames
+      uniqueUsernames
     );
 }
 
@@ -246,29 +279,47 @@ function renderChatHistory(history) {
       (element) => element.remove()
     );
 
+  const fragment =
+    document.createDocumentFragment();
+
   for (const item of items) {
     if (item?.system) {
       addSystemMessage(
-        item
+        item,
+        fragment,
+        false
       );
     } else {
       addChatMessage(
-        item
+        item,
+        fragment,
+        false
       );
     }
   }
+
+  messages.appendChild(
+    fragment
+  );
 
   scrollBottom();
 }
 // === PEOPLE_GENERAL_HISTORY_V1_END ===
 
-function addSystemMessage(data) {
+function addSystemMessage(
+  data,
+  target = messages,
+  shouldScroll = true
+) {
   peopleResetGeneralGroup();
   const div = document.createElement("div");
   div.className = "system-message";
   div.textContent = `${data.text} • ${timeText(data.time)}`;
-  messages.appendChild(div);
-  scrollBottom();
+  target.appendChild(div);
+
+  if (shouldScroll) {
+    scrollBottom();
+  }
 }
 
 // === PEOPLE_MESSAGE_GROUPING_V1_START ===
@@ -397,7 +448,11 @@ function peopleGeneralTextLine(
   return unit;
 }
 
-function addChatMessage(data) {
+function addChatMessage(
+  data,
+  target = messages,
+  shouldScroll = true
+) {
   const messageTime =
     peopleMessageTime(data.time);
 
@@ -424,7 +479,9 @@ function addChatMessage(data) {
 
     peopleGeneralGroup.count += 1;
 
-    scrollBottom();
+    if (shouldScroll) {
+      scrollBottom();
+    }
     return;
   }
 
@@ -485,7 +542,7 @@ function addChatMessage(data) {
     body
   );
 
-  messages.appendChild(row);
+  target.appendChild(row);
 
   peopleGeneralGroup = {
     username:
@@ -495,7 +552,9 @@ function addChatMessage(data) {
     body
   };
 
-  scrollBottom();
+  if (shouldScroll) {
+    scrollBottom();
+  }
 }
 // === PEOPLE_MESSAGE_GROUPING_V1_END ===
 
@@ -772,6 +831,9 @@ function renderVoiceUsers(roster) {
     return;
   }
 
+  const fragment =
+    document.createDocumentFragment();
+
   for (const user of lastVoiceRoster) {
     const row = document.createElement("div");
     row.className = "voice-user";
@@ -823,8 +885,12 @@ function renderVoiceUsers(roster) {
       icons
     );
 
-    voiceUsers.appendChild(row);
+    fragment.appendChild(row);
   }
+
+  voiceUsers.appendChild(
+    fragment
+  );
 
   syncVideoTilesWithRoster();
 }
@@ -1012,30 +1078,6 @@ let peopleActiveServerId = null;
 function peopleApplySelectedServerPayload(
   payload
 ) {
-  peoplePreloadAppAvatars(
-    [
-      ...(payload?.history || [])
-        .filter(
-          (item) =>
-            !item?.system
-        )
-        .map(
-          (item) =>
-            item?.username
-        ),
-      ...(payload?.online || [])
-        .map(
-          (user) =>
-            user?.username
-        ),
-      ...(payload?.voice || [])
-        .map(
-          (user) =>
-            user?.username
-        )
-    ]
-  );
-
   renderChatHistory(
     payload?.history || []
   );
@@ -2656,6 +2698,14 @@ function peopleOnlineUserIsSelf(
 }
 // === PEOPLE_UNIQUE_PRESENCE_CLIENT_V1_END ===
 
+const peopleMemberNameCollator =
+  new Intl.Collator(
+    "fr",
+    {
+      sensitivity: "base"
+    }
+  );
+
 function peopleRenderOnlineUsers(roster) {
   peoplePreloadAppAvatars(
     (
@@ -2734,6 +2784,9 @@ function peopleRenderOnlineUsers(roster) {
     return;
   }
 
+  const fragment =
+    document.createDocumentFragment();
+
   function sortMembers(list) {
     return [...list].sort(
       (a, b) => {
@@ -2753,18 +2806,15 @@ function peopleRenderOnlineUsers(roster) {
           return 1;
         }
 
-        return String(
-          a.username || ""
-        ).localeCompare(
-          String(
-            b.username || ""
-          ),
-          "fr",
-          {
-            sensitivity:
-              "base"
-          }
-        );
+        return peopleMemberNameCollator
+          .compare(
+            String(
+              a.username || ""
+            ),
+            String(
+              b.username || ""
+            )
+          );
       }
     );
   }
@@ -2789,7 +2839,7 @@ function peopleRenderOnlineUsers(roster) {
     title.textContent =
       `${label} — ${list.length}`;
 
-    onlineUsersList.appendChild(
+    fragment.appendChild(
       title
     );
 
@@ -2898,7 +2948,7 @@ function peopleRenderOnlineUsers(roster) {
         dot
       );
 
-      onlineUsersList.appendChild(
+      fragment.appendChild(
         row
       );
     }
@@ -2914,6 +2964,10 @@ function peopleRenderOnlineUsers(roster) {
     "HORS LIGNE",
     offline,
     false
+  );
+
+  onlineUsersList.appendChild(
+    fragment
   );
 }
 

@@ -2,7 +2,6 @@
   const PREVIEW_SIZE = 320;
   const OUTPUT_SIZE = 512;
   const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
-  const TARGET_BYTES = 350 * 1024;
 
   let overlay = null;
   let canvas = null;
@@ -27,6 +26,7 @@
   let dragOffsetY = 0;
 
   let currentResolve = null;
+  let previewFrame = 0;
 
   function injectStyle() {
     if (
@@ -285,7 +285,7 @@
           ) || 1;
 
         clampOffset();
-        drawPreview();
+        schedulePreview();
       }
     );
 
@@ -332,7 +332,7 @@
           );
 
         clampOffset();
-        drawPreview();
+        schedulePreview();
       }
     );
 
@@ -385,15 +385,15 @@
         cancelButton.disabled = true;
 
         info.textContent =
-          "Compression...";
+          "Préparation...";
 
         try {
           const blob =
-            await createCompressedAvatar();
+            await createCroppedAvatar();
 
           if (!blob) {
             throw new Error(
-              "Impossible de compresser cette image."
+              "Impossible de préparer cette image."
             );
           }
 
@@ -413,7 +413,7 @@
         } catch (err) {
           info.textContent =
             err?.message ||
-            "Erreur de compression.";
+            "Erreur de préparation.";
 
           confirmButton.disabled = false;
           cancelButton.disabled = false;
@@ -545,6 +545,20 @@
     );
   }
 
+  function schedulePreview() {
+    if (previewFrame) {
+      return;
+    }
+
+    previewFrame =
+      requestAnimationFrame(
+        () => {
+          previewFrame = 0;
+          drawPreview();
+        }
+      );
+  }
+
   function canvasToBlob(
     targetCanvas,
     type,
@@ -561,44 +575,26 @@
     );
   }
 
-  async function compressCanvas(
+  async function encodeCroppedCanvas(
     targetCanvas
   ) {
-    const qualities = [
-      0.82,
-      0.74,
-      0.66,
-      0.58,
-      0.50
-    ];
+    /*
+      Le fichier passe ensuite dans PeopleAvatarUltra.prepare(),
+      qui effectue la vraie compression finale (~14 Ko).
+      Faire ici 5 essais WebP puis recompresser juste après
+      était du travail CPU en double.
+    */
+    const webp =
+      await canvasToBlob(
+        targetCanvas,
+        "image/webp",
+        0.90
+      );
 
-    let best = null;
-
-    for (const quality of qualities) {
-      const blob =
-        await canvasToBlob(
-          targetCanvas,
-          "image/webp",
-          quality
-        );
-
-      if (!blob) continue;
-
-      best = blob;
-
-      if (
-        blob.size <=
-        TARGET_BYTES
-      ) {
-        return blob;
-      }
+    if (webp) {
+      return webp;
     }
 
-    if (best) {
-      return best;
-    }
-
-    // Fallback JPEG si WebP échoue.
     const jpegCanvas =
       document.createElement(
         "canvas"
@@ -606,15 +602,25 @@
 
     jpegCanvas.width =
       OUTPUT_SIZE;
-
     jpegCanvas.height =
       OUTPUT_SIZE;
 
     const jpegCtx =
-      jpegCanvas.getContext("2d");
+      jpegCanvas.getContext(
+        "2d",
+        {
+          alpha: false
+        }
+      );
+
+    if (!jpegCtx) {
+      throw new Error(
+        "Canvas indisponible."
+      );
+    }
 
     jpegCtx.fillStyle =
-      "#ffffff";
+      "#1e1f22";
 
     jpegCtx.fillRect(
       0,
@@ -632,11 +638,11 @@
     return canvasToBlob(
       jpegCanvas,
       "image/jpeg",
-      0.72
+      0.90
     );
   }
 
-  async function createCompressedAvatar() {
+  async function createCroppedAvatar() {
     const output =
       document.createElement(
         "canvas"
@@ -656,7 +662,7 @@
       OUTPUT_SIZE
     );
 
-    return compressCanvas(
+    return encodeCroppedCanvas(
       output
     );
   }
@@ -693,6 +699,13 @@
     overlay?.classList.add(
       "hidden"
     );
+
+    if (previewFrame) {
+      cancelAnimationFrame(
+        previewFrame
+      );
+      previewFrame = 0;
+    }
 
     image = null;
     dragging = false;

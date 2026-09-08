@@ -9,13 +9,31 @@
     "image/gif"
   ]);
 
+  const TRAILING_URL_PUNCTUATION_RE =
+    /[.,!?;:)\]}]$/;
+
+  const MESSAGE_URL_RE =
+    /https?:\/\/[^\s<>"']+/gi;
+
+  function mayBeYoutubeUrl(value) {
+    const source =
+      String(value || "")
+        .toLowerCase();
+
+    return (
+      source.includes("youtu.be/") ||
+      source.includes("youtube.com/") ||
+      source.includes("m.youtube.com/")
+    );
+  }
+
   function cleanUrlTail(value) {
     let url = String(value || "");
     let tail = "";
 
     while (
       url &&
-      /[.,!?;:)\]}]$/.test(url)
+      TRAILING_URL_PUNCTUATION_RE.test(url)
     ) {
       tail =
         url.slice(-1) +
@@ -95,7 +113,9 @@
       new Set();
 
     const regex =
-      /https?:\/\/[^\s<>"']+/gi;
+      MESSAGE_URL_RE;
+
+    regex.lastIndex = 0;
 
     let cursor = 0;
     let match;
@@ -141,9 +161,13 @@
         );
 
         const id =
-          youtubeId(
+          mayBeYoutubeUrl(
             cleaned.url
-          );
+          )
+            ? youtubeId(
+                cleaned.url
+              )
+            : null;
 
         if (
           id &&
@@ -260,6 +284,12 @@
     image.loading =
       "lazy";
 
+    image.decoding =
+      "async";
+
+    image.fetchPriority =
+      "low";
+
     link.appendChild(
       image
     );
@@ -278,11 +308,12 @@
   ) {
     if (!container) return;
 
-    container.replaceChildren();
+    const fragment =
+      document.createDocumentFragment();
 
     const youtubeIds =
       appendTextWithLinks(
-        container,
+        fragment,
         text
       );
 
@@ -290,14 +321,18 @@
       const id of youtubeIds
     ) {
       appendYoutube(
-        container,
+        fragment,
         id
       );
     }
 
     appendImage(
-      container,
+      fragment,
       imageId
+    );
+
+    container.replaceChildren(
+      fragment
     );
   }
 
@@ -429,6 +464,9 @@
 
       image.alt =
         "Image sélectionnée";
+
+      image.decoding =
+        "async";
 
       const remove =
         document.createElement("button");

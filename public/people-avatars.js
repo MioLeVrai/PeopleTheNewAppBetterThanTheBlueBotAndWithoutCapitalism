@@ -1,6 +1,7 @@
 (() => {
   const versions = new Map();
   const requests = new WeakMap();
+  const elementStates = new WeakMap();
 
   // === PEOPLE_AVATAR_CACHE_V2_START ===
   const avatarCache =
@@ -46,19 +47,54 @@
     return cached;
   }
 
+  function releaseCachedAvatar(
+    cached
+  ) {
+    if (
+      cached?.objectUrl &&
+      cached.src
+    ) {
+      URL.revokeObjectURL(
+        cached.src
+      );
+    }
+  }
+
   function storeAvatar(
     username,
-    src
+    src,
+    objectUrl = false
   ) {
+    const wanted =
+      key(username);
+
+    const previous =
+      avatarCache.get(
+        wanted
+      );
+
+    if (
+      previous &&
+      previous.src !== src
+    ) {
+      releaseCachedAvatar(
+        previous
+      );
+    }
+
     avatarCache.set(
-      key(username),
+      wanted,
       {
         version:
           currentVersion(
             username
           ),
         src:
-          src || ""
+          src || "",
+        objectUrl:
+          Boolean(
+            objectUrl && src
+          )
       }
     );
   }
@@ -68,6 +104,12 @@
   ) {
     const wanted =
       key(username);
+
+    releaseCachedAvatar(
+      avatarCache.get(
+        wanted
+      )
+    );
 
     avatarCache.delete(
       wanted
@@ -146,9 +188,8 @@
     );
 
     /*
-      La data URL a déjà été récupérée :
-      on l'affiche immédiatement au lieu d'attendre
-      une nouvelle requête réseau.
+      La source a déjà été récupérée et mise en cache :
+      on l'affiche immédiatement sans nouvelle requête.
     */
     element.replaceChildren(
       image
@@ -167,6 +208,40 @@
     return String(value || "")
       .trim()
       .toLocaleLowerCase("fr-FR");
+  }
+
+  function avatarElementsFor(
+    username
+  ) {
+    const wanted =
+      key(username);
+
+    if (!wanted) {
+      return [];
+    }
+
+    if (
+      window.CSS?.escape
+    ) {
+      return document.querySelectorAll(
+        '[data-people-avatar-key="' +
+          window.CSS.escape(
+            wanted
+          ) +
+          '"]'
+      );
+    }
+
+    return [
+      ...document.querySelectorAll(
+        "[data-people-avatar-key]"
+      )
+    ].filter(
+      (element) =>
+        element.dataset
+          .peopleAvatarKey ===
+        wanted
+    );
   }
 
   function fallbackFor(name) {
@@ -205,32 +280,6 @@
     image.src = src;
 
     return image;
-  }
-
-  function dataUrl(
-    mime,
-    base64
-  ) {
-    const type =
-      String(
-        mime || "image/jpeg"
-      );
-
-    const data =
-      String(
-        base64 || ""
-      ).trim();
-
-    if (!data) {
-      return "";
-    }
-
-    return (
-      "data:" +
-      type +
-      ";base64," +
-      data
-    );
   }
 
   async function loadAvatarData(
@@ -281,7 +330,7 @@
       (async () => {
         const response =
           await fetch(
-            "/api/profile/avatar-json/" +
+            "/api/profile/avatar/" +
               encodeURIComponent(
                 name
               ) +
@@ -297,53 +346,86 @@
                 "no-store",
               headers: {
                 Accept:
-                  "application/json"
+                  "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
               }
             }
           );
 
-        let body = null;
+        /*
+          Une absence de photo est aussi mise en cache.
+          Sinon un compte sans avatar déclencherait
+          une requête à chaque nouvel affichage.
+        */
+        if (
+          response.status === 404
+        ) {
+          if (
+            currentVersion(
+              name
+            ) === version
+          ) {
+            storeAvatar(
+              name,
+              ""
+            );
+          }
 
-        try {
-          body =
-            await response.json();
-        } catch {}
+          return null;
+        }
 
         if (!response.ok) {
           throw new Error(
-            body?.error ||
             "Avatar indisponible."
           );
         }
 
+        const blob =
+          await response.blob();
+
+        if (!blob.size) {
+          if (
+            currentVersion(
+              name
+            ) === version
+          ) {
+            storeAvatar(
+              name,
+              ""
+            );
+          }
+
+          return null;
+        }
+
         const src =
-          body?.avatar?.data
-            ? dataUrl(
-                body.avatar.mime,
-                body.avatar.data
-              )
-            : "";
+          URL.createObjectURL(
+            blob
+          );
 
         /*
-          Même "pas de PP" est mis en cache.
-          Sinon les comptes sans photo provoqueraient
-          eux aussi une requête à chaque changement d'écran.
+          Si l'avatar a changé pendant la requête,
+          cette réponse est déjà périmée : on libère
+          immédiatement son Blob URL.
         */
         if (
           currentVersion(
             name
-          ) === version
+          ) !== version
         ) {
-          storeAvatar(
-            name,
+          URL.revokeObjectURL(
             src
           );
+
+          return null;
         }
 
-        return (
-          src ||
-          null
+        storeAvatar(
+          name,
+          src,
+          true
         );
+
+        return src;
       })();
 
     avatarInflight.set(
@@ -384,24 +466,33 @@
   async function preloadMany(
     usernames
   ) {
+    const uniqueNames =
+      new Map();
+
+    for (
+      const value of
+      Array.isArray(
+        usernames
+      )
+        ? usernames
+        : []
+    ) {
+      const name =
+        String(
+          value || ""
+        ).trim();
+
+      if (name) {
+        uniqueNames.set(
+          key(name),
+          name
+        );
+      }
+    }
+
     const names =
       [
-        ...new Set(
-          (
-            Array.isArray(
-              usernames
-            )
-              ? usernames
-              : []
-          )
-            .map(
-              (name) =>
-                String(
-                  name || ""
-                ).trim()
-            )
-            .filter(Boolean)
-        )
+        ...uniqueNames.values()
       ];
 
     if (!names.length) {
@@ -455,9 +546,51 @@
         username || "?"
       ).trim() || "?";
 
+    const wanted =
+      key(name);
+
+    const version =
+      currentVersion(
+        name
+      );
+
+    const previousState =
+      elementStates.get(
+        element
+      );
+
+    /*
+      Certains composants réappellent apply() à chaque
+      mise à jour alors que l'avatar n'a pas changé.
+      Dans ce cas on garde simplement l'image déjà rendue.
+    */
+    if (
+      previousState?.key ===
+        wanted &&
+      previousState.version ===
+        version &&
+      previousState.status !==
+        "error"
+    ) {
+      return;
+    }
+
+    elementStates.set(
+      element,
+      {
+        key: wanted,
+        version,
+        status: "loading"
+      }
+    );
+
     element.dataset
       .peopleAvatarUsername =
       name;
+
+    element.dataset
+      .peopleAvatarKey =
+      wanted;
 
     element.classList.add(
       "people-avatar-host"
@@ -473,6 +606,15 @@
         element,
         name,
         cached.src
+      );
+
+      elementStates.set(
+        element,
+        {
+          key: wanted,
+          version,
+          status: "rendered"
+        }
       );
 
       return;
@@ -501,13 +643,22 @@
           element
         ) !== requestId ||
         element.dataset
-          .peopleAvatarUsername !==
-          name
+          .peopleAvatarKey !==
+          wanted
       ) {
         return;
       }
 
       if (!src) {
+        elementStates.set(
+          element,
+          {
+            key: wanted,
+            version,
+            status: "rendered"
+          }
+        );
+
         return;
       }
 
@@ -528,6 +679,15 @@
             element.replaceChildren(
               fallbackFor(name)
             );
+
+            elementStates.set(
+              element,
+              {
+                key: wanted,
+                version,
+                status: "error"
+              }
+            );
           }
         },
         {
@@ -535,11 +695,6 @@
         }
       );
 
-      /*
-        loadAvatarData() a déjà récupéré et mis en cache
-        la data URL. Pas besoin d'attendre un deuxième
-        cycle "load" avant de montrer l'image.
-      */
       if (
         requests.get(
           element
@@ -548,8 +703,32 @@
         element.replaceChildren(
           image
         );
+
+        elementStates.set(
+          element,
+          {
+            key: wanted,
+            version,
+            status: "rendered"
+          }
+        );
       }
     } catch (err) {
+      if (
+        requests.get(
+          element
+        ) === requestId
+      ) {
+        elementStates.set(
+          element,
+          {
+            key: wanted,
+            version,
+            status: "error"
+          }
+        );
+      }
+
       console.warn(
         "[People avatar]",
         name,
@@ -575,12 +754,54 @@
         username || "?"
       ).trim() || "?";
 
+    const wanted =
+      key(name);
+
+    const version =
+      currentVersion(name);
+
+    const previousState =
+      elementStates.get(
+        element
+      );
+
+    /*
+      Les écrans profil/settings peuvent demander deux fois
+      de suite exactement le même avatar après un upload.
+      On évite de recréer une <img> identique.
+    */
+    if (
+      previousState?.key ===
+        wanted &&
+      previousState.version ===
+        version &&
+      previousState.src === src &&
+      previousState.status !==
+        "error"
+    ) {
+      return;
+    }
+
     element.dataset
       .peopleAvatarUsername =
       name;
 
+    element.dataset
+      .peopleAvatarKey =
+      wanted;
+
     element.classList.add(
       "people-avatar-host"
+    );
+
+    elementStates.set(
+      element,
+      {
+        key: wanted,
+        version,
+        src,
+        status: "loading"
+      }
     );
 
     const requestId =
@@ -610,6 +831,16 @@
           element.replaceChildren(
             fallbackFor(name)
           );
+
+          elementStates.set(
+            element,
+            {
+              key: wanted,
+              version,
+              src,
+              status: "error"
+            }
+          );
         }
       },
       {
@@ -627,6 +858,16 @@
         ) {
           element.replaceChildren(
             image
+          );
+
+          elementStates.set(
+            element,
+            {
+              key: wanted,
+              version,
+              src,
+              status: "rendered"
+            }
           );
         }
       },
@@ -655,28 +896,65 @@
       src
     );
 
-    document
-      .querySelectorAll(
-        "[data-people-avatar-username]"
-      )
-      .forEach(
-        (element) => {
-          if (
-            key(
-              element.dataset
-                .peopleAvatarUsername
-            ) !== wanted
-          ) {
-            return;
-          }
+    avatarElementsFor(
+      username
+    ).forEach(
+      (element) => {
+        applyDataUrlToElement(
+          element,
+          username,
+          src
+        );
+      }
+    );
+  }
 
-          applyDataUrlToElement(
-            element,
-            username,
-            src
-          );
-        }
+  function applyBlobEverywhere(
+    username,
+    blob
+  ) {
+    const name =
+      String(
+        username || ""
+      ).trim();
+
+    if (
+      !name ||
+      !blob ||
+      blob.size <= 0
+    ) {
+      return false;
+    }
+
+    const src =
+      URL.createObjectURL(
+        blob
       );
+
+    /*
+      Une seule Blob URL est partagée par tous les avatars
+      du même utilisateur. Elle reste vivante dans le cache
+      et sera révoquée automatiquement au prochain refresh.
+    */
+    storeAvatar(
+      name,
+      src,
+      true
+    );
+
+    avatarElementsFor(
+      name
+    ).forEach(
+      (element) => {
+        applyDataUrlToElement(
+          element,
+          name,
+          src
+        );
+      }
+    );
+
+    return true;
   }
 
   function refresh(username) {
@@ -698,25 +976,16 @@
       name
     );
 
-    document
-      .querySelectorAll(
-        "[data-people-avatar-username]"
-      )
-      .forEach(
-        (element) => {
-          if (
-            key(
-              element.dataset
-                .peopleAvatarUsername
-            ) === key(name)
-          ) {
-            apply(
-              element,
-              name
-            );
-          }
-        }
-      );
+    avatarElementsFor(
+      name
+    ).forEach(
+      (element) => {
+        apply(
+          element,
+          name
+        );
+      }
+    );
   }
 
   window.PeopleAvatars = {
@@ -724,6 +993,7 @@
     refresh,
     applyDataUrlEverywhere,
     applyDataUrlToElement,
+    applyBlobEverywhere,
     loadAvatarData,
     preload,
     preloadMany,

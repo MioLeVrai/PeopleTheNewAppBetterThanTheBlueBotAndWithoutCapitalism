@@ -735,6 +735,52 @@ async function peopleFindAccountById(id) {
   );
 }
 
+async function peopleFindAccountsByIds(ids) {
+  const wanted = [
+    ...new Set(
+      (Array.isArray(ids) ? ids : [])
+        .map((id) => String(id || ""))
+        .filter(Boolean)
+    )
+  ];
+
+  if (!wanted.length) {
+    return [];
+  }
+
+  if (peoplePool) {
+    const result = await peoplePool.query(
+      "SELECT id, username, username_key, password_hash, " +
+      "description, created_at " +
+      "FROM people_accounts " +
+      "WHERE id = ANY($1::bigint[])",
+      [wanted]
+    );
+
+    const byId = new Map(
+      result.rows.map((account) => [
+        String(account.id),
+        account
+      ])
+    );
+
+    return wanted
+      .map((id) => byId.get(id))
+      .filter(Boolean);
+  }
+
+  const byId = new Map(
+    peopleReadLocalAccounts().map((account) => [
+      String(account.id),
+      account
+    ])
+  );
+
+  return wanted
+    .map((id) => byId.get(id))
+    .filter(Boolean);
+}
+
 async function peopleListAccounts(search = "") {
   const q = peopleUsername(search).toLocaleLowerCase("fr-FR");
 
@@ -1848,13 +1894,27 @@ async function peopleDmConversations(accountId) {
   }
 
   const out = [];
+  const conversationItems = [
+    ...map.values()
+  ];
+  const accounts = await peopleFindAccountsByIds(
+    conversationItems.map(
+      (item) => item.otherId
+    )
+  );
+  const accountsById = new Map(
+    accounts.map((account) => [
+      String(account.id),
+      account
+    ])
+  );
 
   for (
-    const item of map.values()
+    const item of conversationItems
   ) {
     const account =
-      await peopleFindAccountById(
-        item.otherId
+      accountsById.get(
+        String(item.otherId)
       );
 
     if (!account) {
@@ -2901,6 +2961,12 @@ async function peopleInitSocial() {
   await peoplePool.query(
     "CREATE INDEX IF NOT EXISTS people_message_images_owner_idx " +
     "ON people_message_images(owner_id, created_at DESC)"
+  );
+
+  await peoplePool.query(
+    "CREATE INDEX IF NOT EXISTS people_message_images_pending_created_idx " +
+    "ON people_message_images(created_at) " +
+    "WHERE general_message_id IS NULL AND dm_message_id IS NULL"
   );
 
   await peoplePool.query(
@@ -4083,18 +4149,18 @@ app.get("/api/social/friends", async (req, res) => {
     if (!session) return;
 
     const ids = await peopleFriendIds(session.id);
-    const friends = [];
-
-    for (const id of ids) {
-      const account = await peopleFindAccountById(id);
-      if (!account) continue;
-
-      friends.push({
+    const accounts =
+      await peopleFindAccountsByIds(ids);
+    const friends = accounts.map(
+      (account) => ({
         ...peoplePublicAccount(account),
-        online: peopleAccountIsOnline(account.id),
+        online:
+          peopleAccountIsOnline(
+            account.id
+          ),
         isFriend: true
-      });
-    }
+      })
+    );
 
     friends.sort((a, b) => {
       if (a.online !== b.online) {
@@ -4131,6 +4197,26 @@ app.get("/api/social/friend-requests", async (req, res) => {
 
     const incoming = [];
     const outgoing = [];
+    const otherIds = rows.map(
+      (request) =>
+        String(request.recipient_id) ===
+        String(session.id)
+          ? request.sender_id
+          : request.recipient_id
+    );
+    const requestAccounts =
+      await peopleFindAccountsByIds(
+        otherIds
+      );
+    const requestAccountsById =
+      new Map(
+        requestAccounts.map(
+          (account) => [
+            String(account.id),
+            account
+          ]
+        )
+      );
 
     for (const request of rows) {
       const isIncoming =
@@ -4142,7 +4228,9 @@ app.get("/api/social/friend-requests", async (req, res) => {
         : request.recipient_id;
 
       const account =
-        await peopleFindAccountById(otherId);
+        requestAccountsById.get(
+          String(otherId)
+        );
 
       if (!account) continue;
 
@@ -5151,6 +5239,10 @@ function peopleWriteLocalMessageImageMeta(
   );
 }
 
+let peopleMessageImageLastCleanupAt = 0;
+const PEOPLE_MESSAGE_IMAGE_CLEANUP_INTERVAL_MS =
+  60 * 60 * 1000;
+
 async function peopleCreatePendingMessageImage(
   ownerId,
   buffer
@@ -5189,12 +5281,30 @@ async function peopleCreatePendingMessageImage(
     String(ownerId);
 
   if (peoplePool) {
-    await peoplePool.query(
-      "DELETE FROM people_message_images " +
-      "WHERE general_message_id IS NULL " +
-      "AND dm_message_id IS NULL " +
-      "AND created_at < NOW() - INTERVAL '1 day'"
-    );
+    const now = Date.now();
+
+    if (
+      now -
+        peopleMessageImageLastCleanupAt >=
+      PEOPLE_MESSAGE_IMAGE_CLEANUP_INTERVAL_MS
+    ) {
+      peopleMessageImageLastCleanupAt =
+        now;
+
+      try {
+        await peoplePool.query(
+          "DELETE FROM people_message_images " +
+          "WHERE general_message_id IS NULL " +
+          "AND dm_message_id IS NULL " +
+          "AND created_at < NOW() - INTERVAL '1 day'"
+        );
+      } catch (err) {
+        console.warn(
+          "[People image cleanup]",
+          err?.message || err
+        );
+      }
+    }
 
     const result =
       await peoplePool.query(
@@ -8621,6 +8731,26 @@ async function peopleServerPresenceRoster(
     return [];
   }
 
+  const connectionCounts =
+    new Map();
+
+  for (const id of userIds.values()) {
+    const key =
+      String(id || "");
+
+    if (!key) {
+      continue;
+    }
+
+    connectionCounts.set(
+      key,
+      (
+        connectionCounts.get(key) ||
+        0
+      ) + 1
+    );
+  }
+
   if (peoplePool) {
     const result =
       await peoplePool.query(
@@ -8637,6 +8767,11 @@ async function peopleServerPresenceRoster(
         const accountId =
           String(row.id);
 
+        const connections =
+          connectionCounts.get(
+            accountId
+          ) || 0;
+
         return {
           id:
             accountId,
@@ -8644,13 +8779,8 @@ async function peopleServerPresenceRoster(
           username:
             row.username,
           online:
-            peopleAccountIsOnline(
-              accountId
-            ),
-          connections:
-            peopleAccountConnectionCount(
-              accountId
-            )
+            connections > 0,
+          connections
         };
       }
     );
@@ -8689,6 +8819,11 @@ async function peopleServerPresenceRoster(
           return null;
         }
 
+        const connections =
+          connectionCounts.get(
+            accountId
+          ) || 0;
+
         return {
           id:
             accountId,
@@ -8696,13 +8831,8 @@ async function peopleServerPresenceRoster(
           username:
             account.username,
           online:
-            peopleAccountIsOnline(
-              accountId
-            ),
-          connections:
-            peopleAccountConnectionCount(
-              accountId
-            )
+            connections > 0,
+          connections
         };
       }
     )
@@ -10189,7 +10319,8 @@ io.on("connection", (socket) => {
           );
 
         emitOnlineUsers(
-          server.id
+          server.id,
+          online
         );
 
         ack({

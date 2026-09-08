@@ -306,6 +306,18 @@
       "peopleDmCallHangup"
     );
 
+  const muteButtonIcon =
+    muteButton.querySelector("span");
+
+  const muteButtonLabel =
+    muteButton.querySelector("small");
+
+  const cameraButtonIcon =
+    cameraButton.querySelector("span");
+
+  const cameraButtonLabel =
+    cameraButton.querySelector("small");
+
   function unlockCallAudio() {
     try {
       if (!audioContext) {
@@ -501,6 +513,8 @@
       "hidden"
     );
 
+    peopleDmCallPublishState();
+
     requestAnimationFrame(
       () => {
         overlay.classList.add(
@@ -521,6 +535,7 @@
           overlay.classList.add(
             "hidden"
           );
+          peopleDmCallPublishState();
         }
       },
       190
@@ -551,6 +566,8 @@
         avatar,
         name
       );
+
+    peopleDmCallPublishState();
   }
 
   function setStatus(
@@ -583,6 +600,14 @@
       camera:
         Boolean(
           cameraEnabled
+        ),
+      remoteCamera:
+        Boolean(
+          call?.remoteCamera
+        ),
+      visible:
+        !overlay.classList.contains(
+          "hidden"
         )
     };
   }
@@ -669,16 +694,12 @@
       micMuted
     );
 
-    muteButton.querySelector(
-      "span"
-    ).textContent =
+    muteButtonIcon.textContent =
       micMuted
         ? "🔇"
         : "🎙️";
 
-    muteButton.querySelector(
-      "small"
-    ).textContent =
+    muteButtonLabel.textContent =
       micMuted
         ? "Muet"
         : "Micro";
@@ -693,16 +714,12 @@
       cameraEnabled
     );
 
-    cameraButton.querySelector(
-      "span"
-    ).textContent =
+    cameraButtonIcon.textContent =
       cameraEnabled
         ? "📹"
         : "📷";
 
-    cameraButton.querySelector(
-      "small"
-    ).textContent =
+    cameraButtonLabel.textContent =
       cameraEnabled
         ? "Cam active"
         : "Caméra";
@@ -715,14 +732,79 @@
     peopleDmCallPublishState();
   }
 
+  function mediaElementHasTracks(
+    element,
+    tracks
+  ) {
+    const current =
+      element.srcObject
+        ?.getTracks?.() ||
+      [];
+
+    if (
+      current.length !==
+      tracks.length
+    ) {
+      return false;
+    }
+
+    const currentIds =
+      new Set(
+        current.map(
+          (track) => track.id
+        )
+      );
+
+    return tracks.every(
+      (track) =>
+        currentIds.has(
+          track.id
+        )
+    );
+  }
+
+  function setMediaElementTracks(
+    element,
+    tracks
+  ) {
+    if (!tracks.length) {
+      if (element.srcObject) {
+        try {
+          element.srcObject =
+            null;
+        } catch {}
+        return true;
+      }
+
+      return false;
+    }
+
+    if (
+      mediaElementHasTracks(
+        element,
+        tracks
+      )
+    ) {
+      return false;
+    }
+
+    element.srcObject =
+      new MediaStream(
+        tracks
+      );
+
+    return true;
+  }
+
   function syncLocalPreview() {
     if (
       cameraEnabled &&
       cameraTrack &&
       localStream
     ) {
-      localVideo.srcObject =
-        new MediaStream(
+      const changed =
+        setMediaElementTracks(
+          localVideo,
           [cameraTrack]
         );
 
@@ -730,9 +812,14 @@
         "hidden"
       );
 
-      localVideo
-        .play()
-        .catch(() => {});
+      if (
+        changed ||
+        localVideo.paused
+      ) {
+        localVideo
+          .play()
+          .catch(() => {});
+      }
 
       return;
     }
@@ -749,6 +836,23 @@
 
   function syncRemoteMedia() {
     if (!remoteStream) {
+      setMediaElementTracks(
+        remoteAudio,
+        []
+      );
+      setMediaElementTracks(
+        remoteVideo,
+        []
+      );
+
+      remoteVideo.classList.add(
+        "hidden"
+      );
+      identity.classList.remove(
+        "with-video"
+      );
+
+      peopleDmCallPublishState();
       return;
     }
 
@@ -761,8 +865,9 @@
             "live"
         );
 
-    remoteAudio.srcObject =
-      new MediaStream(
+    const audioChanged =
+      setMediaElementTracks(
+        remoteAudio,
         audioTracks
       );
 
@@ -771,9 +876,17 @@
         remoteAudio
       );
 
-    remoteAudio
-      .play()
-      .catch(() => {});
+    if (
+      audioTracks.length &&
+      (
+        audioChanged ||
+        remoteAudio.paused
+      )
+    ) {
+      remoteAudio
+        .play()
+        .catch(() => {});
+    }
 
     const videoTracks =
       remoteStream
@@ -788,8 +901,9 @@
       videoTracks.length &&
       call?.remoteCamera
     ) {
-      remoteVideo.srcObject =
-        new MediaStream(
+      const videoChanged =
+        setMediaElementTracks(
+          remoteVideo,
           videoTracks
         );
 
@@ -797,18 +911,23 @@
         "hidden"
       );
 
-      remoteVideo
-        .play()
-        .catch(() => {});
+      if (
+        videoChanged ||
+        remoteVideo.paused
+      ) {
+        remoteVideo
+          .play()
+          .catch(() => {});
+      }
 
       identity.classList.add(
         "with-video"
       );
     } else {
-      try {
-        remoteVideo.srcObject =
-          null;
-      } catch {}
+      setMediaElementTracks(
+        remoteVideo,
+        []
+      );
 
       remoteVideo.classList.add(
         "hidden"
@@ -818,6 +937,8 @@
         "with-video"
       );
     }
+
+    peopleDmCallPublishState();
   }
 
   async function ensureLocalAudio() {
@@ -2241,4 +2362,1517 @@
   peopleDmCallPublishState();
 
   // === PEOPLE_DM_CALLS_V1_END ===
+})();
+
+/* ===== UI V2 intégrée ===== */
+(() => {
+  "use strict";
+
+  // === PEOPLE_DM_CALLS_V2_CLIENT_START ===
+
+  const overlay =
+    document.getElementById(
+      "peopleDmCallOverlay"
+    );
+
+  const card =
+    overlay?.querySelector(
+      ".people-dm-call-card"
+    );
+
+  const dmView =
+    document.getElementById(
+      "dmView"
+    );
+
+  const dmHeader =
+    dmView?.querySelector(
+      ".dm-header"
+    );
+
+  const dmHeaderName =
+    document.getElementById(
+      "dmHeaderName"
+    );
+
+  const callName =
+    document.getElementById(
+      "peopleDmCallName"
+    );
+
+  const activeActions =
+    document.getElementById(
+      "peopleDmCallActiveActions"
+    );
+
+  const remoteAudio =
+    document.getElementById(
+      "peopleDmCallRemoteAudio"
+    );
+
+  if (
+    !overlay ||
+    !card ||
+    !dmView ||
+    !dmHeader ||
+    !dmHeaderName ||
+    !callName ||
+    !activeActions ||
+    !remoteAudio
+  ) {
+    return;
+  }
+
+  /*
+    Le V1 utilisait un vrai modal.
+    V2 garde le même moteur WebRTC mais
+    transforme l'affichage en panneau non bloquant.
+  */
+  card.removeAttribute(
+    "aria-modal"
+  );
+
+  card.setAttribute(
+    "role",
+    "region"
+  );
+
+  const inlineDock =
+    document.createElement(
+      "div"
+    );
+
+  inlineDock.id =
+    "peopleDmCallInlineDock";
+
+  inlineDock.className =
+    "people-dm-call-inline-dock hidden";
+
+  dmHeader.insertAdjacentElement(
+    "afterend",
+    inlineDock
+  );
+
+  const floatingDock =
+    document.createElement(
+      "div"
+    );
+
+  floatingDock.id =
+    "peopleDmCallFloatingDock";
+
+  floatingDock.className =
+    "people-dm-call-floating-dock";
+
+  document.body.appendChild(
+    floatingDock
+  );
+
+  function normalized(value) {
+    return String(
+      value || ""
+    )
+      .trim()
+      .toLocaleLowerCase(
+        "fr-FR"
+      );
+  }
+
+  function overlayVisible() {
+    return !overlay.classList
+      .contains(
+        "hidden"
+      );
+  }
+
+  function currentDmMatchesCall() {
+    if (
+      dmView.classList
+        .contains(
+          "hidden"
+        )
+    ) {
+      return false;
+    }
+
+    const current =
+      normalized(
+        dmHeaderName.textContent
+      );
+
+    const partner =
+      normalized(
+        callName.textContent
+      );
+
+    return (
+      current &&
+      partner &&
+      current !==
+        "message privé" &&
+      current ===
+        partner
+    );
+  }
+
+  function syncPlacement() {
+    if (
+      !overlayVisible()
+    ) {
+      dmView.classList.remove(
+        "people-dm-call-inline"
+      );
+
+      inlineDock.classList.add(
+        "hidden"
+      );
+
+      return;
+    }
+
+    if (
+      currentDmMatchesCall()
+    ) {
+      if (
+        overlay.parentElement !==
+        inlineDock
+      ) {
+        inlineDock.appendChild(
+          overlay
+        );
+      }
+
+      overlay.classList.add(
+        "people-dm-call-docked"
+      );
+
+      overlay.classList.remove(
+        "people-dm-call-floating"
+      );
+
+      inlineDock.classList.remove(
+        "hidden"
+      );
+
+      dmView.classList.add(
+        "people-dm-call-inline"
+      );
+
+      return;
+    }
+
+    if (
+      overlay.parentElement !==
+      floatingDock
+    ) {
+      floatingDock.appendChild(
+        overlay
+      );
+    }
+
+    overlay.classList.remove(
+      "people-dm-call-docked"
+    );
+
+    overlay.classList.add(
+      "people-dm-call-floating"
+    );
+
+    inlineDock.classList.add(
+      "hidden"
+    );
+
+    dmView.classList.remove(
+      "people-dm-call-inline"
+    );
+  }
+
+  /*
+    PEOPLE_DM_CALLS_V2_PLACEMENT_FIX
+
+    IMPORTANT :
+    on ne surveille surtout PAS tout document.body.
+
+    L'ancien observateur global pouvait se réveiller sur
+    chaque mutation de People, puis modifier lui-même des
+    classes DOM, ce qui pouvait créer une boucle de travail
+    et figer complètement l'interface.
+
+    On surveille uniquement les 3 états réellement utiles :
+    - appel visible/caché ;
+    - MP visible/caché ;
+    - pseudo du MP actuellement ouvert.
+
+    La signature évite aussi toute boucle quand syncPlacement()
+    modifie ses propres classes docked/floating.
+  */
+  let placementScheduled =
+    false;
+
+  let lastPlacementSignature =
+    "";
+
+  function placementSignature() {
+    return [
+      overlay.classList
+        .contains(
+          "hidden"
+        )
+        ? "0"
+        : "1",
+      dmView.classList
+        .contains(
+          "hidden"
+        )
+        ? "0"
+        : "1",
+      normalized(
+        dmHeaderName.textContent
+      )
+    ].join(
+      "|"
+    );
+  }
+
+  function schedulePlacement() {
+    if (
+      placementScheduled
+    ) {
+      return;
+    }
+
+    placementScheduled =
+      true;
+
+    requestAnimationFrame(
+      () => {
+        placementScheduled =
+          false;
+
+        const signature =
+          placementSignature();
+
+        if (
+          signature ===
+          lastPlacementSignature
+        ) {
+          return;
+        }
+
+        lastPlacementSignature =
+          signature;
+
+        syncPlacement();
+      }
+    );
+  }
+
+  const placementObserver =
+    new MutationObserver(
+      schedulePlacement
+    );
+
+  placementObserver.observe(
+    dmView,
+    {
+      attributes: true,
+      attributeFilter: [
+        "class"
+      ]
+    }
+  );
+
+  placementObserver.observe(
+    dmHeaderName,
+    {
+      childList: true,
+      subtree: true,
+      characterData: true
+    }
+  );
+
+  schedulePlacement();
+
+  // ==========================================================
+  // VOLUME LOCAL DE LA PERSONNE EN FACE
+  // Même stockage que les vocaux serveur.
+  // ==========================================================
+
+  const volumeWrap =
+    document.createElement(
+      "div"
+    );
+
+  volumeWrap.className =
+    "people-dm-call-volume-wrap";
+
+  const volumeMute =
+    document.createElement(
+      "button"
+    );
+
+  volumeMute.type =
+    "button";
+
+  volumeMute.className =
+    "people-dm-call-volume-mute";
+
+  const volumeRange =
+    document.createElement(
+      "input"
+    );
+
+  volumeRange.type =
+    "range";
+
+  volumeRange.className =
+    "people-dm-call-volume";
+
+  volumeRange.min =
+    "0";
+
+  volumeRange.max =
+    "100";
+
+  volumeRange.step =
+    "1";
+
+  const volumeValue =
+    document.createElement(
+      "span"
+    );
+
+  volumeValue.className =
+    "people-dm-call-volume-value";
+
+  volumeWrap.append(
+    volumeMute,
+    volumeRange,
+    volumeValue
+  );
+
+  activeActions.insertBefore(
+    volumeWrap,
+    activeActions.lastElementChild
+  );
+
+  function prefKey() {
+    return (
+      "people-local-audio:" +
+      normalized(
+        callName.textContent ||
+        "utilisateur"
+      )
+    );
+  }
+
+  function readPref(key) {
+    try {
+      const raw =
+        localStorage.getItem(
+          key
+        );
+
+      if (!raw) {
+        return {
+          volume: 100,
+          muted: false
+        };
+      }
+
+      const parsed =
+        JSON.parse(
+          raw
+        );
+
+      return {
+        volume:
+          Math.max(
+            0,
+            Math.min(
+              100,
+              Number(
+                parsed.volume ??
+                100
+              )
+            )
+          ),
+        muted:
+          Boolean(
+            parsed.muted
+          )
+      };
+    } catch {
+      return {
+        volume: 100,
+        muted: false
+      };
+    }
+  }
+
+  let currentPrefKey =
+    prefKey();
+
+  let currentPref =
+    readPref(
+      currentPrefKey
+    );
+
+  function saveCurrentPref() {
+    try {
+      localStorage.setItem(
+        currentPrefKey,
+        JSON.stringify(
+          currentPref
+        )
+      );
+    } catch {}
+  }
+
+  function applyPref() {
+    remoteAudio.volume =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          currentPref.volume /
+          100
+        )
+      );
+
+    remoteAudio.muted =
+      currentPref.muted;
+
+    volumeRange.value =
+      String(
+        currentPref.volume
+      );
+
+    volumeValue.textContent =
+      Math.round(
+        currentPref.volume
+      ) + "%";
+
+    volumeMute.textContent =
+      currentPref.muted
+        ? "🔇"
+        : "🔊";
+
+    volumeMute.classList.toggle(
+      "is-muted",
+      currentPref.muted
+    );
+
+    volumeMute.title =
+      currentPref.muted
+        ? "Réactiver le son de la personne"
+        : "Couper le son de la personne";
+  }
+
+  function refreshPrefForPartner() {
+    const nextKey =
+      prefKey();
+
+    if (
+      nextKey !==
+      currentPrefKey
+    ) {
+      currentPrefKey =
+        nextKey;
+
+      currentPref =
+        readPref(
+          currentPrefKey
+        );
+    }
+
+    applyPref();
+  }
+
+  volumeMute.addEventListener(
+    "click",
+    () => {
+      currentPref.muted =
+        !currentPref.muted;
+
+      saveCurrentPref();
+      applyPref();
+    }
+  );
+
+  volumeRange.addEventListener(
+    "input",
+    () => {
+      currentPref.volume =
+        Number(
+          volumeRange.value
+        );
+
+      remoteAudio.volume =
+        Math.max(
+          0,
+          Math.min(
+            1,
+            currentPref.volume /
+            100
+          )
+        );
+
+      volumeValue.textContent =
+        Math.round(
+          currentPref.volume
+        ) + "%";
+    }
+  );
+
+  volumeRange.addEventListener(
+    "change",
+    saveCurrentPref
+  );
+
+  window.addEventListener(
+    "people-dm-call-state",
+    () => {
+      refreshPrefForPartner();
+      schedulePlacement();
+    }
+  );
+
+  /*
+    volume/muted restent attachés au même élément <audio>
+    quand WebRTC remplace srcObject. Le polling périodique
+    de V2 n'est donc pas nécessaire.
+  */
+
+  refreshPrefForPartner();
+  syncPlacement();
+
+  // === PEOPLE_DM_CALLS_V2_CLIENT_END ===
+})();
+
+/* ===== UI V3 intégrée ===== */
+(() => {
+  "use strict";
+
+  // === PEOPLE_DM_CALLS_V3_CLIENT_START ===
+
+  const overlay =
+    document.getElementById(
+      "peopleDmCallOverlay"
+    );
+
+  const card =
+    overlay?.querySelector(
+      ".people-dm-call-card"
+    );
+
+  const dmView =
+    document.getElementById(
+      "dmView"
+    );
+
+  const dmHeaderName =
+    document.getElementById(
+      "dmHeaderName"
+    );
+
+  const callName =
+    document.getElementById(
+      "peopleDmCallName"
+    );
+
+  const activeActions =
+    document.getElementById(
+      "peopleDmCallActiveActions"
+    );
+
+  const remoteVideo =
+    document.getElementById(
+      "peopleDmCallRemoteVideo"
+    );
+
+  if (
+    !overlay ||
+    !card ||
+    !dmView ||
+    !dmHeaderName ||
+    !callName ||
+    !activeActions ||
+    !remoteVideo
+  ) {
+    return;
+  }
+
+  function normalized(value) {
+    return String(
+      value || ""
+    )
+      .trim()
+      .toLocaleLowerCase(
+        "fr-FR"
+      );
+  }
+
+  function currentDmMatchesCall() {
+    if (
+      dmView.classList
+        .contains(
+          "hidden"
+        )
+    ) {
+      return false;
+    }
+
+    const current =
+      normalized(
+        dmHeaderName.textContent
+      );
+
+    const partner =
+      normalized(
+        callName.textContent
+      );
+
+    return (
+      current &&
+      partner &&
+      current !==
+        "message privé" &&
+      current ===
+        partner
+    );
+  }
+
+  function callIsActive() {
+    return (
+      !overlay.classList
+        .contains(
+          "hidden"
+        ) &&
+      !activeActions.classList
+        .contains(
+          "hidden"
+        )
+    );
+  }
+
+  function remoteCameraIsActive() {
+    return (
+      callIsActive() &&
+      !remoteVideo.classList
+        .contains(
+          "hidden"
+        ) &&
+      Boolean(
+        remoteVideo.srcObject
+      )
+    );
+  }
+
+  // ==========================================================
+  // 1. HAUTEUR RÉGLABLE DU PANNEAU DANS LE MP
+  // ==========================================================
+
+  const resizeHandle =
+    document.createElement(
+      "div"
+    );
+
+  resizeHandle.id =
+    "peopleDmCallResizeHandle";
+
+  resizeHandle.className =
+    "people-dm-call-resize-handle";
+
+  resizeHandle.title =
+    "Glisser pour régler la hauteur de l'appel";
+
+  resizeHandle.setAttribute(
+    "aria-label",
+    "Régler la hauteur de l'appel"
+  );
+
+  const resizeGrip =
+    document.createElement(
+      "span"
+    );
+
+  resizeHandle.appendChild(
+    resizeGrip
+  );
+
+  card.appendChild(
+    resizeHandle
+  );
+
+  const HEIGHT_KEY =
+    "people-dm-call-inline-height-v1";
+
+  function maxInlineHeight() {
+    return Math.max(
+      260,
+      Math.min(
+        680,
+        Math.round(
+          window.innerHeight *
+          0.72
+        )
+      )
+    );
+  }
+
+  function clampHeight(value) {
+    return Math.max(
+      200,
+      Math.min(
+        maxInlineHeight(),
+        Math.round(
+          Number(value) ||
+          300
+        )
+      )
+    );
+  }
+
+  function loadHeight() {
+    try {
+      return clampHeight(
+        Number(
+          localStorage.getItem(
+            HEIGHT_KEY
+          )
+        ) || 300
+      );
+    } catch {
+      return 300;
+    }
+  }
+
+  let currentInlineHeight =
+    300;
+
+  function applyHeight(
+    value,
+    {
+      save = false
+    } = {}
+  ) {
+    const height =
+      clampHeight(
+        value
+      );
+
+    currentInlineHeight =
+      height;
+
+    card.style.setProperty(
+      "--people-dm-call-inline-height",
+      height + "px"
+    );
+
+    if (save) {
+      try {
+        localStorage.setItem(
+          HEIGHT_KEY,
+          String(height)
+        );
+      } catch {}
+    }
+  }
+
+  applyHeight(
+    loadHeight()
+  );
+
+  let resizeState = null;
+  let resizeFrame = 0;
+  let pendingResizeHeight = null;
+
+  function flushResizeFrame() {
+    resizeFrame = 0;
+
+    if (
+      pendingResizeHeight ===
+      null
+    ) {
+      return;
+    }
+
+    const next =
+      pendingResizeHeight;
+
+    pendingResizeHeight =
+      null;
+
+    applyHeight(
+      next
+    );
+  }
+
+  resizeHandle.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (
+        !overlay.classList
+          .contains(
+            "people-dm-call-docked"
+          )
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+
+      resizeState = {
+        pointerId:
+          event.pointerId,
+        startY:
+          event.clientY,
+        startHeight:
+          card
+            .getBoundingClientRect()
+            .height
+      };
+
+      resizeHandle.setPointerCapture?.(
+        event.pointerId
+      );
+
+      document.body.classList.add(
+        "people-dm-call-resizing"
+      );
+    }
+  );
+
+  resizeHandle.addEventListener(
+    "pointermove",
+    (event) => {
+      if (
+        !resizeState ||
+        resizeState.pointerId !==
+          event.pointerId
+      ) {
+        return;
+      }
+
+      pendingResizeHeight =
+        resizeState.startHeight +
+        (
+          event.clientY -
+          resizeState.startY
+        );
+
+      if (!resizeFrame) {
+        resizeFrame =
+          requestAnimationFrame(
+            flushResizeFrame
+          );
+      }
+    }
+  );
+
+  function endResize(event) {
+    if (!resizeState) {
+      return;
+    }
+
+    if (
+      event &&
+      resizeState.pointerId !==
+        event.pointerId
+    ) {
+      return;
+    }
+
+    if (resizeFrame) {
+      cancelAnimationFrame(
+        resizeFrame
+      );
+      resizeFrame = 0;
+    }
+
+    if (
+      pendingResizeHeight !==
+      null
+    ) {
+      applyHeight(
+        pendingResizeHeight
+      );
+      pendingResizeHeight =
+        null;
+    }
+
+    applyHeight(
+      currentInlineHeight,
+      {
+        save: true
+      }
+    );
+
+    try {
+      resizeHandle.releasePointerCapture?.(
+        resizeState.pointerId
+      );
+    } catch {}
+
+    resizeState = null;
+
+    document.body.classList.remove(
+      "people-dm-call-resizing"
+    );
+  }
+
+  resizeHandle.addEventListener(
+    "pointerup",
+    endResize
+  );
+
+  resizeHandle.addEventListener(
+    "pointercancel",
+    endResize
+  );
+
+  resizeHandle.addEventListener(
+    "dblclick",
+    () => {
+      applyHeight(
+        300,
+        {
+          save: true
+        }
+      );
+    }
+  );
+
+  window.addEventListener(
+    "resize",
+    () => {
+      applyHeight(
+        loadHeight()
+      );
+
+      constrainPip();
+    }
+  );
+
+  // ==========================================================
+  // 2. PLUS DE PANNEAU D'APPEL FLOTTANT UNE FOIS CONNECTÉ
+  // ==========================================================
+
+  function syncAwayCallPanel() {
+    const away =
+      callIsActive() &&
+      !currentDmMatchesCall();
+
+    overlay.classList.toggle(
+      "people-dm-call-away-active",
+      away
+    );
+  }
+
+  // ==========================================================
+  // 3. MINI VIDÉO FLOTTANTE UNIQUEMENT SI LA CAM DISTANTE EST ON
+  // ==========================================================
+
+  const pip =
+    document.createElement(
+      "section"
+    );
+
+  pip.id =
+    "peopleDmCallVideoPip";
+
+  pip.className =
+    "people-dm-call-video-pip hidden";
+
+  const pipHeader =
+    document.createElement(
+      "header"
+    );
+
+  pipHeader.className =
+    "people-dm-call-video-pip-header";
+
+  const pipTitle =
+    document.createElement(
+      "strong"
+    );
+
+  pipTitle.textContent =
+    "Caméra";
+
+  const pipClose =
+    document.createElement(
+      "button"
+    );
+
+  pipClose.type =
+    "button";
+
+  pipClose.className =
+    "people-dm-call-video-pip-close";
+
+  pipClose.title =
+    "Masquer la caméra";
+
+  pipClose.setAttribute(
+    "aria-label",
+    "Masquer la caméra"
+  );
+
+  pipClose.textContent =
+    "×";
+
+  pipHeader.append(
+    pipTitle,
+    pipClose
+  );
+
+  const pipVideo =
+    document.createElement(
+      "video"
+    );
+
+  pipVideo.className =
+    "people-dm-call-video-pip-video";
+
+  pipVideo.autoplay =
+    true;
+
+  pipVideo.muted =
+    true;
+
+  pipVideo.playsInline =
+    true;
+
+  pip.append(
+    pipHeader,
+    pipVideo
+  );
+
+  document.body.appendChild(
+    pip
+  );
+
+  let pipDismissed =
+    false;
+
+  let previousRemoteCamera =
+    false;
+
+  let dragState = null;
+  let dragFrame = 0;
+  let pendingDragPosition = null;
+
+  function flushDragFrame() {
+    dragFrame = 0;
+
+    if (!pendingDragPosition) {
+      return;
+    }
+
+    const {
+      left,
+      top
+    } =
+      pendingDragPosition;
+
+    pendingDragPosition =
+      null;
+
+    pip.style.left =
+      left + "px";
+
+    pip.style.top =
+      top + "px";
+
+    pip.style.right =
+      "auto";
+
+    pip.style.bottom =
+      "auto";
+  }
+
+  function syncPipVideoSource(
+    enabled
+  ) {
+    const source =
+      enabled
+        ? remoteVideo.srcObject
+        : null;
+
+    if (
+      source &&
+      pipVideo.srcObject !==
+        source
+    ) {
+      pipVideo.srcObject =
+        source;
+
+      pipVideo
+        .play()
+        .catch(() => {});
+      return;
+    }
+
+    if (
+      !source &&
+      pipVideo.srcObject
+    ) {
+      try {
+        pipVideo.pause();
+        pipVideo.srcObject =
+          null;
+      } catch {}
+    }
+  }
+
+  function constrainPip() {
+    if (
+      pip.classList
+        .contains(
+          "hidden"
+        )
+    ) {
+      return;
+    }
+
+    const rect =
+      pip.getBoundingClientRect();
+
+    const maxLeft =
+      Math.max(
+        8,
+        window.innerWidth -
+        rect.width -
+        8
+      );
+
+    const maxTop =
+      Math.max(
+        8,
+        window.innerHeight -
+        rect.height -
+        8
+      );
+
+    const left =
+      Math.max(
+        8,
+        Math.min(
+          maxLeft,
+          rect.left
+        )
+      );
+
+    const top =
+      Math.max(
+        8,
+        Math.min(
+          maxTop,
+          rect.top
+        )
+      );
+
+    pip.style.left =
+      left + "px";
+
+    pip.style.top =
+      top + "px";
+
+    pip.style.right =
+      "auto";
+
+    pip.style.bottom =
+      "auto";
+  }
+
+  function resetPipPosition() {
+    pip.style.left =
+      "";
+
+    pip.style.top =
+      "";
+
+    pip.style.right =
+      "";
+
+    pip.style.bottom =
+      "";
+  }
+
+  function syncPip() {
+    const remoteCamera =
+      remoteCameraIsActive();
+
+    if (
+      remoteCamera &&
+      !previousRemoteCamera
+    ) {
+      /*
+        Nouvelle activation de caméra :
+        même si l'ancien popup avait été fermé,
+        on le repropose.
+      */
+      pipDismissed =
+        false;
+
+      resetPipPosition();
+    }
+
+    previousRemoteCamera =
+      remoteCamera;
+
+    const shouldShow =
+      remoteCamera &&
+      !currentDmMatchesCall() &&
+      !pipDismissed;
+
+    pip.classList.toggle(
+      "hidden",
+      !shouldShow
+    );
+
+    /*
+      Important perf : quand le PIP est caché, on ne garde pas
+      une deuxième balise <video> en train de décoder le même
+      flux distant que la vidéo principale.
+    */
+    syncPipVideoSource(
+      shouldShow
+    );
+
+    pipTitle.textContent =
+      callName.textContent
+        ? (
+            "Caméra • " +
+            callName.textContent
+          )
+        : "Caméra";
+
+    if (shouldShow) {
+      requestAnimationFrame(
+        constrainPip
+      );
+    }
+  }
+
+  pipClose.addEventListener(
+    "click",
+    (event) => {
+      event.stopPropagation();
+
+      pipDismissed =
+        true;
+
+      syncPip();
+    }
+  );
+
+  pipHeader.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (
+        event.target ===
+        pipClose
+      ) {
+        return;
+      }
+
+      const rect =
+        pip.getBoundingClientRect();
+
+      dragState = {
+        pointerId:
+          event.pointerId,
+        offsetX:
+          event.clientX -
+          rect.left,
+        offsetY:
+          event.clientY -
+          rect.top,
+        width:
+          rect.width,
+        height:
+          rect.height
+      };
+
+      pipHeader.setPointerCapture?.(
+        event.pointerId
+      );
+
+      pip.classList.add(
+        "dragging"
+      );
+
+      event.preventDefault();
+    }
+  );
+
+  pipHeader.addEventListener(
+    "pointermove",
+    (event) => {
+      if (
+        !dragState ||
+        dragState.pointerId !==
+          event.pointerId
+      ) {
+        return;
+      }
+
+      const maxLeft =
+        Math.max(
+          8,
+          window.innerWidth -
+          dragState.width -
+          8
+        );
+
+      const maxTop =
+        Math.max(
+          8,
+          window.innerHeight -
+          dragState.height -
+          8
+        );
+
+      pendingDragPosition = {
+        left:
+          Math.max(
+            8,
+            Math.min(
+              maxLeft,
+              event.clientX -
+              dragState.offsetX
+            )
+          ),
+        top:
+          Math.max(
+            8,
+            Math.min(
+              maxTop,
+              event.clientY -
+              dragState.offsetY
+            )
+          )
+      };
+
+      if (!dragFrame) {
+        dragFrame =
+          requestAnimationFrame(
+            flushDragFrame
+          );
+      }
+    }
+  );
+
+  function endDrag(event) {
+    if (
+      !dragState ||
+      (
+        event &&
+        dragState.pointerId !==
+          event.pointerId
+      )
+    ) {
+      return;
+    }
+
+    if (dragFrame) {
+      cancelAnimationFrame(
+        dragFrame
+      );
+      dragFrame = 0;
+    }
+
+    flushDragFrame();
+
+    try {
+      pipHeader.releasePointerCapture?.(
+        dragState.pointerId
+      );
+    } catch {}
+
+    dragState = null;
+
+    pip.classList.remove(
+      "dragging"
+    );
+  }
+
+  pipHeader.addEventListener(
+    "pointerup",
+    endDrag
+  );
+
+  pipHeader.addEventListener(
+    "pointercancel",
+    endDrag
+  );
+
+  // ==========================================================
+  // 4. OBSERVATEURS CIBLÉS UNIQUEMENT
+  // ==========================================================
+
+  let scheduled =
+    false;
+
+  function syncAll() {
+    scheduled =
+      false;
+
+    syncAwayCallPanel();
+    syncPip();
+  }
+
+  function scheduleSync() {
+    if (scheduled) {
+      return;
+    }
+
+    scheduled =
+      true;
+
+    requestAnimationFrame(
+      syncAll
+    );
+  }
+
+  const stateObserver =
+    new MutationObserver(
+      scheduleSync
+    );
+
+  /*
+    Les changements internes de l'appel sont publiés par V1 via
+    people-dm-call-state. Ici on observe seulement la navigation
+    dans les MP, car elle appartient au reste de l'application.
+  */
+  stateObserver.observe(
+    dmView,
+    {
+      attributes: true,
+      attributeFilter: [
+        "class"
+      ]
+    }
+  );
+
+  stateObserver.observe(
+    dmHeaderName,
+    {
+      childList: true,
+      subtree: true,
+      characterData: true
+    }
+  );
+
+  window.addEventListener(
+    "people-dm-call-state",
+    scheduleSync
+  );
+
+  scheduleSync();
+
+  // === PEOPLE_DM_CALLS_V3_CLIENT_END ===
 })();

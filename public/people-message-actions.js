@@ -1,9 +1,19 @@
 (() => {
   let menu = null;
+  const contextBindings = new WeakMap();
+  const WHITESPACE_RE = /\s+/g;
+
+  function escapeAttributeValue(value) {
+    return String(value)
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\r/g, "\\D ")
+      .replace(/\n/g, "\\A ");
+  }
 
   function cleanText(value, max = 110) {
     const text = String(value || "")
-      .replace(/\s+/g, " ")
+      .replace(WHITESPACE_RE, " ")
       .trim();
 
     if (!text) return "";
@@ -149,13 +159,11 @@
   ) {
     if (!element) return;
 
-    element.addEventListener(
-      "contextmenu",
-      (event) =>
-        showMenu(
-          event,
-          options
-        )
+    // Keep the latest actions for this message without
+    // installing one contextmenu listener per message.
+    contextBindings.set(
+      element,
+      options || {}
     );
   }
 
@@ -166,16 +174,10 @@
     if (!wanted) return;
 
     const target =
-      Array.from(
-        document.querySelectorAll(
-          "[data-message-id]"
-        )
-      ).find(
-        (element) =>
-          String(
-            element.dataset
-              .messageId || ""
-          ) === wanted
+      document.querySelector(
+        `[data-message-id="${escapeAttributeValue(
+          wanted
+        )}"]`
       );
 
     if (!target) return;
@@ -240,15 +242,7 @@
 
     box.append(author, text);
 
-    if (!reply.deleted) {
-      box.addEventListener(
-        "click",
-        () =>
-          scrollToMessage(
-            reply.id
-          )
-      );
-    } else {
+    if (reply.deleted) {
       box.disabled = true;
     }
 
@@ -263,18 +257,11 @@
 
     document
       .querySelectorAll(
-        "[data-reply-target-id]"
+        `.people-message-reply-preview[data-reply-target-id="${escapeAttributeValue(
+          wanted
+        )}"]`
       )
       .forEach((box) => {
-        if (
-          String(
-            box.dataset
-              .replyTargetId || ""
-          ) !== wanted
-        ) {
-          return;
-        }
-
         const author =
           box.querySelector("strong");
 
@@ -292,11 +279,6 @@
         }
 
         box.disabled = true;
-
-        const clone =
-          box.cloneNode(true);
-
-        box.replaceWith(clone);
       });
   }
 
@@ -431,6 +413,56 @@
   }
 
   document.addEventListener(
+    "contextmenu",
+    (event) => {
+      let element =
+        event.target instanceof Element
+          ? event.target
+          : null;
+
+      while (element) {
+        const options =
+          contextBindings.get(element);
+
+        if (options) {
+          showMenu(
+            event,
+            options
+          );
+          return;
+        }
+
+        element =
+          element.parentElement;
+      }
+    }
+  );
+
+  document.addEventListener(
+    "click",
+    (event) => {
+      const preview =
+        event.target instanceof Element
+          ? event.target.closest(
+              ".people-message-reply-preview[data-reply-target-id]"
+            )
+          : null;
+
+      if (
+        !preview ||
+        preview.disabled
+      ) {
+        return;
+      }
+
+      scrollToMessage(
+        preview.dataset
+          .replyTargetId
+      );
+    }
+  );
+
+  document.addEventListener(
     "pointerdown",
     (event) => {
       if (
@@ -467,7 +499,10 @@
   document.addEventListener(
     "scroll",
     closeMenu,
-    true
+    {
+      capture: true,
+      passive: true
+    }
   );
 
   window.PeopleMessageActions = {
