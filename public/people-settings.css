@@ -50,15 +50,19 @@
 .people-settings-backdrop {
   position: absolute;
   inset: 0;
+  /*
+    Un blur plein écran force le navigateur
+    à recomposer tout ce qui se trouve derrière
+    la modale. Une teinte légèrement plus opaque
+    garde le contraste sans ce coût GPU.
+  */
   background:
     rgba(
       4,
       3,
       8,
-      .76
+      .84
     );
-  backdrop-filter:
-    blur(6px);
 }
 
 .people-settings-shell {

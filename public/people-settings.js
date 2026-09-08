@@ -94,6 +94,9 @@
   let audioContext = null;
 
   function ensureAudio() {
+    let created =
+      false;
+
     try {
       if (!audioContext) {
         const AudioCtx =
@@ -103,6 +106,9 @@
         if (AudioCtx) {
           audioContext =
             new AudioCtx();
+
+          created =
+            true;
         }
       }
 
@@ -118,7 +124,14 @@
       }
     } catch {}
 
+    /*
+      Le routage de sortie n'a besoin
+      d'être appliqué qu'à la création.
+      Un changement ultérieur de sortie
+      passe déjà par applyOutputToAll().
+    */
     if (
+      created &&
       audioContext
     ) {
       void window.PeopleAudioDevices
@@ -306,9 +319,23 @@
     setInputId(
       value
     ) {
+      const next =
+        String(
+          value || ""
+        );
+
+      if (
+        audioDeviceValue(
+          "input"
+        ) ===
+        next
+      ) {
+        return;
+      }
+
       saveAudioDeviceValue(
         "input",
-        value
+        next
       );
 
       window.dispatchEvent(
@@ -317,9 +344,7 @@
           {
             detail: {
               deviceId:
-                String(
-                  value || ""
-                )
+                next
             }
           }
         )
@@ -329,9 +354,23 @@
     setOutputId(
       value
     ) {
+      const next =
+        String(
+          value || ""
+        );
+
+      if (
+        audioDeviceValue(
+          "output"
+        ) ===
+        next
+      ) {
+        return;
+      }
+
       saveAudioDeviceValue(
         "output",
-        value
+        next
       );
 
       void applyOutputToAll();
@@ -342,9 +381,7 @@
           {
             detail: {
               deviceId:
-                String(
-                  value || ""
-                )
+                next
             }
           }
         )
@@ -842,9 +879,64 @@
     }
   };
 
+  let audioUnlockBound =
+    true;
+
+  function removeAudioUnlockListeners() {
+    if (!audioUnlockBound) {
+      return;
+    }
+
+    audioUnlockBound =
+      false;
+
+    document.removeEventListener(
+      "pointerdown",
+      unlockAudioFromGesture
+    );
+
+    document.removeEventListener(
+      "keydown",
+      unlockAudioFromGesture
+    );
+  }
+
+  function unlockAudioFromGesture() {
+    const ctx =
+      ensureAudio();
+
+    if (!ctx) {
+      removeAudioUnlockListeners();
+      return;
+    }
+
+    if (
+      ctx.state ===
+      "running"
+    ) {
+      removeAudioUnlockListeners();
+      return;
+    }
+
+    ctx.resume?.()
+      .then(
+        () => {
+          if (
+            ctx.state ===
+            "running"
+          ) {
+            removeAudioUnlockListeners();
+          }
+        }
+      )
+      .catch(
+        () => {}
+      );
+  }
+
   document.addEventListener(
     "pointerdown",
-    ensureAudio,
+    unlockAudioFromGesture,
     {
       passive: true
     }
@@ -852,7 +944,7 @@
 
   document.addEventListener(
     "keydown",
-    ensureAudio
+    unlockAudioFromGesture
   );
 
   // ==========================================================
@@ -1423,13 +1515,17 @@
     setStatus("");
 
     try {
-      const meData =
-        await api(
-          "/api/auth/me"
-        );
+      if (
+        !currentUser?.username
+      ) {
+        const meData =
+          await api(
+            "/api/auth/me"
+          );
 
-      currentUser =
-        meData.user;
+        currentUser =
+          meData.user;
+      }
 
       if (
         !currentUser?.username
@@ -1501,7 +1597,7 @@
       "people-settings-open"
     );
 
-    renderSounds();
+    updateSoundSelections();
 
     void refreshAudioDevices(
       false
@@ -1806,8 +1902,8 @@
             ?.getOutputId?.() ||
           "";
 
-    select.innerHTML =
-      "";
+    const fragment =
+      document.createDocumentFragment();
 
     const fallback =
       document.createElement(
@@ -1823,7 +1919,7 @@
         ? "Microphone par défaut"
         : "Sortie par défaut";
 
-    select.appendChild(
+    fragment.appendChild(
       fallback
     );
 
@@ -1873,19 +1969,16 @@
       visibleIndex +=
         1;
 
-      select.appendChild(
+      fragment.appendChild(
         option
       );
     }
 
     const stillExists =
       !selected ||
-      [...select.options]
-        .some(
-          (option) =>
-            option.value ===
-            selected
-        );
+      unique.has(
+        selected
+      );
 
     if (!stillExists) {
       if (
@@ -1904,13 +1997,17 @@
       }
     }
 
+    select.replaceChildren(
+      fragment
+    );
+
     select.value =
       stillExists
         ? selected
         : "";
   }
 
-  async function refreshAudioDevices(
+  async function performAudioDeviceRefresh(
     requestPermission = false
   ) {
     if (
@@ -2055,6 +2152,32 @@
     }
   }
 
+  let audioDeviceRefreshPromise =
+    null;
+
+  function refreshAudioDevices(
+    requestPermission = false
+  ) {
+    if (
+      audioDeviceRefreshPromise
+    ) {
+      return audioDeviceRefreshPromise;
+    }
+
+    audioDeviceRefreshPromise =
+      performAudioDeviceRefresh(
+        requestPermission
+      )
+        .finally(
+          () => {
+            audioDeviceRefreshPromise =
+              null;
+          }
+        );
+
+    return audioDeviceRefreshPromise;
+  }
+
   audioInputSelect
     ?.addEventListener(
       "change",
@@ -2134,19 +2257,11 @@
     card.className =
       "people-settings-sound-card";
 
-    const selected =
-      kind ===
-        "ringtone"
-        ? window.PeopleSounds
-            .getRingtone()
-        : window.PeopleSounds
-            .getNotificationSound();
+    card.dataset.soundId =
+      sound.id;
 
-    card.classList.toggle(
-      "selected",
-      sound.id ===
-        selected
-    );
+    card.dataset.soundKind =
+      kind;
 
     card.innerHTML = `
       <span
@@ -2176,85 +2291,178 @@
     ).textContent =
       sound.description;
 
-    card.addEventListener(
-      "click",
-      (event) => {
-        const preview =
-          event.target instanceof
-          Element
-            ? event.target.closest(
-                ".people-settings-sound-preview"
-              )
-            : null;
-
-        if (
-          kind ===
-          "ringtone"
-        ) {
-          window.PeopleSounds
-            .setRingtone(
-              sound.id
-            );
-
-          window.PeopleSounds
-            .playRingtonePulse(
-              "incoming",
-              sound.id
-            );
-        } else {
-          window.PeopleSounds
-            .setNotificationSound(
-              sound.id
-            );
-
-          window.PeopleSounds
-            .playNotification(
-              sound.id
-            );
-        }
-
-        renderSounds();
-
-        if (preview) {
-          event.stopPropagation();
-        }
-      }
-    );
-
     return card;
   }
 
-  function renderSounds() {
-    ringtones.innerHTML =
-      "";
+  function updateSoundSelections() {
+    const ringtoneId =
+      window.PeopleSounds
+        .getRingtone();
 
-    notifications.innerHTML =
-      "";
+    const notificationId =
+      window.PeopleSounds
+        .getNotificationSound();
+
+    for (
+      const card of
+      ringtones.querySelectorAll(
+        ".people-settings-sound-card"
+      )
+    ) {
+      card.classList.toggle(
+        "selected",
+        card.dataset
+          .soundId ===
+          ringtoneId
+      );
+    }
+
+    for (
+      const card of
+      notifications.querySelectorAll(
+        ".people-settings-sound-card"
+      )
+    ) {
+      card.classList.toggle(
+        "selected",
+        card.dataset
+          .soundId ===
+          notificationId
+      );
+    }
+  }
+
+  function renderSounds() {
+    const ringtoneFragment =
+      document.createDocumentFragment();
+
+    const notificationFragment =
+      document.createDocumentFragment();
 
     for (
       const sound of
       RINGTONES
     ) {
-      ringtones.appendChild(
-        soundCard(
-          sound,
-          "ringtone"
-        )
-      );
+      ringtoneFragment
+        .appendChild(
+          soundCard(
+            sound,
+            "ringtone"
+          )
+        );
     }
 
     for (
       const sound of
       NOTIFICATION_SOUNDS
     ) {
-      notifications.appendChild(
-        soundCard(
-          sound,
-          "notification"
-        )
+      notificationFragment
+        .appendChild(
+          soundCard(
+            sound,
+            "notification"
+          )
+        );
+    }
+
+    ringtones.replaceChildren(
+      ringtoneFragment
+    );
+
+    notifications.replaceChildren(
+      notificationFragment
+    );
+
+    updateSoundSelections();
+  }
+
+  function handleSoundClick(
+    event,
+    kind,
+    container
+  ) {
+    const target =
+      event.target instanceof
+      Element
+        ? event.target
+        : null;
+
+    const card =
+      target?.closest(
+        ".people-settings-sound-card"
+      );
+
+    if (
+      !card ||
+      !container.contains(
+        card
+      )
+    ) {
+      return;
+    }
+
+    const soundId =
+      card.dataset.soundId ||
+      "";
+
+    if (
+      kind ===
+      "ringtone"
+    ) {
+      if (
+        !window.PeopleSounds
+          .setRingtone(
+            soundId
+          )
+      ) {
+        return;
+      }
+
+      window.PeopleSounds
+        .playRingtonePulse(
+          "incoming",
+          soundId
+        );
+    } else {
+      if (
+        !window.PeopleSounds
+          .setNotificationSound(
+            soundId
+          )
+      ) {
+        return;
+      }
+
+      window.PeopleSounds
+        .playNotification(
+          soundId
+        );
+    }
+
+    updateSoundSelections();
+  }
+
+  ringtones.addEventListener(
+    "click",
+    (event) => {
+      handleSoundClick(
+        event,
+        "ringtone",
+        ringtones
       );
     }
-  }
+  );
+
+  notifications.addEventListener(
+    "click",
+    (event) => {
+      handleSoundClick(
+        event,
+        "notification",
+        notifications
+      );
+    }
+  );
 
   renderSounds();
 
