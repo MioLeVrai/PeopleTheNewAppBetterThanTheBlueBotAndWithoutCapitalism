@@ -29,20 +29,26 @@
   }
 
   const rtcConfig = {
-    iceServers: [
-      {
-        urls:
-          "stun:stun.l.google.com:19302"
-      },
-      {
-        urls:
-          "stun:stun1.l.google.com:19302"
-      },
-      {
-        urls:
-          "stun:stun.cloudflare.com:3478"
-      }
-    ],
+    iceServers:
+      Array.isArray(
+        window.PEOPLE_RTC_ICE_SERVERS
+      ) &&
+      window.PEOPLE_RTC_ICE_SERVERS.length
+        ? window.PEOPLE_RTC_ICE_SERVERS
+        : [
+            {
+              urls:
+                "stun:stun.l.google.com:19302"
+            },
+            {
+              urls:
+                "stun:stun1.l.google.com:19302"
+            },
+            {
+              urls:
+                "stun:stun.cloudflare.com:3478"
+            }
+          ],
     iceCandidatePoolSize: 10
   };
 
@@ -54,6 +60,9 @@
   let micMuted = false;
   let cameraEnabled = false;
   let pendingIce = [];
+  let localAudioRequest = null;
+  let connectionWatchTimer = null;
+  let iceRestartTimer = null;
 
   let audioContext = null;
   let ringingTimer = null;
@@ -821,7 +830,50 @@
     }
   }
 
-  async function ensureLocalAudio() {
+  function ensureEmptyLocalStream() {
+    if (!localStream) {
+      localStream =
+        new MediaStream();
+    }
+
+    return localStream;
+  }
+
+  function scheduleAudioRenegotiation() {
+    if (
+      !call ||
+      !peer ||
+      !peer.localDescription ||
+      !peer.remoteDescription
+    ) {
+      return;
+    }
+
+    setTimeout(
+      () => {
+        if (
+          !call ||
+          !peer ||
+          peer.signalingState !==
+            "stable"
+        ) {
+          return;
+        }
+
+        void sendOffer().catch(
+          (err) => {
+            console.warn(
+              "[People appel MP/renegociation audio]",
+              err
+            );
+          }
+        );
+      },
+      0
+    );
+  }
+
+  function requestLocalAudio() {
     const liveAudio =
       localStream
         ?.getAudioTracks()
@@ -835,67 +887,170 @@
       liveAudio.enabled =
         !micMuted;
 
-      return localStream;
+      return Promise.resolve(
+        localStream
+      );
     }
 
-    try {
-      const stream =
-        await navigator
-          .mediaDevices
-          .getUserMedia({
-            audio:
-              window.PeopleAudioDevices
-                ?.getInputConstraints?.() ||
-              {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                channelCount: 1
-              },
-            video: false
-          });
+    if (localAudioRequest) {
+      return localAudioRequest;
+    }
 
-      if (!localStream) {
-        localStream =
-          new MediaStream();
-      }
+    localAudioRequest =
+      (async () => {
+        try {
+          const stream =
+            await navigator
+              .mediaDevices
+              .getUserMedia({
+                audio:
+                  window.PeopleAudioDevices
+                    ?.getInputConstraints?.() ||
+                  {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    channelCount: 1
+                  },
+                video: false
+              });
 
-      for (
-        const track of
-        stream.getAudioTracks()
-      ) {
-        track.enabled =
-          !micMuted;
+          ensureEmptyLocalStream();
 
-        localStream.addTrack(
-          track
-        );
+          let addedToPeer = false;
 
-        if (peer) {
-          peer.addTrack(
-            track,
-            localStream
+          for (
+            const track of
+            stream.getAudioTracks()
+          ) {
+            track.enabled =
+              !micMuted;
+
+            const duplicate =
+              localStream
+                .getAudioTracks()
+                .some(
+                  (current) =>
+                    current.id ===
+                    track.id
+                );
+
+            if (duplicate) {
+              continue;
+            }
+
+            localStream.addTrack(
+              track
+            );
+
+            if (peer) {
+              const currentSender =
+                peer
+                  .getSenders()
+                  .find(
+                    (sender) =>
+                      sender.track
+                        ?.kind ===
+                      "audio"
+                  );
+
+              if (currentSender) {
+                await currentSender
+                  .replaceTrack(
+                    track
+                  );
+              } else {
+                peer.addTrack(
+                  track,
+                  localStream
+                );
+
+                addedToPeer = true;
+              }
+            }
+          }
+
+          if (addedToPeer) {
+            scheduleAudioRenegotiation();
+          }
+
+          return localStream;
+        } catch (err) {
+          console.warn(
+            "[People appel MP/micro]",
+            err
           );
+
+          setStatus(
+            "Micro indisponible — tu peux quand même écouter"
+          );
+
+          return ensureEmptyLocalStream();
+        } finally {
+          localAudioRequest = null;
         }
+      })();
+
+    return localAudioRequest;
+  }
+
+  async function ensureLocalAudio(
+    timeoutMs = 4500
+  ) {
+    const request =
+      requestLocalAudio();
+
+    if (
+      !Number.isFinite(
+        timeoutMs
+      ) ||
+      timeoutMs <= 0
+    ) {
+      return request;
+    }
+
+    let timer = null;
+
+    try {
+      const result =
+        await Promise.race([
+          request.then(
+            (stream) => ({
+              done: true,
+              stream
+            })
+          ),
+          new Promise(
+            (resolve) => {
+              timer = setTimeout(
+                () =>
+                  resolve({
+                    done: false,
+                    stream: null
+                  }),
+                timeoutMs
+              );
+            }
+          )
+        ]);
+
+      if (result.done) {
+        return result.stream;
       }
 
-      return localStream;
-    } catch (err) {
       console.warn(
-        "[People appel MP/micro]",
-        err
+        "[People appel MP/micro] délai dépassé, connexion sans attendre le micro"
       );
 
       setStatus(
-        "Micro indisponible — tu peux quand même écouter"
+        "Connexion… micro en attente"
       );
 
-      if (!localStream) {
-        localStream =
-          new MediaStream();
+      return ensureEmptyLocalStream();
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
       }
-
-      return localStream;
     }
   }
 
@@ -964,6 +1119,14 @@
           return;
         }
 
+        const candidate =
+          typeof event.candidate
+            .toJSON ===
+          "function"
+            ? event.candidate
+                .toJSON()
+            : event.candidate;
+
         socket.emit(
           "dm-call-webrtc-ice",
           {
@@ -971,9 +1134,31 @@
               call.id,
             target:
               call.peerSocketId,
-            candidate:
-              event.candidate
+            candidate
           }
+        );
+      };
+
+    peer.onicecandidateerror =
+      (event) => {
+        console.warn(
+          "[People appel MP/ICE candidate]",
+          event?.errorCode ||
+            "",
+          event?.errorText ||
+            ""
+        );
+      };
+
+    peer.oniceconnectionstatechange =
+      () => {
+        if (!peer) {
+          return;
+        }
+
+        console.info(
+          "[People appel MP/ICE]",
+          peer.iceConnectionState
         );
       };
 
@@ -986,10 +1171,22 @@
         const state =
           peer.connectionState;
 
+        console.info(
+          "[People appel MP/connexion]",
+          state
+        );
+
         if (
           state ===
           "connected"
         ) {
+          if (connectionWatchTimer) {
+            clearTimeout(
+              connectionWatchTimer
+            );
+            connectionWatchTimer = null;
+          }
+
           setStatus(
             "Appel en cours"
           );
@@ -997,7 +1194,45 @@
 
         if (
           state ===
-            "failed" ||
+            "failed"
+        ) {
+          setStatus(
+            "Connexion impossible — nouvelle tentative…"
+          );
+
+          if (
+            call?.initiator &&
+            !iceRestartTimer
+          ) {
+            iceRestartTimer =
+              setTimeout(
+                () => {
+                  iceRestartTimer = null;
+
+                  if (
+                    !call ||
+                    !peer ||
+                    peer.signalingState !==
+                      "stable"
+                  ) {
+                    return;
+                  }
+
+                  void sendOffer(
+                    true
+                  ).catch(
+                    (err) => {
+                      console.warn(
+                        "[People appel MP/ICE restart]",
+                        err
+                      );
+                    }
+                  );
+                },
+                500
+              );
+          }
+        } else if (
           state ===
             "disconnected"
         ) {
@@ -1036,7 +1271,9 @@
     }
   }
 
-  async function sendOffer() {
+  async function sendOffer(
+    iceRestart = false
+  ) {
     if (
       !call?.id ||
       !call?.peerSocketId
@@ -1057,7 +1294,11 @@
     const offer =
       await pc.createOffer({
         offerToReceiveAudio: true,
-        offerToReceiveVideo: true
+        offerToReceiveVideo: true,
+        iceRestart:
+          Boolean(
+            iceRestart
+          )
       });
 
     await pc.setLocalDescription(
@@ -1071,8 +1312,14 @@
           call.id,
         target:
           call.peerSocketId,
-        sdp:
-          pc.localDescription
+        sdp: {
+          type:
+            pc.localDescription
+              .type,
+          sdp:
+            pc.localDescription
+              .sdp
+        }
       }
     );
   }
@@ -1132,8 +1379,14 @@
             call.id,
           target:
             call.peerSocketId,
-          sdp:
-            pc.localDescription
+          sdp: {
+            type:
+              pc.localDescription
+                .type,
+            sdp:
+              pc.localDescription
+                .sdp
+          }
         }
       );
     } catch (err) {
@@ -1520,6 +1773,20 @@
   }
 
   function stopMedia() {
+    if (connectionWatchTimer) {
+      clearTimeout(
+        connectionWatchTimer
+      );
+      connectionWatchTimer = null;
+    }
+
+    if (iceRestartTimer) {
+      clearTimeout(
+        iceRestartTimer
+      );
+      iceRestartTimer = null;
+    }
+
     if (peer) {
       try {
         peer.ontrack = null;
@@ -1751,6 +2018,11 @@
         payload?.peerCamera
       );
 
+    call.initiator =
+      Boolean(
+        payload?.initiator
+      );
+
     setStatus(
       "Connexion…"
     );
@@ -1759,9 +2031,48 @@
       "active"
     );
 
-    await ensureLocalAudio();
+    await ensureLocalAudio(
+      4500
+    );
 
     createPeer();
+
+    if (connectionWatchTimer) {
+      clearTimeout(
+        connectionWatchTimer
+      );
+    }
+
+    connectionWatchTimer =
+      setTimeout(
+        () => {
+          if (
+            call &&
+            peer &&
+            peer.connectionState !==
+              "connected"
+          ) {
+            setStatus(
+              "Connexion réseau impossible — vérifie le réseau/TURN"
+            );
+
+            console.warn(
+              "[People appel MP] connexion non établie",
+              {
+                connectionState:
+                  peer.connectionState,
+                iceConnectionState:
+                  peer.iceConnectionState,
+                iceGatheringState:
+                  peer.iceGatheringState,
+                signalingState:
+                  peer.signalingState
+              }
+            );
+          }
+        },
+        12000
+      );
 
     socket.emit(
       "dm-call-media-state",
@@ -1912,7 +2223,12 @@
       acceptButton.disabled =
         true;
 
-      await ensureLocalAudio();
+      /*
+        Ne jamais bloquer l'acceptation de l'appel sur
+        getUserMedia(). Une permission micro lente pouvait
+        laisser l'autre client sonner indéfiniment.
+      */
+      void requestLocalAudio();
 
       socket.emit(
         "dm-call-answer",
