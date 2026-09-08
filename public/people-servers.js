@@ -168,6 +168,279 @@
     return data;
   }
 
+  // === PEOPLE_BROWSER_HISTORY_V1_START ===
+  const PEOPLE_HISTORY_KEY =
+    "peopleNavigationV1";
+
+  let peopleHistoryRestoring =
+    false;
+
+  function peopleHistoryEntry(
+    state
+  ) {
+    return (
+      state &&
+      typeof state ===
+        "object"
+        ? state[
+            PEOPLE_HISTORY_KEY
+          ]
+        : null
+    );
+  }
+
+  function peopleHistorySame(
+    left,
+    right
+  ) {
+    if (
+      !left ||
+      !right ||
+      left.view !==
+        right.view
+    ) {
+      return false;
+    }
+
+    if (
+      left.view ===
+        "dm"
+    ) {
+      return (
+        String(
+          left.username ||
+          ""
+        ) ===
+        String(
+          right.username ||
+          ""
+        )
+      );
+    }
+
+    if (
+      left.view ===
+        "server"
+    ) {
+      return (
+        String(
+          left.serverId ||
+          ""
+        ) ===
+        String(
+          right.serverId ||
+          ""
+        )
+      );
+    }
+
+    return true;
+  }
+
+  function peopleHistoryState(
+    entry
+  ) {
+    const base =
+      history.state &&
+      typeof history.state ===
+        "object"
+        ? {
+            ...history.state
+          }
+        : {};
+
+    base[
+      PEOPLE_HISTORY_KEY
+    ] = entry;
+
+    return base;
+  }
+
+  function peopleHistoryReplace(
+    entry
+  ) {
+    if (
+      !entry?.view
+    ) {
+      return;
+    }
+
+    history.replaceState(
+      peopleHistoryState(
+        entry
+      ),
+      "",
+      location.href
+    );
+  }
+
+  function peopleHistoryPush(
+    entry
+  ) {
+    if (
+      peopleHistoryRestoring ||
+      !authenticated ||
+      !entry?.view
+    ) {
+      return;
+    }
+
+    const current =
+      peopleHistoryEntry(
+        history.state
+      );
+
+    if (
+      peopleHistorySame(
+        current,
+        entry
+      )
+    ) {
+      return;
+    }
+
+    /*
+      Première vue People de l'onglet :
+      on initialise l'entrée courante au lieu de créer
+      artificiellement une page "vide" derrière.
+    */
+    if (!current) {
+      peopleHistoryReplace(
+        entry
+      );
+
+      return;
+    }
+
+    history.pushState(
+      peopleHistoryState(
+        entry
+      ),
+      "",
+      location.href
+    );
+  }
+
+  async function peopleHistoryRestore(
+    entry
+  ) {
+    if (
+      !authenticated
+    ) {
+      return;
+    }
+
+    const target =
+      entry &&
+      typeof entry ===
+        "object"
+        ? entry
+        : {
+            view:
+              "friends"
+          };
+
+    peopleHistoryRestoring =
+      true;
+
+    try {
+      if (
+        target.view ===
+          "dm" &&
+        target.username
+      ) {
+        await window
+          .PeopleSocialNavigation
+          ?.openDm?.(
+            String(
+              target.username
+            ),
+            {
+              history:
+                false
+            }
+          );
+
+        return;
+      }
+
+      if (
+        target.view ===
+          "server" &&
+        target.serverId
+      ) {
+        let server =
+          serverById.get(
+            String(
+              target.serverId
+            )
+          );
+
+        if (!server) {
+          await refreshServers();
+
+          server =
+            serverById.get(
+              String(
+                target.serverId
+              )
+            );
+        }
+
+        if (server) {
+          await openServer(
+            server,
+            {
+              history:
+                false
+            }
+          );
+
+          return;
+        }
+      }
+
+      viewingHome =
+        true;
+
+      updateRailSelection();
+
+      window
+        .PeopleSocialNavigation
+        ?.showFriends?.(
+          {
+            history:
+              false
+          }
+        );
+    } finally {
+      peopleHistoryRestoring =
+        false;
+    }
+  }
+
+  window.PeopleNavigationHistory = {
+    push:
+      peopleHistoryPush,
+    replace:
+      peopleHistoryReplace,
+    isRestoring() {
+      return peopleHistoryRestoring;
+    }
+  };
+
+  window.addEventListener(
+    "popstate",
+    (event) => {
+      void peopleHistoryRestore(
+        peopleHistoryEntry(
+          event.state
+        )
+      );
+    }
+  );
+  // === PEOPLE_BROWSER_HISTORY_V1_END ===
+
   function readInvitePath() {
     const match =
       location.pathname.match(
@@ -685,7 +958,8 @@
   }
 
   async function openServer(
-    server
+    server,
+    options = null
   ) {
     if (!server?.id) {
       return;
@@ -726,6 +1000,22 @@
         ?.setMode(
           "server"
         );
+
+      if (
+        options?.history !==
+          false
+      ) {
+        peopleHistoryPush(
+          {
+            view:
+              "server",
+            serverId:
+              String(
+                activeServer.id
+              )
+          }
+        );
+      }
     } catch (err) {
       alert(
         err.message
@@ -1132,7 +1422,19 @@
 
       window
         .PeopleSocialNavigation
-        ?.showFriends();
+        ?.showFriends(
+          {
+            history:
+              false
+          }
+        );
+
+      peopleHistoryReplace(
+        {
+          view:
+            "friends"
+        }
+      );
     }
   );
 

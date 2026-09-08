@@ -235,6 +235,25 @@
     } catch {}
   }
 
+  // === PEOPLE_BROWSER_HISTORY_SOCIAL_V1 ===
+  function peopleRecordBrowserNavigation(
+    entry,
+    options = null
+  ) {
+    if (
+      options?.history ===
+        false
+    ) {
+      return;
+    }
+
+    window
+      .PeopleNavigationHistory
+      ?.push?.(
+        entry
+      );
+  }
+
   function showFriends(options = null) {
     setMode("home");
     homeMain?.classList.remove("dm-open");
@@ -252,6 +271,14 @@
       .querySelectorAll(".dm-conversation-row.active")
       .forEach((row) => row.classList.remove("active"));
 
+    peopleRecordBrowserNavigation(
+      {
+        view:
+          "friends"
+      },
+      options
+    );
+
     if (options?.refresh === false) {
       return;
     }
@@ -265,7 +292,8 @@
 
   window.PeopleSocialNavigation = {
     setMode,
-    showFriends
+    showFriends,
+    openDm
   };
 
   // === PEOPLE_PROFILE_SOCIAL_EVERYWHERE_V3_START ===
@@ -2128,7 +2156,10 @@ function dmTextLine(
     }
   }
 
-  async function openDm(username) {
+  async function openDm(
+    username,
+    options = null
+  ) {
     if (!username) return;
 
     // === PEOPLE_DM_REOPEN_CLIENT_V1 ===
@@ -2167,6 +2198,18 @@ function dmTextLine(
     await loadActiveDm();
     renderConversationList();
     dmInput?.focus();
+
+    peopleRecordBrowserNavigation(
+      {
+        view:
+          "dm",
+        username:
+          String(
+            username
+          )
+      },
+      options
+    );
   }
 
   function closeProfile() {
