@@ -2,304 +2,177 @@
   "use strict";
 
   const BRAND = "People";
+  const SPACE_RE = /\s+/g;
+
+  let refs = {};
+  let pending = false;
 
   function clean(value) {
     return String(value || "")
-      .replace(/\s+/g, " ")
+      .replace(SPACE_RE, " ")
       .trim()
       .slice(0, 80);
   }
 
   function visible(element) {
-    if (!element) {
-      return false;
-    }
-
-    if (
-      element.classList.contains(
-        "hidden"
-      )
-    ) {
-      return false;
-    }
-
-    return (
-      element.getAttribute(
-        "aria-hidden"
-      ) !== "true"
+    return Boolean(
+      element &&
+      !element.classList.contains("hidden") &&
+      element.getAttribute("aria-hidden") !== "true"
     );
   }
 
   function setTitle(...parts) {
-    const values =
-      parts
-        .flat()
-        .map(clean)
-        .filter(Boolean);
+    const values = [];
 
-    if (
-      values[
-        values.length - 1
-      ] !== BRAND
-    ) {
+    for (const part of parts) {
+      const value = clean(part);
+      if (value) values.push(value);
+    }
+
+    if (values[values.length - 1] !== BRAND) {
       values.push(BRAND);
     }
 
-    const title =
-      values.join(" • ");
+    const title = values.join(" • ");
 
-    if (
-      document.title !== title
-    ) {
-      document.title =
-        title;
+    if (document.title !== title) {
+      document.title = title;
     }
   }
 
-  function detectView() {
-    const appShell =
-      document.getElementById(
-        "peopleAppShell"
-      );
+  function cacheRefs() {
+    refs = {
+      appShell: document.getElementById("peopleAppShell"),
+      peopleMain: document.getElementById("peopleMain"),
+      homeMain: document.getElementById("homeMain"),
+      dmView: document.getElementById("dmView"),
+      friendsView: document.getElementById("friendsView"),
+      activeServerName: document.getElementById("activeServerName"),
+      dmHeaderName: document.getElementById("dmHeaderName"),
+      homeMainTitle: document.getElementById("homeMainTitle")
+    };
+  }
 
-    /*
-      Écran connexion / inscription :
-      on laisse simplement People.
-    */
-    if (
-      !appShell ||
-      appShell.classList.contains(
-        "hidden"
-      )
-    ) {
+  function detectView() {
+    const {
+      appShell,
+      peopleMain,
+      homeMain,
+      dmView,
+      friendsView,
+      activeServerName,
+      dmHeaderName,
+      homeMainTitle
+    } = refs;
+
+    if (!appShell || appShell.classList.contains("hidden")) {
       setTitle(BRAND);
       return;
     }
 
-    const peopleMain =
-      document.getElementById(
-        "peopleMain"
-      );
-
-    const homeMain =
-      document.getElementById(
-        "homeMain"
-      );
-
-    /*
-      SERVEUR
-    */
-    if (
-      visible(peopleMain)
-    ) {
-      const activeServerName =
-        clean(
-          document
-            .getElementById(
-              "activeServerName"
-            )
-            ?.textContent
-        );
-
-      if (
-        activeServerName &&
-        activeServerName !==
-          "Serveur"
-      ) {
-        setTitle(
-          activeServerName
-        );
-
-        return;
-      }
+    if (visible(peopleMain)) {
+      const serverName = clean(activeServerName?.textContent);
 
       setTitle(
-        "Serveur"
+        serverName && serverName !== "Serveur"
+          ? serverName
+          : "Serveur"
       );
-
       return;
     }
 
-    /*
-      ACCUEIL / AMIS / MP
-    */
-    if (
-      visible(homeMain)
-    ) {
-      const dmView =
-        document.getElementById(
-          "dmView"
-        );
+    if (visible(homeMain)) {
+      if (visible(dmView)) {
+        const dmName = clean(dmHeaderName?.textContent);
 
-      const friendsView =
-        document.getElementById(
-          "friendsView"
-        );
-
-      if (
-        visible(dmView)
-      ) {
-        const dmName =
-          clean(
-            document
-              .getElementById(
-                "dmHeaderName"
-              )
-              ?.textContent
-          );
-
-        if (
-          dmName &&
-          dmName !==
-            "Message privé"
-        ) {
-          setTitle(
-            dmName,
-            "MP"
-          );
+        if (dmName && dmName !== "Message privé") {
+          setTitle(dmName, "MP");
         } else {
-          setTitle(
-            "MP"
-          );
+          setTitle("MP");
         }
-
         return;
       }
 
-      if (
-        visible(friendsView)
-      ) {
-        setTitle(
-          "Amis"
-        );
-
+      if (visible(friendsView)) {
+        setTitle("Amis");
         return;
       }
 
-      const homeTitle =
-        clean(
-          document
-            .getElementById(
-              "homeMainTitle"
-            )
-            ?.textContent
-        );
-
-      if (homeTitle) {
-        setTitle(
-          homeTitle
-        );
-      } else {
-        setTitle(
-          "Accueil"
-        );
-      }
-
+      setTitle(clean(homeMainTitle?.textContent) || "Accueil");
       return;
     }
 
-    setTitle(
-      "Accueil"
-    );
+    setTitle("Accueil");
   }
-
-  let pending =
-    false;
 
   function scheduleDetect() {
-    if (pending) {
-      return;
-    }
+    if (pending) return;
 
     pending = true;
-
-    requestAnimationFrame(
-      () => {
-        pending = false;
-        detectView();
-      }
-    );
+    requestAnimationFrame(() => {
+      pending = false;
+      detectView();
+    });
   }
 
-  const observer =
-    new MutationObserver(
-      scheduleDetect
-    );
+  const stateObserver = new MutationObserver(scheduleDetect);
+  const textObserver = new MutationObserver(scheduleDetect);
 
-  function start() {
-    observer.observe(
-      document.body,
-      {
+  function observeRelevantElements() {
+    const stateTargets = [
+      refs.appShell,
+      refs.peopleMain,
+      refs.homeMain,
+      refs.dmView,
+      refs.friendsView
+    ].filter(Boolean);
+
+    for (const target of stateTargets) {
+      stateObserver.observe(target, {
+        attributes: true,
+        attributeFilter: ["class", "aria-hidden"]
+      });
+    }
+
+    const textTargets = [
+      refs.activeServerName,
+      refs.dmHeaderName,
+      refs.homeMainTitle
+    ].filter(Boolean);
+
+    for (const target of textTargets) {
+      textObserver.observe(target, {
         subtree: true,
         childList: true,
-        attributes: true,
-        characterData: true,
-        attributeFilter: [
-          "class",
-          "aria-hidden"
-        ]
-      }
-    );
-
-    document.addEventListener(
-      "click",
-      scheduleDetect,
-      true
-    );
-
-    window.addEventListener(
-      "people-authenticated",
-      scheduleDetect
-    );
-
-    window.addEventListener(
-      "people-server-selected",
-      scheduleDetect
-    );
-
-    window.addEventListener(
-      "people-server-invalid",
-      scheduleDetect
-    );
-
-    window.addEventListener(
-      "popstate",
-      scheduleDetect
-    );
-
-    scheduleDetect();
-
-    setTimeout(
-      scheduleDetect,
-      100
-    );
-
-    setTimeout(
-      scheduleDetect,
-      400
-    );
+        characterData: true
+      });
+    }
   }
 
-  if (
-    document.readyState ===
-    "loading"
-  ) {
-    document.addEventListener(
-      "DOMContentLoaded",
-      start,
-      {
-        once: true
-      }
-    );
+  function start() {
+    cacheRefs();
+    observeRelevantElements();
+
+    // Certains changements de vue passent uniquement par des clics.
+    document.addEventListener("click", scheduleDetect, true);
+
+    window.addEventListener("people-authenticated", scheduleDetect);
+    window.addEventListener("people-server-selected", scheduleDetect);
+    window.addEventListener("people-server-invalid", scheduleDetect);
+    window.addEventListener("popstate", scheduleDetect);
+
+    scheduleDetect();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start, { once: true });
   } else {
     start();
   }
 
   window.PeoplePageTitle = {
-    refresh:
-      scheduleDetect,
-    detect:
-      detectView
+    refresh: scheduleDetect,
+    detect: detectView
   };
 })();
-

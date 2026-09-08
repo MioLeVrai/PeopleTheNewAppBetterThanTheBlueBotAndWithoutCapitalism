@@ -471,22 +471,100 @@
     }, 5000);
   }
 
-  function requestNotificationPermission() {
+  let notificationRequestPromise = null;
+  let notificationUnlockBound = false;
+  let notificationDeniedLogged = false;
+
+  function notificationPermission() {
     try {
-      if (!("Notification" in window)) return;
-      if (Notification.permission === "default") {
-        Notification.requestPermission().catch(() => {});
-      }
-    } catch {}
+      if (!("Notification" in window)) return "unsupported";
+      return Notification.permission || "default";
+    } catch {
+      return "unsupported";
+    }
+  }
+
+  function requestNotificationPermission() {
+    const permission = notificationPermission();
+
+    if (permission === "granted" || permission === "denied" || permission === "unsupported") {
+      return Promise.resolve(permission);
+    }
+
+    if (notificationRequestPromise) return notificationRequestPromise;
+
+    try {
+      notificationRequestPromise = Promise.resolve(Notification.requestPermission())
+        .then((result) => {
+          console.log("[People notifications] Permission :", result);
+          return result;
+        })
+        .catch((error) => {
+          console.warn("[People notifications] Demande de permission impossible", error);
+          return notificationPermission();
+        })
+        .finally(() => {
+          notificationRequestPromise = null;
+        });
+
+      return notificationRequestPromise;
+    } catch (error) {
+      console.warn("[People notifications] Demande de permission impossible", error);
+      notificationRequestPromise = null;
+      return Promise.resolve(notificationPermission());
+    }
+  }
+
+  function unbindNotificationUnlock() {
+    if (!notificationUnlockBound) return;
+    notificationUnlockBound = false;
+    document.removeEventListener("pointerdown", requestNotificationFromGesture, true);
+    document.removeEventListener("keydown", requestNotificationFromGesture, true);
+  }
+
+  function requestNotificationFromGesture() {
+    unbindNotificationUnlock();
+    requestNotificationPermission().then((permission) => {
+      // Si l'utilisateur a simplement fermé le prompt, on pourra retenter
+      // lors d'une future interaction, sans boucle ni polling.
+      if (permission === "default") bindNotificationUnlock();
+    });
+  }
+
+  function bindNotificationUnlock() {
+    if (notificationUnlockBound || notificationPermission() !== "default") return;
+
+    notificationUnlockBound = true;
+    document.addEventListener("pointerdown", requestNotificationFromGesture, {
+      capture: true,
+      passive: true
+    });
+    document.addEventListener("keydown", requestNotificationFromGesture, true);
   }
 
   function showSystemNotification(sender, text) {
-    try {
-      if (!("Notification" in window)) return;
-      if (Notification.permission !== "granted") return;
+    const permission = notificationPermission();
 
+    if (permission === "default") {
+      bindNotificationUnlock();
+      return;
+    }
+
+    if (permission !== "granted") {
+      if (permission === "denied" && !notificationDeniedLogged) {
+        notificationDeniedLogged = true;
+        console.warn(
+          "[People notifications] Notifications système refusées. " +
+          "Réactive-les dans les permissions de l'app/site ou dans Windows."
+        );
+      }
+      return;
+    }
+
+    try {
       const notification = new Notification(`People — ${sender} t'a ping`, {
         body: String(text).slice(0, 220),
+        icon: "people-favicon.png",
         tag: `people-ping-${sender}-${Date.now()}`,
         silent: true
       });
@@ -496,8 +574,14 @@
         notification.close();
       };
 
+      notification.onerror = (event) => {
+        console.warn("[People notifications] Notification système refusée par l'environnement", event);
+      };
+
       setTimeout(() => notification.close(), 7000);
-    } catch {}
+    } catch (error) {
+      console.warn("[People notifications] Création de notification impossible", error);
+    }
   }
 
   if (joinForm) {
@@ -508,6 +592,9 @@
   }
 
   bindAudioUnlock();
+  bindNotificationUnlock();
+
+  window.addEventListener("people-authenticated", bindNotificationUnlock);
 
   peopleSocket.on("chat-message", (data) => {
     const me = currentUsername();
@@ -538,5 +625,33 @@
     { once: true }
   );
 
-  console.log("[People] Volume local, mute local et pings activés.");
+  window.PeopleNotifications = {
+    get permission() {
+      return notificationPermission();
+    },
+    request: requestNotificationPermission,
+    test() {
+      const permission = notificationPermission();
+      console.log("[People notifications] Permission actuelle :", permission);
+      if (permission !== "granted") return false;
+
+      try {
+        const notification = new Notification("People — test", {
+          body: "Les notifications système fonctionnent.",
+          icon: "people-favicon.png",
+          tag: `people-test-${Date.now()}`
+        });
+        setTimeout(() => notification.close(), 5000);
+        return true;
+      } catch (error) {
+        console.warn("[People notifications] Test impossible", error);
+        return false;
+      }
+    }
+  };
+
+  console.log(
+    "[People] Volume local, mute local et pings activés. Notification :",
+    notificationPermission()
+  );
 })();
