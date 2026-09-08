@@ -692,10 +692,27 @@
       return false;
     }
 
+    const senderKey = String(sender || "user")
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "-")
+      .slice(0, 40);
+
+    // IMPORTANT : un tag unique garantit qu'Edge/Windows traite chaque ping
+    // comme une nouvelle notification. Un tag stable par expéditeur peut être
+    // regroupé/remplacé silencieusement par le système.
+    const notificationTag =
+      `people-ping-${senderKey}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    console.log(
+      "[People notifications] Ping système :",
+      sender,
+      notificationTag
+    );
+
     return showBrowserNotification(
       `People — ${sender} t'a ping`,
       browserNotificationOptions(text, {
-        tag: `people-ping-${String(sender || "user").toLowerCase()}`,
+        tag: notificationTag,
         renotify: true,
         data: { url: window.location.href }
       })
