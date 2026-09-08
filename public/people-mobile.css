@@ -131,6 +131,7 @@
       transform
       190ms
       ease !important;
+    will-change: transform;
     box-shadow:
       18px 0 48px
       rgba(0, 0, 0, 0.48);
@@ -158,8 +159,12 @@
         0,
         0.48
       );
-    backdrop-filter:
-      blur(1px);
+    /*
+      Un blur plein écran coûte cher sur mobile.
+      L'opacité du backdrop suffit visuellement.
+    */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .people-mobile-sidebar-toggle {
@@ -688,6 +693,7 @@
       transform
       190ms
       ease !important;
+    will-change: transform;
   }
 
   .app.people-online-open
@@ -960,3 +966,11 @@ and (
 }
 
 /* === PEOPLE_MOBILE_UI_V1_END === */
+
+
+@media (max-width: 780px) and (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .online-panel {
+    transition: none !important;
+  }
+}

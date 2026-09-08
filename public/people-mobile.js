@@ -71,6 +71,11 @@
     toggle
   );
 
+  let lastAvailable = null;
+  let lastOpen = null;
+  let responsiveFrame = 0;
+  let navigationTimer = 0;
+
   function isMobile() {
     return mobileQuery.matches;
   }
@@ -98,46 +103,63 @@
       isMobile() &&
       !authIsVisible();
 
-    toggle.style.display =
-      available
-        ? "grid"
-        : "none";
-
-    backdrop.style.display =
-      (
-        available &&
-        sidebarIsOpen()
-      )
-        ? "block"
-        : "none";
-
     const open =
+      available &&
       sidebarIsOpen();
 
-    toggle.textContent =
-      open
-        ? "×"
-        : "☰";
+    /*
+      Évite de réécrire les mêmes styles/attributs
+      à chaque resize ou mutation sans changement réel.
+    */
+    if (available !== lastAvailable) {
+      toggle.style.display =
+        available
+          ? "grid"
+          : "none";
 
-    toggle.title =
-      open
-        ? "Fermer la navigation"
-        : "Ouvrir la navigation";
+      lastAvailable =
+        available;
+    }
 
-    toggle.setAttribute(
-      "aria-label",
-      toggle.title
-    );
+    if (open !== lastOpen) {
+      backdrop.style.display =
+        open
+          ? "block"
+          : "none";
 
-    toggle.setAttribute(
-      "aria-expanded",
-      open
-        ? "true"
-        : "false"
-    );
+      toggle.textContent =
+        open
+          ? "×"
+          : "☰";
+
+      toggle.title =
+        open
+          ? "Fermer la navigation"
+          : "Ouvrir la navigation";
+
+      toggle.setAttribute(
+        "aria-label",
+        toggle.title
+      );
+
+      toggle.setAttribute(
+        "aria-expanded",
+        open
+          ? "true"
+          : "false"
+      );
+
+      lastOpen =
+        open;
+    }
   }
 
   function closeSidebar() {
+    if (!sidebarIsOpen()) {
+      updateToggle();
+      return;
+    }
+
     shell.classList.remove(
       "people-mobile-sidebar-open"
     );
@@ -161,9 +183,11 @@
       "people-online-open"
     );
 
-    shell.classList.add(
-      "people-mobile-sidebar-open"
-    );
+    if (!sidebarIsOpen()) {
+      shell.classList.add(
+        "people-mobile-sidebar-open"
+      );
+    }
 
     updateToggle();
   }
@@ -174,6 +198,26 @@
     } else {
       openSidebar();
     }
+  }
+
+  function scheduleNavigation(
+    callback,
+    delay
+  ) {
+    if (navigationTimer) {
+      clearTimeout(
+        navigationTimer
+      );
+    }
+
+    navigationTimer =
+      window.setTimeout(
+        () => {
+          navigationTimer = 0;
+          callback();
+        },
+        delay
+      );
   }
 
   toggle.addEventListener(
@@ -227,7 +271,7 @@
         );
 
       if (railButton) {
-        setTimeout(
+        scheduleNavigation(
           openSidebar,
           30
         );
@@ -245,7 +289,7 @@
         );
 
       if (destination) {
-        setTimeout(
+        scheduleNavigation(
           closeSidebar,
           40
         );
@@ -262,6 +306,13 @@
           "#onlinePanelToggle"
         )
       ) {
+        if (navigationTimer) {
+          clearTimeout(
+            navigationTimer
+          );
+          navigationTimer = 0;
+        }
+
         closeSidebar();
       }
     },
@@ -301,7 +352,8 @@
     )
     ?.addEventListener(
       "pointerdown",
-      closeOnMainInteraction
+      closeOnMainInteraction,
+      { passive: true }
     );
 
   document
@@ -310,37 +362,54 @@
     )
     ?.addEventListener(
       "pointerdown",
-      closeOnMainInteraction
+      closeOnMainInteraction,
+      { passive: true }
     );
 
   function syncResponsiveState() {
+    responsiveFrame = 0;
+
     if (!isMobile()) {
       shell.classList.remove(
         "people-mobile-sidebar-open"
       );
+
+      if (navigationTimer) {
+        clearTimeout(
+          navigationTimer
+        );
+        navigationTimer = 0;
+      }
     }
 
     updateToggle();
   }
 
+  function scheduleResponsiveState() {
+    if (responsiveFrame) {
+      return;
+    }
+
+    responsiveFrame =
+      requestAnimationFrame(
+        syncResponsiveState
+      );
+  }
+
   mobileQuery.addEventListener?.(
     "change",
-    syncResponsiveState
+    scheduleResponsiveState
   );
 
+  /*
+    Certains WebViews émettent beaucoup de resize
+    pendant la rotation ou l'ouverture du clavier.
+    On coalesce tout à une mise à jour par frame.
+  */
   window.addEventListener(
     "resize",
-    syncResponsiveState
-  );
-
-  window.addEventListener(
-    "orientationchange",
-    () => {
-      setTimeout(
-        syncResponsiveState,
-        120
-      );
-    }
+    scheduleResponsiveState,
+    { passive: true }
   );
 
   if (joinScreen) {
