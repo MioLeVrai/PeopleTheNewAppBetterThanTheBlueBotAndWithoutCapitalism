@@ -7801,50 +7801,20 @@ app.get(
 // === PEOPLE_SERVERS_V1_END ===
 
 // === PEOPLE_DESKTOP_APP_VERSION_V1_START ===
-const PEOPLE_DESKTOP_PACKAGE_FILE =
-  pathAccounts.join(
-    __dirname,
-    "desktop",
-    "package.json"
-  );
-
 const PEOPLE_DESKTOP_RELEASE_FILE =
   pathAccounts.join(
     __dirname,
-    "desktop",
     "release.json"
   );
+
+const PEOPLE_DESKTOP_DEFAULT_VERSION =
+  "1.0.0";
 
 const PEOPLE_DESKTOP_DEFAULT_INSTALLER_URL =
   "https://github.com/MioLeVrai/PeopleTheNewAppBetterThanTheBlueBotAndWithoutCapitalism/releases/latest/download/People-Setup.exe";
 
 function peopleDesktopReleaseInfo() {
-  let packageVersion =
-    "1.0.0";
-
   let release = {};
-
-  try {
-    const desktopPackage =
-      JSON.parse(
-        fsAccounts.readFileSync(
-          PEOPLE_DESKTOP_PACKAGE_FILE,
-          "utf8"
-        )
-      );
-
-    if (desktopPackage?.version) {
-      packageVersion =
-        String(
-          desktopPackage.version
-        ).trim();
-    }
-  } catch (err) {
-    console.warn(
-      "[People desktop/package]",
-      err?.message || err
-    );
-  }
 
   try {
     if (
@@ -7862,17 +7832,18 @@ function peopleDesktopReleaseInfo() {
     }
   } catch (err) {
     console.warn(
-      "[People desktop/release]",
+      "[People release.json]",
       err?.message || err
     );
   }
 
   const version =
     String(
+      process.env.PEOPLE_DESKTOP_VERSION ||
       release?.version ||
-      packageVersion
+      PEOPLE_DESKTOP_DEFAULT_VERSION
     ).trim() ||
-    packageVersion;
+    PEOPLE_DESKTOP_DEFAULT_VERSION;
 
   const installerUrl =
     String(

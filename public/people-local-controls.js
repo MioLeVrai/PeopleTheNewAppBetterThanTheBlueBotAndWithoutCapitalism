@@ -477,6 +477,10 @@
 
   function notificationPermission() {
     try {
+      if (window.PeopleDesktopNotifications?.available) {
+        return "desktop-native";
+      }
+
       if (!("Notification" in window)) return "unsupported";
       return Notification.permission || "default";
     } catch {
@@ -487,7 +491,12 @@
   function requestNotificationPermission() {
     const permission = notificationPermission();
 
-    if (permission === "granted" || permission === "denied" || permission === "unsupported") {
+    if (
+      permission === "desktop-native" ||
+      permission === "granted" ||
+      permission === "denied" ||
+      permission === "unsupported"
+    ) {
       return Promise.resolve(permission);
     }
 
@@ -543,6 +552,22 @@
   }
 
   function showSystemNotification(sender, text) {
+    if (window.PeopleDesktopNotifications?.show) {
+      try {
+        window.PeopleDesktopNotifications.show({
+          title: `People — ${sender} t'a ping`,
+          body: String(text).slice(0, 220),
+          silent: true
+        });
+        return;
+      } catch (error) {
+        console.warn(
+          "[People notifications] Bridge desktop indisponible, fallback navigateur",
+          error
+        );
+      }
+    }
+
     const permission = notificationPermission();
 
     if (permission === "default") {
@@ -632,7 +657,17 @@
     request: requestNotificationPermission,
     test() {
       const permission = notificationPermission();
-      console.log("[People notifications] Permission actuelle :", permission);
+      console.log("[People notifications] Mode actuel :", permission);
+
+      if (window.PeopleDesktopNotifications?.test) {
+        try {
+          return Boolean(window.PeopleDesktopNotifications.test());
+        } catch (error) {
+          console.warn("[People notifications] Test desktop impossible", error);
+          return false;
+        }
+      }
+
       if (permission !== "granted") return false;
 
       try {
