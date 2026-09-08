@@ -600,7 +600,9 @@
       body: String(text).slice(0, 220),
       icon: "/people-favicon.png",
       badge: "/people-favicon.png",
-      silent: true,
+      // Ne force pas le mode silencieux côté navigateur : certains environnements
+      // Windows le rendent beaucoup trop discret.
+      timestamp: Date.now(),
       ...extra
     };
   }
@@ -613,6 +615,18 @@
       const registration = await ensureNotificationServiceWorker();
       if (registration?.showNotification) {
         await registration.showNotification(title, options);
+
+        // Vérifie que le navigateur a réellement enregistré la notification.
+        try {
+          const created = await registration.getNotifications(
+            options?.tag ? { tag: options.tag } : undefined
+          );
+          console.log(
+            "[People notifications] Notifications actives après showNotification :",
+            created.length
+          );
+        } catch {}
+
         return true;
       }
     } catch (error) {
@@ -682,6 +696,7 @@
       `People — ${sender} t'a ping`,
       browserNotificationOptions(text, {
         tag: `people-ping-${String(sender || "user").toLowerCase()}`,
+        renotify: true,
         data: { url: window.location.href }
       })
     );
@@ -761,6 +776,7 @@
         "People — test",
         browserNotificationOptions("Les notifications système fonctionnent.", {
           tag: `people-test-${Date.now()}`,
+          renotify: true,
           data: { url: window.location.href }
         })
       );
