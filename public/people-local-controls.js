@@ -474,6 +474,7 @@
   let notificationRequestPromise = null;
   let notificationUnlockBound = false;
   let notificationDeniedLogged = false;
+  let notificationServiceWorkerPromise = null;
 
   function notificationPermission() {
     try {
@@ -506,6 +507,9 @@
       notificationRequestPromise = Promise.resolve(Notification.requestPermission())
         .then((result) => {
           console.log("[People notifications] Permission :", result);
+          if (result === "granted") {
+            void ensureNotificationServiceWorker();
+          }
           return result;
         })
         .catch((error) => {
@@ -534,8 +538,6 @@
   function requestNotificationFromGesture() {
     unbindNotificationUnlock();
     requestNotificationPermission().then((permission) => {
-      // Si l'utilisateur a simplement fermé le prompt, on pourra retenter
-      // lors d'une future interaction, sans boucle ni polling.
       if (permission === "default") bindNotificationUnlock();
     });
   }
@@ -551,7 +553,97 @@
     document.addEventListener("keydown", requestNotificationFromGesture, true);
   }
 
-  function showSystemNotification(sender, text) {
+  function canUseNotificationServiceWorker() {
+    return Boolean(
+      window.isSecureContext &&
+      "serviceWorker" in navigator
+    );
+  }
+
+  function ensureNotificationServiceWorker() {
+    if (window.PeopleDesktopNotifications?.available) {
+      return Promise.resolve(null);
+    }
+
+    if (!canUseNotificationServiceWorker()) {
+      return Promise.resolve(null);
+    }
+
+    if (notificationServiceWorkerPromise) {
+      return notificationServiceWorkerPromise;
+    }
+
+    notificationServiceWorkerPromise = navigator.serviceWorker
+      .register("/people-notifications-sw.js", { scope: "/" })
+      .then(async (registration) => {
+        try {
+          // ready garantit qu'un worker actif contrôle ou est prêt à servir la portée.
+          await navigator.serviceWorker.ready;
+        } catch {}
+        console.log("[People notifications] Service Worker prêt.");
+        return registration;
+      })
+      .catch((error) => {
+        console.warn(
+          "[People notifications] Service Worker indisponible, fallback Notification API",
+          error
+        );
+        notificationServiceWorkerPromise = null;
+        return null;
+      });
+
+    return notificationServiceWorkerPromise;
+  }
+
+  function browserNotificationOptions(text, extra = {}) {
+    return {
+      body: String(text).slice(0, 220),
+      icon: "/people-favicon.png",
+      badge: "/people-favicon.png",
+      silent: true,
+      ...extra
+    };
+  }
+
+  async function showBrowserNotification(title, options) {
+    // Priorité au Service Worker : c'est le chemin web le plus robuste pour
+    // produire une vraie notification système, même lorsque l'onglet n'est
+    // pas au premier plan.
+    try {
+      const registration = await ensureNotificationServiceWorker();
+      if (registration?.showNotification) {
+        await registration.showNotification(title, options);
+        return true;
+      }
+    } catch (error) {
+      console.warn(
+        "[People notifications] showNotification via Service Worker impossible",
+        error
+      );
+    }
+
+    // Fallback pour les navigateurs desktop qui supportent le constructeur.
+    try {
+      const notification = new Notification(title, options);
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+      notification.onerror = (event) => {
+        console.warn(
+          "[People notifications] Notification système refusée par l'environnement",
+          event
+        );
+      };
+      setTimeout(() => notification.close(), 7000);
+      return true;
+    } catch (error) {
+      console.warn("[People notifications] Création de notification impossible", error);
+      return false;
+    }
+  }
+
+  async function showSystemNotification(sender, text) {
     if (window.PeopleDesktopNotifications?.show) {
       try {
         window.PeopleDesktopNotifications.show({
@@ -559,7 +651,7 @@
           body: String(text).slice(0, 220),
           silent: true
         });
-        return;
+        return true;
       } catch (error) {
         console.warn(
           "[People notifications] Bridge desktop indisponible, fallback navigateur",
@@ -572,7 +664,7 @@
 
     if (permission === "default") {
       bindNotificationUnlock();
-      return;
+      return false;
     }
 
     if (permission !== "granted") {
@@ -580,33 +672,19 @@
         notificationDeniedLogged = true;
         console.warn(
           "[People notifications] Notifications système refusées. " +
-          "Réactive-les dans les permissions de l'app/site ou dans Windows."
+          "Réactive-les dans les permissions du site/navigateur ou dans Windows."
         );
       }
-      return;
+      return false;
     }
 
-    try {
-      const notification = new Notification(`People — ${sender} t'a ping`, {
-        body: String(text).slice(0, 220),
-        icon: "people-favicon.png",
-        tag: `people-ping-${sender}-${Date.now()}`,
-        silent: true
-      });
-
-      notification.onclick = () => {
-        window.focus();
-        notification.close();
-      };
-
-      notification.onerror = (event) => {
-        console.warn("[People notifications] Notification système refusée par l'environnement", event);
-      };
-
-      setTimeout(() => notification.close(), 7000);
-    } catch (error) {
-      console.warn("[People notifications] Création de notification impossible", error);
-    }
+    return showBrowserNotification(
+      `People — ${sender} t'a ping`,
+      browserNotificationOptions(text, {
+        tag: `people-ping-${String(sender || "user").toLowerCase()}`,
+        data: { url: window.location.href }
+      })
+    );
   }
 
   if (joinForm) {
@@ -618,6 +696,9 @@
 
   bindAudioUnlock();
   bindNotificationUnlock();
+  if (notificationPermission() === "granted") {
+    void ensureNotificationServiceWorker();
+  }
 
   window.addEventListener("people-authenticated", bindNotificationUnlock);
 
@@ -628,7 +709,7 @@
 
     playPingSound();
     showToast(data.username || "Quelqu'un", data.text || "");
-    showSystemNotification(data.username || "Quelqu'un", data.text || "");
+    void showSystemNotification(data.username || "Quelqu'un", data.text || "");
 
     // app.js a déjà ajouté le message : accès direct au dernier enfant,
     // sans scanner tout l'historique.
@@ -655,7 +736,7 @@
       return notificationPermission();
     },
     request: requestNotificationPermission,
-    test() {
+    async test() {
       const permission = notificationPermission();
       console.log("[People notifications] Mode actuel :", permission);
 
@@ -668,20 +749,35 @@
         }
       }
 
-      if (permission !== "granted") return false;
-
-      try {
-        const notification = new Notification("People — test", {
-          body: "Les notifications système fonctionnent.",
-          icon: "people-favicon.png",
-          tag: `people-test-${Date.now()}`
-        });
-        setTimeout(() => notification.close(), 5000);
-        return true;
-      } catch (error) {
-        console.warn("[People notifications] Test impossible", error);
+      if (permission !== "granted") {
+        console.warn(
+          "[People notifications] Test annulé : permission =",
+          permission
+        );
         return false;
       }
+
+      return showBrowserNotification(
+        "People — test",
+        browserNotificationOptions("Les notifications système fonctionnent.", {
+          tag: `people-test-${Date.now()}`,
+          data: { url: window.location.href }
+        })
+      );
+    },
+    diagnose() {
+      const result = {
+        permission: notificationPermission(),
+        secureContext: Boolean(window.isSecureContext),
+        protocol: window.location.protocol,
+        serviceWorkerSupported: "serviceWorker" in navigator,
+        notificationSupported: "Notification" in window,
+        desktopNative: Boolean(window.PeopleDesktopNotifications?.available),
+        visibilityState: document.visibilityState,
+        url: window.location.href
+      };
+      console.table(result);
+      return result;
     }
   };
 
