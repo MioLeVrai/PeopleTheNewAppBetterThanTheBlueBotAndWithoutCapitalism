@@ -256,6 +256,20 @@ function peopleMessageIsEncrypted(
   );
 }
 
+const PEOPLE_DM_E2EE_PREFIX =
+  "people-e2ee-dm:v1:";
+
+function peopleDmE2eeIsEnvelope(
+  value
+) {
+  return String(
+    value ||
+    ""
+  ).startsWith(
+    PEOPLE_DM_E2EE_PREFIX
+  );
+}
+
 function peopleEncryptMessageText(
   value
 ) {
@@ -269,8 +283,15 @@ function peopleEncryptMessageText(
     !plain ||
     peopleMessageIsEncrypted(
       plain
+    ) ||
+    peopleDmE2eeIsEnvelope(
+      plain
     )
   ) {
+    /*
+      Un MP E2EE est déjà chiffré côté appareil :
+      le serveur le conserve OPAQUE.
+    */
     return plain;
   }
 
@@ -329,11 +350,17 @@ function peopleDecryptMessageText(
 
   if (
     !stored ||
+    peopleDmE2eeIsEnvelope(
+      stored
+    ) ||
     !peopleMessageIsEncrypted(
       stored
     )
   ) {
-    // Compatibilité avec les anciens messages en clair.
+    /*
+      - anciens messages en clair : compatibilité
+      - nouveaux MP E2EE : passage opaque jusqu'au client
+    */
     return stored;
   }
 
@@ -967,6 +994,383 @@ const PEOPLE_LOCAL_SOCIAL = pathAccounts.join(
   "people-social.local.json"
 );
 
+// === PEOPLE_DM_E2EE_SERVER_V1_START ===
+const PEOPLE_LOCAL_E2EE =
+  pathAccounts.join(
+    __dirname,
+    "people-e2ee.local.json"
+  );
+
+function peopleE2eeDeviceId(value) {
+  const clean =
+    String(value || "").trim();
+
+  return /^[a-zA-Z0-9_-]{16,80}$/.test(clean)
+    ? clean
+    : "";
+}
+
+function peopleE2eePublicJwk(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const x = String(value.x || "");
+  const y = String(value.y || "");
+
+  if (
+    value.kty !== "EC" ||
+    value.crv !== "P-256" ||
+    !/^[a-zA-Z0-9_-]{40,90}$/.test(x) ||
+    !/^[a-zA-Z0-9_-]{40,90}$/.test(y)
+  ) {
+    return null;
+  }
+
+  return {
+    kty: "EC",
+    crv: "P-256",
+    x,
+    y,
+    ext: true
+  };
+}
+
+function peopleReadLocalE2ee() {
+  try {
+    if (!fsAccounts.existsSync(PEOPLE_LOCAL_E2EE)) {
+      return [];
+    }
+
+    const raw =
+      JSON.parse(
+        fsAccounts.readFileSync(
+          PEOPLE_LOCAL_E2EE,
+          "utf8"
+        )
+      );
+
+    return Array.isArray(raw)
+      ? raw
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function peopleWriteLocalE2ee(rows) {
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_E2EE,
+    JSON.stringify(
+      Array.isArray(rows)
+        ? rows
+        : [],
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+}
+
+async function peopleE2eeRegisterDevice(
+  accountId,
+  deviceId,
+  publicJwk
+) {
+  const userId =
+    String(accountId || "");
+
+  const device =
+    peopleE2eeDeviceId(deviceId);
+
+  const key =
+    peopleE2eePublicJwk(publicJwk);
+
+  if (!userId || !device || !key) {
+    const err =
+      new Error("E2EE_DEVICE_INVALID");
+
+    err.code =
+      "E2EE_DEVICE_INVALID";
+
+    throw err;
+  }
+
+  const serialized =
+    JSON.stringify(key);
+
+  if (peoplePool) {
+    await peoplePool.query(
+      "INSERT INTO people_e2ee_devices " +
+      "(user_id, device_id, public_jwk, last_seen_at) " +
+      "VALUES ($1, $2, $3, NOW()) " +
+      "ON CONFLICT (user_id, device_id) " +
+      "DO UPDATE SET public_jwk = EXCLUDED.public_jwk, last_seen_at = NOW()",
+      [
+        userId,
+        device,
+        serialized
+      ]
+    );
+
+    return;
+  }
+
+  const rows =
+    peopleReadLocalE2ee();
+
+  const next = {
+    user_id: userId,
+    device_id: device,
+    public_jwk: serialized,
+    last_seen_at:
+      new Date().toISOString()
+  };
+
+  const index =
+    rows.findIndex(
+      (row) =>
+        String(row.user_id) === userId &&
+        String(row.device_id) === device
+    );
+
+  if (index >= 0) {
+    rows[index] = next;
+  } else {
+    rows.push(next);
+  }
+
+  peopleWriteLocalE2ee(rows);
+}
+
+async function peopleE2eeDevices(accountId) {
+  const userId =
+    String(accountId || "");
+
+  if (!userId) {
+    return [];
+  }
+
+  let rows;
+
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "SELECT device_id, public_jwk, last_seen_at " +
+        "FROM people_e2ee_devices " +
+        "WHERE user_id = $1 " +
+        "ORDER BY last_seen_at DESC " +
+        "LIMIT 8",
+        [userId]
+      );
+
+    rows =
+      result.rows;
+  } else {
+    rows =
+      peopleReadLocalE2ee()
+        .filter(
+          (row) =>
+            String(row.user_id) === userId
+        )
+        .sort(
+          (a, b) =>
+            new Date(
+              b.last_seen_at || 0
+            ).getTime() -
+            new Date(
+              a.last_seen_at || 0
+            ).getTime()
+        )
+        .slice(0, 8);
+  }
+
+  return rows
+    .map(
+      (row) => {
+        try {
+          const publicJwk =
+            peopleE2eePublicJwk(
+              typeof row.public_jwk === "string"
+                ? JSON.parse(row.public_jwk)
+                : row.public_jwk
+            );
+
+          const deviceId =
+            peopleE2eeDeviceId(row.device_id);
+
+          if (!publicJwk || !deviceId) {
+            return null;
+          }
+
+          return {
+            userId,
+            deviceId,
+            publicJwk
+          };
+        } catch {
+          return null;
+        }
+      }
+    )
+    .filter(Boolean);
+}
+
+function peopleDmE2eeEnvelope(value) {
+  const body =
+    String(value || "").trim();
+
+  if (!peopleDmE2eeIsEnvelope(body)) {
+    return null;
+  }
+
+  if (body.length > 24000) {
+    const err =
+      new Error("E2EE_ENVELOPE_INVALID");
+
+    err.code =
+      "E2EE_ENVELOPE_INVALID";
+
+    throw err;
+  }
+
+  const encoded =
+    body.slice(
+      PEOPLE_DM_E2EE_PREFIX.length
+    );
+
+  if (
+    !encoded ||
+    !/^[a-zA-Z0-9_-]+$/.test(encoded)
+  ) {
+    const err =
+      new Error("E2EE_ENVELOPE_INVALID");
+
+    err.code =
+      "E2EE_ENVELOPE_INVALID";
+
+    throw err;
+  }
+
+  let envelope;
+
+  try {
+    envelope =
+      JSON.parse(
+        Buffer.from(
+          encoded,
+          "base64url"
+        ).toString("utf8")
+      );
+  } catch {
+    const err =
+      new Error("E2EE_ENVELOPE_INVALID");
+
+    err.code =
+      "E2EE_ENVELOPE_INVALID";
+
+    throw err;
+  }
+
+  const from =
+    String(envelope?.from || "");
+
+  const to =
+    String(envelope?.to || "");
+
+  const senderDevice =
+    peopleE2eeDeviceId(envelope?.sd);
+
+  const senderPublic =
+    peopleE2eePublicJwk(envelope?.spk);
+
+  const messageIv =
+    String(envelope?.iv || "");
+
+  const ciphertext =
+    String(envelope?.ct || "");
+
+  const keys =
+    Array.isArray(envelope?.keys)
+      ? envelope.keys
+      : [];
+
+  if (
+    envelope?.v !== 1 ||
+    !from ||
+    !to ||
+    from.length > 100 ||
+    to.length > 100 ||
+    !senderDevice ||
+    !senderPublic ||
+    !/^[a-zA-Z0-9_-]{16,40}$/.test(messageIv) ||
+    !/^[a-zA-Z0-9_-]{16,16000}$/.test(ciphertext) ||
+    keys.length < 1 ||
+    keys.length > 16
+  ) {
+    const err =
+      new Error("E2EE_ENVELOPE_INVALID");
+
+    err.code =
+      "E2EE_ENVELOPE_INVALID";
+
+    throw err;
+  }
+
+  const normalizedKeys =
+    keys.map(
+      (item) => {
+        const userId =
+          String(item?.u || "");
+
+        const deviceId =
+          peopleE2eeDeviceId(item?.d);
+
+        const iv =
+          String(item?.iv || "");
+
+        const wrapped =
+          String(item?.ct || "");
+
+        if (
+          !userId ||
+          userId.length > 100 ||
+          !deviceId ||
+          !/^[a-zA-Z0-9_-]{16,40}$/.test(iv) ||
+          !/^[a-zA-Z0-9_-]{32,160}$/.test(wrapped)
+        ) {
+          const err =
+            new Error("E2EE_ENVELOPE_INVALID");
+
+          err.code =
+            "E2EE_ENVELOPE_INVALID";
+
+          throw err;
+        }
+
+        return {
+          u: userId,
+          d: deviceId,
+          iv,
+          ct: wrapped
+        };
+      }
+    );
+
+  return {
+    v: 1,
+    from,
+    to,
+    sd: senderDevice,
+    spk: senderPublic,
+    iv: messageIv,
+    ct: ciphertext,
+    keys: normalizedKeys
+  };
+}
+// === PEOPLE_DM_E2EE_SERVER_V1_END ===
+
+
 function peopleReadLocalSocial() {
   try {
     if (!fsAccounts.existsSync(PEOPLE_LOCAL_SOCIAL)) {
@@ -1077,6 +1481,146 @@ function peopleSessionForRequest(req, res) {
 
   return session;
 }
+
+// === PEOPLE_DM_E2EE_ROUTES_V1_START ===
+app.post(
+  "/api/e2ee/device",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) {
+        return;
+      }
+
+      await peopleE2eeRegisterDevice(
+        session.id,
+        req.body?.deviceId,
+        req.body?.publicJwk
+      );
+
+      return res.json({
+        ok: true
+      });
+    } catch (err) {
+      if (
+        err?.code ===
+          "E2EE_DEVICE_INVALID"
+      ) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+            error:
+              "Clé E2EE de l'appareil invalide."
+          });
+      }
+
+      console.error(
+        "[People E2EE/device]",
+        err
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+          error:
+            "Impossible d'enregistrer la clé E2EE."
+        });
+    }
+  }
+);
+
+app.get(
+  "/api/e2ee/dm/:username/devices",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) {
+        return;
+      }
+
+      const target =
+        await peopleFindAccount(
+          req.params.username
+        );
+
+      if (!target) {
+        return res
+          .status(404)
+          .json({
+            ok: false,
+            error:
+              "Utilisateur introuvable."
+          });
+      }
+
+      if (
+        String(target.id) ===
+          String(session.id)
+      ) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+            error:
+              "Conversation E2EE invalide."
+          });
+      }
+
+      const [
+        myDevices,
+        otherDevices
+      ] =
+        await Promise.all([
+          peopleE2eeDevices(
+            session.id
+          ),
+          peopleE2eeDevices(
+            target.id
+          )
+        ]);
+
+      return res.json({
+        ok: true,
+        me: {
+          id:
+            String(session.id)
+        },
+        other:
+          peoplePublicAccount(
+            target
+          ),
+        myDevices,
+        otherDevices
+      });
+    } catch (err) {
+      console.error(
+        "[People E2EE/devices]",
+        err
+      );
+
+      return res
+        .status(500)
+        .json({
+          ok: false,
+          error:
+            "Impossible de charger les clés E2EE."
+        });
+    }
+  }
+);
+// === PEOPLE_DM_E2EE_ROUTES_V1_END ===
 
 function peopleAccountIsOnline(accountId) {
   const wanted = String(accountId);
@@ -1656,10 +2200,19 @@ async function peopleCreateDm(
   const recipient =
     String(recipientId);
 
-  const cleanBody =
+  const rawBody =
     String(body || "")
-      .trim()
-      .slice(0, 2000);
+      .trim();
+
+  const cleanBody =
+    peopleDmE2eeIsEnvelope(
+      rawBody
+    )
+      ? rawBody
+      : rawBody.slice(
+          0,
+          2000
+        );
 
   const imageKey =
     peopleNormalizeMessageImageId(
@@ -3376,6 +3929,22 @@ async function peopleInitSocial() {
     "read_at TIMESTAMPTZ NULL" +
     ")"
   );
+  await peoplePool.query(
+    "CREATE TABLE IF NOT EXISTS people_e2ee_devices (" +
+    "user_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+    "device_id VARCHAR(80) NOT NULL, " +
+    "public_jwk TEXT NOT NULL, " +
+    "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+    "last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+    "PRIMARY KEY (user_id, device_id)" +
+    ")"
+  );
+
+  await peoplePool.query(
+    "CREATE INDEX IF NOT EXISTS people_e2ee_devices_seen_idx " +
+    "ON people_e2ee_devices(user_id, last_seen_at DESC)"
+  );
+
   await peoplePool.query(
     "CREATE TABLE IF NOT EXISTS people_closed_dms (" +
     "user_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
@@ -5388,6 +5957,11 @@ app.post("/api/dm/:username", async (req, res) => {
         req.body?.body || ""
       ).trim();
 
+    const e2eeEnvelope =
+      peopleDmE2eeEnvelope(
+        body
+      );
+
     const imageId =
       peopleNormalizeMessageImageId(
         req.body?.imageId
@@ -5403,13 +5977,71 @@ app.post("/api/dm/:username", async (req, res) => {
         !body &&
         !imageId
       ) ||
-      body.length > 2000
+      (
+        !e2eeEnvelope &&
+        body.length > 2000
+      ) ||
+      (
+        e2eeEnvelope &&
+        body.length > 24000
+      )
     ) {
       return res.status(400).json({
         ok: false,
         error:
           "Le MP doit contenir du texte ou une image."
       });
+    }
+
+    if (e2eeEnvelope) {
+      const senderId =
+        String(session.id);
+
+      const recipientId =
+        String(target.id);
+
+      const allowedIds =
+        new Set([
+          senderId,
+          recipientId
+        ]);
+
+      const hasSenderKey =
+        e2eeEnvelope.keys.some(
+          (item) =>
+            String(item.u) ===
+              senderId
+        );
+
+      const hasRecipientKey =
+        e2eeEnvelope.keys.some(
+          (item) =>
+            String(item.u) ===
+              recipientId
+        );
+
+      if (
+        e2eeEnvelope.from !==
+          senderId ||
+        e2eeEnvelope.to !==
+          recipientId ||
+        !hasSenderKey ||
+        !hasRecipientKey ||
+        e2eeEnvelope.keys.some(
+          (item) =>
+            !allowedIds.has(
+              String(item.u)
+            )
+        )
+      ) {
+        return res
+          .status(400)
+          .json({
+            ok: false,
+            error:
+              "Enveloppe E2EE invalide."
+          });
+      }
     }
 
     const message =
@@ -5481,6 +6113,17 @@ app.post("/api/dm/:username", async (req, res) => {
       message: payload
     });
   } catch (err) {
+    if (
+      err?.code ===
+        "E2EE_ENVELOPE_INVALID"
+    ) {
+      return res.status(400).json({
+        ok: false,
+        error:
+          "Enveloppe E2EE invalide."
+      });
+    }
+
     if (
       err?.code ===
       "IMAGE_INVALID"
@@ -9356,6 +9999,14 @@ function peopleDmCallConversationPreview(
       body
     );
 
+  if (
+    peopleDmE2eeIsEnvelope(
+      cleanBody
+    )
+  ) {
+    return "🔒 Message chiffré";
+  }
+
   const event =
     peopleDmCallParseEventBody(
       cleanBody
@@ -12086,6 +12737,18 @@ async function peopleMigrateStoredMessageEncryption() {
           );
 
         if (!body) {
+          continue;
+        }
+
+        if (
+          peopleDmE2eeIsEnvelope(
+            body
+          )
+        ) {
+          /*
+            Déjà chiffré de bout en bout :
+            ne surtout pas le convertir en AES serveur.
+          */
           continue;
         }
 

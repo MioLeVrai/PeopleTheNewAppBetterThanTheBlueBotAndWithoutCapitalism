@@ -208,6 +208,1124 @@
     return data;
   }
 
+  // === PEOPLE_DM_E2EE_CLIENT_V1_START ===
+  const PEOPLE_DM_E2EE_PREFIX =
+    "people-e2ee-dm:v1:";
+
+  const PEOPLE_DM_E2EE_DB =
+    "people-e2ee-v1";
+
+  const PEOPLE_DM_E2EE_STORE =
+    "devices";
+
+  const peopleDmE2eeEncoder =
+    new TextEncoder();
+
+  const peopleDmE2eeDecoder =
+    new TextDecoder();
+
+  let peopleDmE2eeDbPromise =
+    null;
+
+  let peopleDmE2eeDevicePromise =
+    null;
+
+  let peopleDmE2eeActiveAccountId =
+    "";
+
+  const peopleDmE2eeDerivedKeyCache =
+    new Map();
+
+  function peopleDmE2eeBytesToBase64Url(
+    value
+  ) {
+    const bytes =
+      value instanceof Uint8Array
+        ? value
+        : new Uint8Array(
+            value
+          );
+
+    let binary =
+      "";
+
+    for (
+      let index = 0;
+      index < bytes.length;
+      index += 1
+    ) {
+      binary +=
+        String.fromCharCode(
+          bytes[index]
+        );
+    }
+
+    return btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  }
+
+  function peopleDmE2eeBase64UrlToBytes(
+    value
+  ) {
+    const raw =
+      String(value || "");
+
+    const base64 =
+      raw
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
+        .padEnd(
+          Math.ceil(
+            raw.length / 4
+          ) * 4,
+          "="
+        );
+
+    const binary =
+      atob(base64);
+
+    const bytes =
+      new Uint8Array(
+        binary.length
+      );
+
+    for (
+      let index = 0;
+      index < binary.length;
+      index += 1
+    ) {
+      bytes[index] =
+        binary.charCodeAt(
+          index
+        );
+    }
+
+    return bytes;
+  }
+
+  function peopleDmE2eeEncodeJson(
+    value
+  ) {
+    return peopleDmE2eeBytesToBase64Url(
+      peopleDmE2eeEncoder.encode(
+        JSON.stringify(
+          value
+        )
+      )
+    );
+  }
+
+  function peopleDmE2eeDecodeEnvelope(
+    value
+  ) {
+    const body =
+      String(value || "");
+
+    if (
+      !body.startsWith(
+        PEOPLE_DM_E2EE_PREFIX
+      )
+    ) {
+      return null;
+    }
+
+    try {
+      const envelope =
+        JSON.parse(
+          peopleDmE2eeDecoder.decode(
+            peopleDmE2eeBase64UrlToBytes(
+              body.slice(
+                PEOPLE_DM_E2EE_PREFIX.length
+              )
+            )
+          )
+        );
+
+      if (
+        envelope?.v !== 1 ||
+        !envelope?.from ||
+        !envelope?.to ||
+        !envelope?.sd ||
+        !envelope?.spk ||
+        !envelope?.iv ||
+        !envelope?.ct ||
+        !Array.isArray(
+          envelope?.keys
+        )
+      ) {
+        return null;
+      }
+
+      return envelope;
+    } catch {
+      return null;
+    }
+  }
+
+  function peopleDmE2eeOpenDb() {
+    if (peopleDmE2eeDbPromise) {
+      return peopleDmE2eeDbPromise;
+    }
+
+    peopleDmE2eeDbPromise =
+      new Promise(
+        (
+          resolve,
+          reject
+        ) => {
+          const request =
+            indexedDB.open(
+              PEOPLE_DM_E2EE_DB,
+              1
+            );
+
+          request.onupgradeneeded =
+            () => {
+              const db =
+                request.result;
+
+              if (
+                !db.objectStoreNames
+                  .contains(
+                    PEOPLE_DM_E2EE_STORE
+                  )
+              ) {
+                db.createObjectStore(
+                  PEOPLE_DM_E2EE_STORE,
+                  {
+                    keyPath:
+                      "accountId"
+                  }
+                );
+              }
+            };
+
+          request.onsuccess =
+            () =>
+              resolve(
+                request.result
+              );
+
+          request.onerror =
+            () =>
+              reject(
+                request.error ||
+                new Error(
+                  "IndexedDB E2EE indisponible."
+                )
+              );
+        }
+      );
+
+    return peopleDmE2eeDbPromise;
+  }
+
+  async function peopleDmE2eeReadDevice(
+    accountId
+  ) {
+    const db =
+      await peopleDmE2eeOpenDb();
+
+    return new Promise(
+      (
+        resolve,
+        reject
+      ) => {
+        const tx =
+          db.transaction(
+            PEOPLE_DM_E2EE_STORE,
+            "readonly"
+          );
+
+        const request =
+          tx
+            .objectStore(
+              PEOPLE_DM_E2EE_STORE
+            )
+            .get(
+              String(accountId)
+            );
+
+        request.onsuccess =
+          () =>
+            resolve(
+              request.result ||
+              null
+            );
+
+        request.onerror =
+          () =>
+            reject(
+              request.error
+            );
+      }
+    );
+  }
+
+  async function peopleDmE2eeWriteDevice(
+    record
+  ) {
+    const db =
+      await peopleDmE2eeOpenDb();
+
+    return new Promise(
+      (
+        resolve,
+        reject
+      ) => {
+        const tx =
+          db.transaction(
+            PEOPLE_DM_E2EE_STORE,
+            "readwrite"
+          );
+
+        tx.objectStore(
+          PEOPLE_DM_E2EE_STORE
+        ).put(
+          record
+        );
+
+        tx.oncomplete =
+          () =>
+            resolve();
+
+        tx.onerror =
+          () =>
+            reject(
+              tx.error
+            );
+
+        tx.onabort =
+          () =>
+            reject(
+              tx.error
+            );
+      }
+    );
+  }
+
+  function peopleDmE2eeNewDeviceId() {
+    if (crypto.randomUUID) {
+      return (
+        "dev_" +
+        crypto.randomUUID()
+          .replace(
+            /-/g,
+            "_"
+          )
+      );
+    }
+
+    return (
+      "dev_" +
+      peopleDmE2eeBytesToBase64Url(
+        crypto.getRandomValues(
+          new Uint8Array(
+            24
+          )
+        )
+      )
+    );
+  }
+
+  async function peopleDmE2eeCreateDevice(
+    accountId
+  ) {
+    if (
+      !window.crypto?.subtle ||
+      !window.indexedDB
+    ) {
+      throw new Error(
+        "Ce navigateur ne permet pas l'E2EE People."
+      );
+    }
+
+    /*
+      La paire est générée exportable uniquement le temps
+      d'extraire le JWK public. La clé privée stockée ensuite
+      est réimportée NON exportable.
+    */
+    const generated =
+      await crypto.subtle.generateKey(
+        {
+          name:
+            "ECDH",
+          namedCurve:
+            "P-256"
+        },
+        true,
+        [
+          "deriveBits"
+        ]
+      );
+
+    const publicJwk =
+      await crypto.subtle.exportKey(
+        "jwk",
+        generated.publicKey
+      );
+
+    const privateJwk =
+      await crypto.subtle.exportKey(
+        "jwk",
+        generated.privateKey
+      );
+
+    const privateKey =
+      await crypto.subtle.importKey(
+        "jwk",
+        privateJwk,
+        {
+          name:
+            "ECDH",
+          namedCurve:
+            "P-256"
+        },
+        false,
+        [
+          "deriveBits"
+        ]
+      );
+
+    const record = {
+      accountId:
+        String(accountId),
+      deviceId:
+        peopleDmE2eeNewDeviceId(),
+      privateKey,
+      publicJwk: {
+        kty:
+          publicJwk.kty,
+        crv:
+          publicJwk.crv,
+        x:
+          publicJwk.x,
+        y:
+          publicJwk.y,
+        ext:
+          true
+      },
+      createdAt:
+        Date.now()
+    };
+
+    await peopleDmE2eeWriteDevice(
+      record
+    );
+
+    return record;
+  }
+
+  async function peopleDmE2eeEnsureDevice() {
+    if (!me?.id) {
+      throw new Error(
+        "Compte People indisponible pour E2EE."
+      );
+    }
+
+    const accountId =
+      String(me.id);
+
+    /*
+      Déconnexion / connexion d'un autre compte :
+      jamais de réutilisation de la clé privée précédente.
+    */
+    if (
+      peopleDmE2eeActiveAccountId !==
+        accountId
+    ) {
+      peopleDmE2eeActiveAccountId =
+        accountId;
+
+      peopleDmE2eeDevicePromise =
+        null;
+
+      peopleDmE2eeDerivedKeyCache.clear();
+    }
+
+    if (peopleDmE2eeDevicePromise) {
+      return peopleDmE2eeDevicePromise;
+    }
+
+    peopleDmE2eeDevicePromise =
+      (
+        async () => {
+          let record =
+            await peopleDmE2eeReadDevice(
+              accountId
+            );
+
+          if (
+            !record?.deviceId ||
+            !record?.privateKey ||
+            !record?.publicJwk
+          ) {
+            record =
+              await peopleDmE2eeCreateDevice(
+                accountId
+              );
+          }
+
+          await api(
+            "/api/e2ee/device",
+            {
+              method:
+                "POST",
+              body:
+                JSON.stringify({
+                  deviceId:
+                    record.deviceId,
+                  publicJwk:
+                    record.publicJwk
+                })
+            }
+          );
+
+          return record;
+        }
+      )();
+
+    try {
+      return await peopleDmE2eeDevicePromise;
+    } catch (err) {
+      peopleDmE2eeDevicePromise =
+        null;
+
+      throw err;
+    }
+  }
+
+  async function peopleDmE2eeImportPublicKey(
+    publicJwk
+  ) {
+    return crypto.subtle.importKey(
+      "jwk",
+      publicJwk,
+      {
+        name:
+          "ECDH",
+        namedCurve:
+          "P-256"
+      },
+      false,
+      []
+    );
+  }
+
+  function peopleDmE2eePairSalt(
+    from,
+    to
+  ) {
+    return peopleDmE2eeEncoder.encode(
+      "People E2EE DM salt v1|" +
+      String(from) +
+      "|" +
+      String(to)
+    );
+  }
+
+  function peopleDmE2eeWrapInfo(
+    senderDevice,
+    targetUser,
+    targetDevice
+  ) {
+    return peopleDmE2eeEncoder.encode(
+      "People E2EE DM wrap v1|" +
+      String(senderDevice) +
+      "|" +
+      String(targetUser) +
+      "|" +
+      String(targetDevice)
+    );
+  }
+
+  function peopleDmE2eeWrapAad(
+    from,
+    to,
+    senderDevice,
+    targetUser,
+    targetDevice
+  ) {
+    return peopleDmE2eeEncoder.encode(
+      "People E2EE DM key v1|" +
+      String(from) +
+      "|" +
+      String(to) +
+      "|" +
+      String(senderDevice) +
+      "|" +
+      String(targetUser) +
+      "|" +
+      String(targetDevice)
+    );
+  }
+
+  function peopleDmE2eeMessageAad(
+    from,
+    to,
+    senderDevice
+  ) {
+    return peopleDmE2eeEncoder.encode(
+      "People E2EE DM message v1|" +
+      String(from) +
+      "|" +
+      String(to) +
+      "|" +
+      String(senderDevice)
+    );
+  }
+
+  async function peopleDmE2eeDeriveWrapKey(
+    privateKey,
+    peerPublicJwk,
+    from,
+    to,
+    senderDevice,
+    targetUser,
+    targetDevice
+  ) {
+    const cacheKey =
+      [
+        from,
+        to,
+        senderDevice,
+        targetUser,
+        targetDevice,
+        peerPublicJwk?.x,
+        peerPublicJwk?.y
+      ].join(
+        "|"
+      );
+
+    if (
+      peopleDmE2eeDerivedKeyCache.has(
+        cacheKey
+      )
+    ) {
+      return peopleDmE2eeDerivedKeyCache.get(
+        cacheKey
+      );
+    }
+
+    const peerPublic =
+      await peopleDmE2eeImportPublicKey(
+        peerPublicJwk
+      );
+
+    const sharedBits =
+      await crypto.subtle.deriveBits(
+        {
+          name:
+            "ECDH",
+          public:
+            peerPublic
+        },
+        privateKey,
+        256
+      );
+
+    const hkdfKey =
+      await crypto.subtle.importKey(
+        "raw",
+        sharedBits,
+        "HKDF",
+        false,
+        [
+          "deriveKey"
+        ]
+      );
+
+    const wrapKey =
+      await crypto.subtle.deriveKey(
+        {
+          name:
+            "HKDF",
+          hash:
+            "SHA-256",
+          salt:
+            peopleDmE2eePairSalt(
+              from,
+              to
+            ),
+          info:
+            peopleDmE2eeWrapInfo(
+              senderDevice,
+              targetUser,
+              targetDevice
+            )
+        },
+        hkdfKey,
+        {
+          name:
+            "AES-GCM",
+          length:
+            256
+        },
+        false,
+        [
+          "encrypt",
+          "decrypt"
+        ]
+      );
+
+    peopleDmE2eeDerivedKeyCache.set(
+      cacheKey,
+      wrapKey
+    );
+
+    return wrapKey;
+  }
+
+  async function peopleDmE2eeEncryptText(
+    plainText,
+    username
+  ) {
+    const text =
+      String(plainText || "");
+
+    if (!text) {
+      return "";
+    }
+
+    if (text.length > 2000) {
+      throw new Error(
+        "Le MP ne peut pas dépasser 2000 caractères."
+      );
+    }
+
+    const state =
+      await peopleDmE2eeEnsureDevice();
+
+    const keys =
+      await api(
+        "/api/e2ee/dm/" +
+        encodeURIComponent(
+          username
+        ) +
+        "/devices"
+      );
+
+    const otherId =
+      String(
+        keys?.other?.id ||
+        ""
+      );
+
+    if (
+      !otherId ||
+      !Array.isArray(
+        keys?.otherDevices
+      ) ||
+      !keys.otherDevices.length
+    ) {
+      throw new Error(
+        "Cet utilisateur n'a pas encore activé les MP E2EE sur un appareil."
+      );
+    }
+
+    const devices = [
+      ...(
+        Array.isArray(
+          keys?.myDevices
+        )
+          ? keys.myDevices
+          : []
+      ),
+      ...keys.otherDevices
+    ];
+
+    const unique =
+      new Map();
+
+    for (const device of devices) {
+      const userId =
+        String(
+          device?.userId ||
+          ""
+        );
+
+      const deviceId =
+        String(
+          device?.deviceId ||
+          ""
+        );
+
+      if (
+        !userId ||
+        !deviceId ||
+        !device?.publicJwk
+      ) {
+        continue;
+      }
+
+      unique.set(
+        userId +
+          ":" +
+          deviceId,
+        {
+          userId,
+          deviceId,
+          publicJwk:
+            device.publicJwk
+        }
+      );
+    }
+
+    const from =
+      String(me.id);
+
+    const to =
+      otherId;
+
+    if (
+      ![
+        ...unique.values()
+      ].some(
+        (device) =>
+          device.userId === to
+      )
+    ) {
+      throw new Error(
+        "Aucune clé E2EE valide trouvée pour ce destinataire."
+      );
+    }
+
+    const rawMessageKey =
+      crypto.getRandomValues(
+        new Uint8Array(
+          32
+        )
+      );
+
+    const messageKey =
+      await crypto.subtle.importKey(
+        "raw",
+        rawMessageKey,
+        {
+          name:
+            "AES-GCM"
+        },
+        false,
+        [
+          "encrypt"
+        ]
+      );
+
+    const messageIv =
+      crypto.getRandomValues(
+        new Uint8Array(
+          12
+        )
+      );
+
+    const ciphertext =
+      await crypto.subtle.encrypt(
+        {
+          name:
+            "AES-GCM",
+          iv:
+            messageIv,
+          additionalData:
+            peopleDmE2eeMessageAad(
+              from,
+              to,
+              state.deviceId
+            ),
+          tagLength:
+            128
+        },
+        messageKey,
+        peopleDmE2eeEncoder.encode(
+          text
+        )
+      );
+
+    const wrappedKeys =
+      [];
+
+    for (
+      const device of
+      unique.values()
+    ) {
+      const wrapKey =
+        await peopleDmE2eeDeriveWrapKey(
+          state.privateKey,
+          device.publicJwk,
+          from,
+          to,
+          state.deviceId,
+          device.userId,
+          device.deviceId
+        );
+
+      const wrapIv =
+        crypto.getRandomValues(
+          new Uint8Array(
+            12
+          )
+        );
+
+      const wrapped =
+        await crypto.subtle.encrypt(
+          {
+            name:
+              "AES-GCM",
+            iv:
+              wrapIv,
+            additionalData:
+              peopleDmE2eeWrapAad(
+                from,
+                to,
+                state.deviceId,
+                device.userId,
+                device.deviceId
+              ),
+            tagLength:
+              128
+          },
+          wrapKey,
+          rawMessageKey
+        );
+
+      wrappedKeys.push({
+        u:
+          device.userId,
+        d:
+          device.deviceId,
+        iv:
+          peopleDmE2eeBytesToBase64Url(
+            wrapIv
+          ),
+        ct:
+          peopleDmE2eeBytesToBase64Url(
+            wrapped
+          )
+      });
+    }
+
+    const envelope = {
+      v:
+        1,
+      from,
+      to,
+      sd:
+        state.deviceId,
+      spk:
+        state.publicJwk,
+      iv:
+        peopleDmE2eeBytesToBase64Url(
+          messageIv
+        ),
+      ct:
+        peopleDmE2eeBytesToBase64Url(
+          ciphertext
+        ),
+      keys:
+        wrappedKeys
+    };
+
+    return (
+      PEOPLE_DM_E2EE_PREFIX +
+      peopleDmE2eeEncodeJson(
+        envelope
+      )
+    );
+  }
+
+  async function peopleDmE2eeDecryptText(
+    value
+  ) {
+    const body =
+      String(value || "");
+
+    const envelope =
+      peopleDmE2eeDecodeEnvelope(
+        body
+      );
+
+    if (!envelope) {
+      /*
+        Ancien MP :
+        le serveur AES V1 le déchiffre encore comme avant.
+      */
+      return body;
+    }
+
+    try {
+      const state =
+        await peopleDmE2eeEnsureDevice();
+
+      const copy =
+        envelope.keys.find(
+          (item) =>
+            String(item?.u) ===
+              String(me.id) &&
+            String(item?.d) ===
+              String(state.deviceId)
+        );
+
+      if (!copy) {
+        return "🔒 Message chiffré — clé absente sur cet appareil";
+      }
+
+      const wrapKey =
+        await peopleDmE2eeDeriveWrapKey(
+          state.privateKey,
+          envelope.spk,
+          envelope.from,
+          envelope.to,
+          envelope.sd,
+          copy.u,
+          copy.d
+        );
+
+      const rawMessageKey =
+        await crypto.subtle.decrypt(
+          {
+            name:
+              "AES-GCM",
+            iv:
+              peopleDmE2eeBase64UrlToBytes(
+                copy.iv
+              ),
+            additionalData:
+              peopleDmE2eeWrapAad(
+                envelope.from,
+                envelope.to,
+                envelope.sd,
+                copy.u,
+                copy.d
+              ),
+            tagLength:
+              128
+          },
+          wrapKey,
+          peopleDmE2eeBase64UrlToBytes(
+            copy.ct
+          )
+        );
+
+      const messageKey =
+        await crypto.subtle.importKey(
+          "raw",
+          rawMessageKey,
+          {
+            name:
+              "AES-GCM"
+          },
+          false,
+          [
+            "decrypt"
+          ]
+        );
+
+      const plain =
+        await crypto.subtle.decrypt(
+          {
+            name:
+              "AES-GCM",
+            iv:
+              peopleDmE2eeBase64UrlToBytes(
+                envelope.iv
+              ),
+            additionalData:
+              peopleDmE2eeMessageAad(
+                envelope.from,
+                envelope.to,
+                envelope.sd
+              ),
+            tagLength:
+              128
+          },
+          messageKey,
+          peopleDmE2eeBase64UrlToBytes(
+            envelope.ct
+          )
+        );
+
+      return peopleDmE2eeDecoder.decode(
+        plain
+      );
+    } catch (err) {
+      console.warn(
+        "[People E2EE/decrypt]",
+        err
+      );
+
+      return "⚠️ Message chiffré impossible à vérifier";
+    }
+  }
+
+  async function peopleDmE2eeDecryptMessage(
+    message
+  ) {
+    const next = {
+      ...message,
+      body:
+        await peopleDmE2eeDecryptText(
+          message?.body
+        )
+    };
+
+    if (
+      message?.replyTo &&
+      !message.replyTo.deleted
+    ) {
+      next.replyTo = {
+        ...message.replyTo,
+        text:
+          await peopleDmE2eeDecryptText(
+            message.replyTo.text
+          )
+      };
+    }
+
+    return next;
+  }
+
+  async function peopleDmE2eeDecryptMessages(
+    list
+  ) {
+    const messages =
+      Array.isArray(list)
+        ? list
+        : [];
+
+    return Promise.all(
+      messages.map(
+        peopleDmE2eeDecryptMessage
+      )
+    );
+  }
+
+  async function peopleDmE2eeNotificationPayload(
+    payload
+  ) {
+    if (
+      !payload ||
+      !String(
+        payload.body ||
+        ""
+      ).startsWith(
+        PEOPLE_DM_E2EE_PREFIX
+      )
+    ) {
+      return payload;
+    }
+
+    return {
+      ...payload,
+      body:
+        await peopleDmE2eeDecryptText(
+          payload.body
+        )
+    };
+  }
+  // === PEOPLE_DM_E2EE_CLIENT_V1_END ===
+
+
   function setMode(mode) {
     const home = mode === "home";
 
@@ -2119,13 +3237,18 @@ function dmTextLine(
 
       const subtitle = document.createElement("p");
       subtitle.textContent =
-        "Les messages privés sont enregistrés sur People.";
+        "🔒 Les nouveaux MP texte sont chiffrés de bout en bout.";
 
       welcome.append(title, subtitle);
       fragment.appendChild(welcome);
 
+      const decryptedMessages =
+        await peopleDmE2eeDecryptMessages(
+          data.messages || []
+        );
+
       renderDmMessageGroups(
-        data.messages || [],
+        decryptedMessages,
         fragment
       );
 
@@ -2321,6 +3444,15 @@ function dmTextLine(
         };
       }
 
+      try {
+        await peopleDmE2eeEnsureDevice();
+      } catch (err) {
+        console.warn(
+          "[People E2EE/bootstrap]",
+          err
+        );
+      }
+
       socialReady = true;
 
       await Promise.all([
@@ -2416,6 +3548,14 @@ function dmTextLine(
               );
         }
 
+        const encryptedBody =
+          body
+            ? await peopleDmE2eeEncryptText(
+                body,
+                activeDmUser.username
+              )
+            : "";
+
         await api(
           "/api/dm/" +
             encodeURIComponent(
@@ -2425,7 +3565,8 @@ function dmTextLine(
             method: "POST",
             body:
               JSON.stringify({
-                body,
+                body:
+                  encryptedBody,
                 imageId,
                 replyToId:
                   peopleDmReplyController
@@ -3164,8 +4305,13 @@ function dmTextLine(
 
     if (!senderName) return;
 
+    const notificationPayload =
+      await peopleDmE2eeNotificationPayload(
+        payload
+      );
+
     peopleDmHandleIncomingNotification(
-      payload
+      notificationPayload
     );
 
     if (
@@ -3186,8 +4332,21 @@ function dmTextLine(
         new Notification(
           "People — MP de " + senderName,
           {
-            body: String(payload.body || (payload.imageId ? "🖼️ Image" : "")).slice(0, 180),
-            tag: "people-dm-" + senderName
+            body:
+              String(
+                notificationPayload?.body ||
+                (
+                  payload.imageId
+                    ? "🖼️ Image"
+                    : "🔒 Nouveau message chiffré"
+                )
+              ).slice(
+                0,
+                180
+              ),
+            tag:
+              "people-dm-" +
+              senderName
           }
         );
       }
