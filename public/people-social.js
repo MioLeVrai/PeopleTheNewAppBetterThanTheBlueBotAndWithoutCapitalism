@@ -165,6 +165,172 @@
   let directoryRequestVersion = 0;
   let conversationsByUsername = new Map();
 
+  // === PEOPLE_DM_OPTIMISTIC_V2_START ===
+  // Les MP texte sont affichés immédiatement, avant le chiffrement E2EE
+  // et avant l'aller-retour HTTP. Les messages restent dans cette file
+  // jusqu'à confirmation du serveur.
+  const peopleDmPendingMessages =
+    new Map();
+
+  let peopleDmPendingSequence =
+    0;
+
+  function peopleDmCreatePendingId() {
+    peopleDmPendingSequence +=
+      1;
+
+    return (
+      "pending-dm-" +
+      Date.now().toString(36) +
+      "-" +
+      peopleDmPendingSequence.toString(36)
+    );
+  }
+
+  function peopleDmPendingFor(
+    username
+  ) {
+    const wanted =
+      String(username || "")
+        .trim()
+        .toLocaleLowerCase("fr-FR");
+
+    return [
+      ...peopleDmPendingMessages.values()
+    ]
+      .filter(
+        (entry) =>
+          entry.usernameKey ===
+          wanted
+      )
+      .sort(
+        (left, right) =>
+          dmMessageTimestamp(
+            left.message
+          ) -
+          dmMessageTimestamp(
+            right.message
+          )
+      );
+  }
+
+  function peopleDmAddPending(
+    username,
+    body
+  ) {
+    const id =
+      peopleDmCreatePendingId();
+
+    const entry = {
+      id,
+      usernameKey:
+        String(username || "")
+          .trim()
+          .toLocaleLowerCase("fr-FR"),
+      message: {
+        senderId:
+          String(me?.id || ""),
+        recipientId:
+          String(
+            activeDmUser?.id || ""
+          ),
+        body:
+          String(body || ""),
+        imageId:
+          null,
+        replyTo:
+          null,
+        createdAt:
+          new Date().toISOString()
+      }
+    };
+
+    peopleDmPendingMessages.set(
+      id,
+      entry
+    );
+
+    return entry;
+  }
+
+  function peopleDmRemovePending(
+    id
+  ) {
+    peopleDmPendingMessages.delete(
+      String(id || "")
+    );
+  }
+
+  function peopleDmRemovePendingElement(
+    id
+  ) {
+    const wanted =
+      String(id || "");
+
+    dmMessages
+      ?.querySelectorAll(
+        "[data-people-dm-pending-id]"
+      )
+      .forEach(
+        (element) => {
+          if (
+            element.dataset
+              .peopleDmPendingId ===
+            wanted
+          ) {
+            element.remove();
+          }
+        }
+      );
+  }
+
+  function peopleDmAppendPending(
+    username,
+    target = dmMessages
+  ) {
+    if (!target) {
+      return;
+    }
+
+    for (
+      const entry of
+      peopleDmPendingFor(
+        username
+      )
+    ) {
+      const built =
+        dmMessageElement(
+          entry.message
+        );
+
+      built.row.dataset
+        .peopleDmPendingId =
+        entry.id;
+
+      built.row.classList.add(
+        "people-dm-pending"
+      );
+
+      target.appendChild(
+        built.row
+      );
+    }
+  }
+
+  function peopleDmScrollToBottom() {
+    requestAnimationFrame(
+      () => {
+        if (!dmMessages) {
+          return;
+        }
+
+        dmMessages.scrollTop =
+          dmMessages.scrollHeight;
+      }
+    );
+  }
+  // === PEOPLE_DM_OPTIMISTIC_V2_END ===
+
   function esc(value) {
     return String(value || "");
   }
@@ -2660,6 +2826,7 @@
     }
   }
 
+// === PEOPLE_DM_INSTANT_SEND_V2 ===
 // === PEOPLE_DM_GROUPING_V1_START ===
   const PEOPLE_DM_GROUP_MAX_MESSAGES = 10;
   const PEOPLE_DM_GROUP_MAX_GAP_MS =
@@ -3302,14 +3469,16 @@ function dmTextLine(
         fragment
       );
 
+      peopleDmAppendPending(
+        activeDmUser.username,
+        fragment
+      );
+
       dmMessages.replaceChildren(
         fragment
       );
 
-      requestAnimationFrame(() => {
-        dmMessages.scrollTop =
-          dmMessages.scrollHeight;
-      });
+      peopleDmScrollToBottom();
 
       await api(
         "/api/dm/" +
@@ -3542,7 +3711,7 @@ function dmTextLine(
     }
   );
 
-    dmForm?.addEventListener(
+  dmForm?.addEventListener(
     "submit",
     async (event) => {
       event.preventDefault();
@@ -3552,6 +3721,11 @@ function dmTextLine(
       ) {
         return;
       }
+
+      const targetUsername =
+        String(
+          activeDmUser.username
+        );
 
       const body =
         String(
@@ -3569,21 +3743,90 @@ function dmTextLine(
         return;
       }
 
+      const replySnapshot =
+        peopleDmReplyController
+          ?.get?.() ||
+        null;
+
+      const replyToId =
+        replySnapshot?.id ||
+        null;
+
+      /*
+        Le texte seul est optimiste :
+        on l'affiche AVANT le chiffrement E2EE et AVANT le POST.
+        Les images restent sur le chemin classique car leur imageId
+        n'existe qu'après l'upload.
+      */
+      const optimistic =
+        Boolean(
+          body &&
+          !file
+        );
+
+      const pending =
+        optimistic
+          ? peopleDmAddPending(
+              targetUsername,
+              body
+            )
+          : null;
+
+      if (
+        optimistic &&
+        dmMessages
+      ) {
+        const built =
+          dmMessageElement(
+            pending.message
+          );
+
+        built.row.dataset
+          .peopleDmPendingId =
+          pending.id;
+
+        built.row.classList.add(
+          "people-dm-pending"
+        );
+
+        dmMessages.appendChild(
+          built.row
+        );
+
+        dmInput.value =
+          "";
+
+        peopleDmReplyController
+          ?.clear();
+
+        peopleDmScrollToBottom();
+      }
+
       const submitButton =
         dmForm.querySelector(
           'button[type="submit"]'
         );
 
-      dmInput.disabled =
-        true;
+      /*
+        Pour le texte simple on ne bloque plus le compositeur :
+        l'utilisateur peut déjà taper le message suivant.
+        L'upload d'image conserve le verrouillage actuel.
+      */
+      const lockComposer =
+        Boolean(file);
 
-      if (submitButton) {
-        submitButton.disabled =
+      if (lockComposer) {
+        dmInput.disabled =
           true;
-      }
 
-      peopleDmImagePicker
-        ?.setBusy(true);
+        if (submitButton) {
+          submitButton.disabled =
+            true;
+        }
+
+        peopleDmImagePicker
+          ?.setBusy(true);
+      }
 
       try {
         let imageId =
@@ -3602,56 +3845,115 @@ function dmTextLine(
           body
             ? await peopleDmE2eeEncryptText(
                 body,
-                activeDmUser.username
+                targetUsername
               )
             : "";
 
         await api(
           "/api/dm/" +
             encodeURIComponent(
-              activeDmUser.username
+              targetUsername
             ),
           {
-            method: "POST",
+            method:
+              "POST",
             body:
               JSON.stringify({
                 body:
                   encryptedBody,
                 imageId,
-                replyToId:
-                  peopleDmReplyController
-                    ?.get()?.id || null
+                replyToId
               })
           }
         );
 
-        dmInput.value =
-          "";
+        if (pending) {
+          /*
+            On enlève seulement l'entrée de la file.
+            Le DOM optimiste reste affiché jusqu'au remplacement
+            atomique par loadActiveDm(), donc aucun flash/disparition.
+          */
+          peopleDmRemovePending(
+            pending.id
+          );
+        } else {
+          dmInput.value =
+            "";
 
-        peopleDmImagePicker
-          ?.clear();
+          peopleDmImagePicker
+            ?.clear();
 
-        peopleDmReplyController
-          ?.clear();
+          peopleDmReplyController
+            ?.clear();
+        }
 
-        await loadActiveDm();
+        if (
+          activeDmUser?.username ===
+          targetUsername
+        ) {
+          await loadActiveDm();
+        } else {
+          void refreshConversations();
+        }
       } catch (err) {
+        if (pending) {
+          peopleDmRemovePending(
+            pending.id
+          );
+
+          peopleDmRemovePendingElement(
+            pending.id
+          );
+
+          /*
+            Ne jamais écraser un nouveau brouillon que l'utilisateur
+            aurait commencé pendant l'envoi.
+          */
+          if (
+            activeDmUser?.username ===
+              targetUsername &&
+            dmInput &&
+            !String(
+              dmInput.value || ""
+            )
+          ) {
+            dmInput.value =
+              body;
+
+            if (
+              replySnapshot?.id
+            ) {
+              peopleDmReplyController
+                ?.set?.(
+                  replySnapshot
+                );
+            }
+          }
+        }
+
         alert(
           err.message
         );
       } finally {
-        dmInput.disabled =
-          false;
-
-        if (submitButton) {
-          submitButton.disabled =
+        if (lockComposer) {
+          dmInput.disabled =
             false;
+
+          if (submitButton) {
+            submitButton.disabled =
+              false;
+          }
+
+          peopleDmImagePicker
+            ?.setBusy(false);
         }
 
-        peopleDmImagePicker
-          ?.setBusy(false);
-
-        dmInput.focus();
+        if (
+          activeDmUser?.username ===
+          targetUsername
+        ) {
+          dmInput.focus();
+        }
       }
     }
   );
