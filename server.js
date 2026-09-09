@@ -1621,6 +1621,7 @@ app.get(
   }
 );
 // === PEOPLE_DM_E2EE_ROUTES_V1_END ===
+// === PEOPLE_DM_SIDEBAR_PREVIEW_CLEAN_V1 ===
 
 function peopleAccountIsOnline(accountId) {
   const wanted = String(accountId);
@@ -2826,6 +2827,12 @@ async function peopleDmConversations(accountId) {
               message.body,
               message.image_id
             ),
+          lastMessageE2ee:
+            peopleDmE2eeIsEnvelope(
+              message.body
+            )
+              ? message.body
+              : null,
           lastAt:
             message.created_at,
           unreadCount:
@@ -2886,6 +2893,9 @@ async function peopleDmConversations(accountId) {
       },
       lastMessage:
         item.lastMessage,
+      lastMessageE2ee:
+        item.lastMessageE2ee ||
+        null,
       lastAt:
         item.lastAt,
       unreadCount:
@@ -10004,7 +10014,7 @@ function peopleDmCallConversationPreview(
       cleanBody
     )
   ) {
-    return "🔒 Message chiffré";
+    return "Message privé";
   }
 
   const event =

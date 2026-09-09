@@ -54,3 +54,15 @@
   border-radius: 4px;
 }
 /* === PEOPLE_PROFILE_CLICK_STYLE_V3_END === */
+
+/* === PEOPLE_MESSAGE_HOVER_CLEAN_V1_START === */
+/*
+  Pas de gros rectangle autour d'un groupe de messages.
+  Le hover individuel de chaque message reste celui du thème actuel.
+*/
+.message:hover,
+.dm-message:hover {
+  background: transparent !important;
+}
+/* === PEOPLE_MESSAGE_HOVER_CLEAN_V1_END === */
+

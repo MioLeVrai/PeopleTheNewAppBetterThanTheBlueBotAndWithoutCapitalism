@@ -1167,7 +1167,7 @@
         );
 
       if (!copy) {
-        return "🔒 Message chiffré — clé absente sur cet appareil";
+        return "Message indisponible sur cet appareil";
       }
 
       const wrapKey =
@@ -1324,6 +1324,7 @@
     };
   }
   // === PEOPLE_DM_E2EE_CLIENT_V1_END ===
+  // === PEOPLE_DM_SIDEBAR_PREVIEW_CLEAN_V1 ===
 
 
   function setMode(mode) {
@@ -2567,10 +2568,59 @@
               "/api/dm/conversations"
             );
 
-            conversations =
-              Array.isArray(data.conversations)
+            const rawConversations =
+              Array.isArray(
+                data.conversations
+              )
                 ? data.conversations
                 : [];
+
+            conversations =
+              await Promise.all(
+                rawConversations.map(
+                  async (
+                    conversation
+                  ) => {
+                    const encryptedPreview =
+                      String(
+                        conversation?.lastMessageE2ee ||
+                        ""
+                      );
+
+                    if (
+                      !encryptedPreview.startsWith(
+                        PEOPLE_DM_E2EE_PREFIX
+                      )
+                    ) {
+                      return conversation;
+                    }
+
+                    const decryptedPreview =
+                      await peopleDmE2eeDecryptText(
+                        encryptedPreview
+                      );
+
+                    const cleanPreview =
+                      String(
+                        decryptedPreview ||
+                        ""
+                      ).trim();
+
+                    return {
+                      ...conversation,
+                      lastMessage:
+                        cleanPreview &&
+                        cleanPreview !==
+                          "Message indisponible sur cet appareil" &&
+                        !cleanPreview.startsWith(
+                          "⚠️"
+                        )
+                          ? cleanPreview
+                          : "Message privé"
+                    };
+                  }
+                )
+              );
 
             conversationsByUsername =
               new Map(
@@ -3237,7 +3287,7 @@ function dmTextLine(
 
       const subtitle = document.createElement("p");
       subtitle.textContent =
-        "🔒 Les nouveaux MP texte sont chiffrés de bout en bout.";
+        "Les nouveaux MP texte sont chiffrés de bout en bout.";
 
       welcome.append(title, subtitle);
       fragment.appendChild(welcome);
@@ -4338,7 +4388,7 @@ function dmTextLine(
                 (
                   payload.imageId
                     ? "🖼️ Image"
-                    : "🔒 Nouveau message chiffré"
+                    : "Nouveau message"
                 )
               ).slice(
                 0,
