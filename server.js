@@ -86,6 +86,353 @@ function peopleSessionSecret() {
 
 const PEOPLE_SESSION_SECRET = peopleSessionSecret();
 
+// === PEOPLE_MESSAGE_ENCRYPTION_V1_START ===
+const PEOPLE_MESSAGE_ENCRYPTION_PREFIX =
+  "people-msg:v1:";
+
+const PEOPLE_MESSAGE_ENCRYPTION_AAD =
+  Buffer.from(
+    "People message encryption v1",
+    "utf8"
+  );
+
+const PEOPLE_LOCAL_MESSAGE_KEY =
+  pathAccounts.join(
+    __dirname,
+    ".people-message-encryption-key"
+  );
+
+function peopleDecodeMessageEncryptionKey(
+  value
+) {
+  const raw =
+    String(
+      value ||
+      ""
+    ).trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  let key =
+    null;
+
+  if (
+    /^[0-9a-f]{64}$/i.test(
+      raw
+    )
+  ) {
+    key =
+      Buffer.from(
+        raw,
+        "hex"
+      );
+  } else {
+    try {
+      key =
+        Buffer.from(
+          raw,
+          "base64url"
+        );
+    } catch {
+      key =
+        null;
+    }
+
+    if (
+      !key ||
+      key.length !==
+        32
+    ) {
+      try {
+        key =
+          Buffer.from(
+            raw,
+            "base64"
+          );
+      } catch {
+        key =
+          null;
+      }
+    }
+  }
+
+  if (
+    !key ||
+    key.length !==
+      32
+  ) {
+    const err =
+      new Error(
+        "PEOPLE_MESSAGE_ENCRYPTION_KEY doit contenir exactement 32 octets " +
+        "(base64url/base64 ou 64 caractères hex)."
+      );
+
+    err.code =
+      "PEOPLE_MESSAGE_KEY_INVALID";
+
+    throw err;
+  }
+
+  return key;
+}
+
+function peopleMessageEncryptionKey() {
+  const configured =
+    String(
+      process.env
+        .PEOPLE_MESSAGE_ENCRYPTION_KEY ||
+      ""
+    ).trim();
+
+  if (configured) {
+    return peopleDecodeMessageEncryptionKey(
+      configured
+    );
+  }
+
+  if (PEOPLE_PRODUCTION) {
+    const err =
+      new Error(
+        "PEOPLE_MESSAGE_ENCRYPTION_KEY manque. " +
+        "Ajoute cette variable dans Render > Environment avant de démarrer People."
+      );
+
+    err.code =
+      "PEOPLE_MESSAGE_KEY_MISSING";
+
+    throw err;
+  }
+
+  if (
+    fsAccounts.existsSync(
+      PEOPLE_LOCAL_MESSAGE_KEY
+    )
+  ) {
+    return peopleDecodeMessageEncryptionKey(
+      fsAccounts.readFileSync(
+        PEOPLE_LOCAL_MESSAGE_KEY,
+        "utf8"
+      )
+    );
+  }
+
+  const key =
+    cryptoAccounts.randomBytes(
+      32
+    );
+
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_MESSAGE_KEY,
+    key.toString(
+      "base64url"
+    ) +
+      "\n",
+    {
+      mode:
+        0o600
+    }
+  );
+
+  console.log(
+    "[People] Clé locale de chiffrement messages créée."
+  );
+
+  return key;
+}
+
+const PEOPLE_MESSAGE_ENCRYPTION_KEY =
+  peopleMessageEncryptionKey();
+
+function peopleMessageIsEncrypted(
+  value
+) {
+  return String(
+    value ||
+    ""
+  ).startsWith(
+    PEOPLE_MESSAGE_ENCRYPTION_PREFIX
+  );
+}
+
+function peopleEncryptMessageText(
+  value
+) {
+  const plain =
+    String(
+      value ||
+      ""
+    );
+
+  if (
+    !plain ||
+    peopleMessageIsEncrypted(
+      plain
+    )
+  ) {
+    return plain;
+  }
+
+  const iv =
+    cryptoAccounts.randomBytes(
+      12
+    );
+
+  const cipher =
+    cryptoAccounts.createCipheriv(
+      "aes-256-gcm",
+      PEOPLE_MESSAGE_ENCRYPTION_KEY,
+      iv
+    );
+
+  cipher.setAAD(
+    PEOPLE_MESSAGE_ENCRYPTION_AAD
+  );
+
+  const ciphertext =
+    Buffer.concat([
+      cipher.update(
+        plain,
+        "utf8"
+      ),
+      cipher.final()
+    ]);
+
+  const tag =
+    cipher.getAuthTag();
+
+  return (
+    PEOPLE_MESSAGE_ENCRYPTION_PREFIX +
+    iv.toString(
+      "base64url"
+    ) +
+    "." +
+    tag.toString(
+      "base64url"
+    ) +
+    "." +
+    ciphertext.toString(
+      "base64url"
+    )
+  );
+}
+
+function peopleDecryptMessageText(
+  value
+) {
+  const stored =
+    String(
+      value ||
+      ""
+    );
+
+  if (
+    !stored ||
+    !peopleMessageIsEncrypted(
+      stored
+    )
+  ) {
+    // Compatibilité avec les anciens messages en clair.
+    return stored;
+  }
+
+  const payload =
+    stored.slice(
+      PEOPLE_MESSAGE_ENCRYPTION_PREFIX.length
+    );
+
+  const parts =
+    payload.split(
+      "."
+    );
+
+  if (
+    parts.length !==
+      3
+  ) {
+    const err =
+      new Error(
+        "Message chiffré invalide."
+      );
+
+    err.code =
+      "PEOPLE_MESSAGE_DECRYPT_FAILED";
+
+    throw err;
+  }
+
+  try {
+    const iv =
+      Buffer.from(
+        parts[0],
+        "base64url"
+      );
+
+    const tag =
+      Buffer.from(
+        parts[1],
+        "base64url"
+      );
+
+    const ciphertext =
+      Buffer.from(
+        parts[2],
+        "base64url"
+      );
+
+    if (
+      iv.length !==
+        12 ||
+      tag.length !==
+        16
+    ) {
+      throw new Error(
+        "Format AES-GCM invalide."
+      );
+    }
+
+    const decipher =
+      cryptoAccounts.createDecipheriv(
+        "aes-256-gcm",
+        PEOPLE_MESSAGE_ENCRYPTION_KEY,
+        iv
+      );
+
+    decipher.setAAD(
+      PEOPLE_MESSAGE_ENCRYPTION_AAD
+    );
+
+    decipher.setAuthTag(
+      tag
+    );
+
+    return Buffer.concat([
+      decipher.update(
+        ciphertext
+      ),
+      decipher.final()
+    ]).toString(
+      "utf8"
+    );
+  } catch (cause) {
+    const err =
+      new Error(
+        "Impossible de déchiffrer un message. " +
+        "Vérifie PEOPLE_MESSAGE_ENCRYPTION_KEY."
+      );
+
+    err.code =
+      "PEOPLE_MESSAGE_DECRYPT_FAILED";
+
+    err.cause =
+      cause;
+
+    throw err;
+  }
+}
+// === PEOPLE_MESSAGE_ENCRYPTION_V1_END ===
+
 // === PEOPLE_SIMPLE_ADMIN_DELETE_V1_START ===
 const PEOPLE_SIMPLE_ADMIN_TOKEN =
   String(
@@ -638,7 +985,17 @@ function peopleReadLocalSocial() {
 
     return {
       friends: Array.isArray(raw.friends) ? raw.friends : [],
-      dms: Array.isArray(raw.dms) ? raw.dms : [],
+      dms: Array.isArray(raw.dms)
+        ? raw.dms.map(
+            (message) => ({
+              ...message,
+              body:
+                peopleDecryptMessageText(
+                  message?.body
+                )
+            })
+          )
+        : [],
       friend_requests: Array.isArray(raw.friend_requests)
         ? raw.friend_requests
         : [],
@@ -647,7 +1004,14 @@ function peopleReadLocalSocial() {
           ? raw.closed_dms
           : []
     };
-  } catch {
+  } catch (err) {
+    if (
+      err?.code ===
+        "PEOPLE_MESSAGE_DECRYPT_FAILED"
+    ) {
+      throw err;
+    }
+
     return {
       friends: [],
       dms: [],
@@ -663,7 +1027,17 @@ function peopleWriteLocalSocial(data) {
     JSON.stringify(
       {
         friends: Array.isArray(data.friends) ? data.friends : [],
-        dms: Array.isArray(data.dms) ? data.dms : [],
+        dms: Array.isArray(data.dms)
+          ? data.dms.map(
+              (message) => ({
+                ...message,
+                body:
+                  peopleEncryptMessageText(
+                    message?.body
+                  )
+              })
+            )
+          : [],
         friend_requests: Array.isArray(data.friend_requests)
           ? data.friend_requests
           : [],
@@ -1345,7 +1719,9 @@ async function peopleCreateDm(
           [
             sender,
             recipient,
-            cleanBody,
+            peopleEncryptMessageText(
+              cleanBody
+            ),
             replyKey || null
           ]
         );
@@ -1379,6 +1755,11 @@ async function peopleCreateDm(
       }
 
       await client.query("COMMIT");
+
+      row.body =
+        peopleDecryptMessageText(
+          row.body
+        );
 
       row.image_id =
         boundImageId;
@@ -1521,7 +1902,26 @@ async function peopleDmHistory(
         ]
       );
 
-    return result.rows.reverse();
+    return result.rows
+      .reverse()
+      .map(
+        (row) => ({
+          ...row,
+          body:
+            peopleDecryptMessageText(
+              row.body
+            ),
+          reply_body:
+            row.reply_body ===
+              null ||
+            row.reply_body ===
+              undefined
+              ? row.reply_body
+              : peopleDecryptMessageText(
+                  row.reply_body
+                )
+        })
+      );
   }
 
   const all =
@@ -1973,8 +2373,25 @@ function peopleReadLocalGeneral() {
       )
     );
 
-    return Array.isArray(data) ? data : [];
-  } catch {
+    return Array.isArray(data)
+      ? data.map(
+          (message) => ({
+            ...message,
+            text:
+              peopleDecryptMessageText(
+                message?.text
+              )
+          })
+        )
+      : [];
+  } catch (err) {
+    if (
+      err?.code ===
+        "PEOPLE_MESSAGE_DECRYPT_FAILED"
+    ) {
+      throw err;
+    }
+
     return [];
   }
 }
@@ -1984,7 +2401,17 @@ function peopleWriteLocalGeneral(messages) {
     PEOPLE_LOCAL_GENERAL,
     JSON.stringify(
       Array.isArray(messages)
-        ? messages.slice(-1000)
+        ? messages
+            .slice(-1000)
+            .map(
+              (message) => ({
+                ...message,
+                text:
+                  peopleEncryptMessageText(
+                    message?.text
+                  )
+              })
+            )
         : [],
       null,
       2
@@ -2075,7 +2502,10 @@ async function peopleGeneralReplyPreview(
     return {
       id: String(row.id),
       username: row.username,
-      text: row.body,
+      text:
+        peopleDecryptMessageText(
+          row.body
+        ),
       imageId:
         row.image_id
           ? String(row.image_id)
@@ -2154,7 +2584,10 @@ async function peopleDmReplyPreview(
       username:
         row.sender_username ||
         "Utilisateur",
-      text: row.body,
+      text:
+        peopleDecryptMessageText(
+          row.body
+        ),
       imageId:
         row.image_id
           ? String(row.image_id)
@@ -2511,7 +2944,9 @@ async function peopleSaveGeneralMessage(
           [
             String(senderId),
             cleanUsername,
-            cleanText,
+            peopleEncryptMessageText(
+              cleanText
+            ),
             replyKey || null
           ]
         );
@@ -2550,7 +2985,9 @@ async function peopleSaveGeneralMessage(
         username:
           row.username,
         text:
-          row.body,
+          peopleDecryptMessageText(
+            row.body
+          ),
         imageId:
           boundImageId,
         replyTo:
@@ -2686,7 +3123,9 @@ async function peopleLoadGeneralMessages(
         username:
           row.username,
         text:
-          row.body,
+          peopleDecryptMessageText(
+            row.body
+          ),
         imageId:
           row.image_id
             ? String(row.image_id)
@@ -2703,7 +3142,9 @@ async function peopleLoadGeneralMessages(
                       username:
                         row.reply_username,
                       text:
-                        row.reply_body || "",
+                        peopleDecryptMessageText(
+                          row.reply_body || ""
+                        ),
                       imageId:
                         row.reply_image_id
                           ? String(
@@ -2915,7 +3356,7 @@ async function peopleInitSocial() {
     "id BIGSERIAL PRIMARY KEY, " +
     "sender_id BIGINT NULL REFERENCES people_accounts(id) ON DELETE SET NULL, " +
     "username VARCHAR(24) NOT NULL, " +
-    "body VARCHAR(1000) NOT NULL, " +
+    "body TEXT NOT NULL, " +
     "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()" +
     ")"
   );
@@ -2930,7 +3371,7 @@ async function peopleInitSocial() {
     "id BIGSERIAL PRIMARY KEY, " +
     "sender_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
     "recipient_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
-    "body VARCHAR(2000) NOT NULL, " +
+    "body TEXT NOT NULL, " +
     "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
     "read_at TIMESTAMPTZ NULL" +
     ")"
@@ -6864,7 +7305,9 @@ async function peopleServerReplyPreview(
       username:
         row.username,
       text:
-        row.body,
+        peopleDecryptMessageText(
+          row.body
+        ),
       imageId:
         row.image_id
           ? String(row.image_id)
@@ -6982,7 +7425,9 @@ async function peopleServerSaveMessage(
             sid,
             String(senderId),
             cleanUsername,
-            cleanText,
+            peopleEncryptMessageText(
+              cleanText
+            ),
             replyKey || null
           ]
         );
@@ -7023,7 +7468,9 @@ async function peopleServerSaveMessage(
         username:
           row.username,
         text:
-          row.body,
+          peopleDecryptMessageText(
+            row.body
+          ),
         imageId:
           boundImageId,
         replyTo:
@@ -7171,7 +7618,9 @@ async function peopleServerLoadMessages(
           username:
             row.username,
           text:
-            row.body,
+            peopleDecryptMessageText(
+              row.body
+            ),
           imageId:
             row.image_id
               ? String(row.image_id)
@@ -7188,7 +7637,9 @@ async function peopleServerLoadMessages(
                         username:
                           row.reply_username,
                         text:
-                          row.reply_body || "",
+                          peopleDecryptMessageText(
+                            row.reply_body || ""
+                          ),
                         imageId:
                           row.reply_image_id
                             ? String(
@@ -7787,7 +8238,9 @@ async function peopleSaveServerSystemMessage(
         [
           sid,
           "Système",
-          cleanText
+          peopleEncryptMessageText(
+            cleanText
+          )
         ]
       );
 
@@ -7802,7 +8255,9 @@ async function peopleSaveServerSystemMessage(
       username:
         "Système",
       text:
-        row.body,
+        peopleDecryptMessageText(
+          row.body
+        ),
       system:
         true,
       time:
@@ -8896,14 +9351,19 @@ function peopleDmCallConversationPreview(
   body,
   imageId
 ) {
+  const cleanBody =
+    peopleDecryptMessageText(
+      body
+    );
+
   const event =
     peopleDmCallParseEventBody(
-      body
+      cleanBody
     );
 
   if (!event) {
     return (
-      body ||
+      cleanBody ||
       (
         imageId
           ? "🖼️ Image"
@@ -9029,7 +9489,9 @@ function peopleDmCallSaveTimeline(
         String(
           call.calleeAccountId
         ),
-        body,
+        peopleEncryptMessageText(
+          body
+        ),
         readAt
       ]
     )
@@ -11531,11 +11993,192 @@ io.on("connection", (socket) => {
   );
 });
 
+// === PEOPLE_MESSAGE_ENCRYPTION_MIGRATION_V1_START ===
+async function peopleMigrateStoredMessageEncryption() {
+  if (peoplePool) {
+    const client =
+      await peoplePool.connect();
+
+    let migratedGeneral =
+      0;
+
+    let migratedDm =
+      0;
+
+    try {
+      await client.query(
+        "BEGIN"
+      );
+
+      /*
+        Les ciphertexts AES-GCM sont plus longs que le texte initial.
+        TEXT évite toute troncature.
+      */
+      await client.query(
+        "ALTER TABLE people_general_messages " +
+        "ALTER COLUMN body TYPE TEXT"
+      );
+
+      await client.query(
+        "ALTER TABLE people_direct_messages " +
+        "ALTER COLUMN body TYPE TEXT"
+      );
+
+      const generalRows =
+        await client.query(
+          "SELECT id, body FROM people_general_messages ORDER BY id ASC"
+        );
+
+      for (
+        const row of
+        generalRows.rows
+      ) {
+        const body =
+          String(
+            row.body ||
+            ""
+          );
+
+        if (!body) {
+          continue;
+        }
+
+        if (
+          peopleMessageIsEncrypted(
+            body
+          )
+        ) {
+          // Valide également que la clé actuelle est la bonne.
+          peopleDecryptMessageText(
+            body
+          );
+
+          continue;
+        }
+
+        await client.query(
+          "UPDATE people_general_messages SET body = $1 WHERE id = $2",
+          [
+            peopleEncryptMessageText(
+              body
+            ),
+            row.id
+          ]
+        );
+
+        migratedGeneral +=
+          1;
+      }
+
+      const dmRows =
+        await client.query(
+          "SELECT id, body FROM people_direct_messages ORDER BY id ASC"
+        );
+
+      for (
+        const row of
+        dmRows.rows
+      ) {
+        const body =
+          String(
+            row.body ||
+            ""
+          );
+
+        if (!body) {
+          continue;
+        }
+
+        if (
+          peopleMessageIsEncrypted(
+            body
+          )
+        ) {
+          peopleDecryptMessageText(
+            body
+          );
+
+          continue;
+        }
+
+        await client.query(
+          "UPDATE people_direct_messages SET body = $1 WHERE id = $2",
+          [
+            peopleEncryptMessageText(
+              body
+            ),
+            row.id
+          ]
+        );
+
+        migratedDm +=
+          1;
+      }
+
+      await client.query(
+        "COMMIT"
+      );
+
+      console.log(
+        "[People] Chiffrement messages : " +
+        migratedGeneral +
+        " serveur(s) + " +
+        migratedDm +
+        " MP migré(s)."
+      );
+
+      return;
+    } catch (err) {
+      await client
+        .query(
+          "ROLLBACK"
+        )
+        .catch(
+          () => {}
+        );
+
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /*
+    En local, les helpers de lecture renvoient du plaintext
+    et les helpers d'écriture rechiffrent avant JSON.stringify().
+  */
+  if (
+    fsAccounts.existsSync(
+      PEOPLE_LOCAL_SOCIAL
+    )
+  ) {
+    peopleWriteLocalSocial(
+      peopleReadLocalSocial()
+    );
+  }
+
+  if (
+    fsAccounts.existsSync(
+      PEOPLE_LOCAL_GENERAL
+    )
+  ) {
+    peopleWriteLocalGeneral(
+      peopleReadLocalGeneral()
+    );
+  }
+
+  console.log(
+    "[People] Chiffrement messages local vérifié."
+  );
+}
+// === PEOPLE_MESSAGE_ENCRYPTION_MIGRATION_V1_END ===
+
 const PORT = Number(process.env.PORT) || 3000;
 
 peopleInitAccounts()
   .then(() => peopleInitSocial())
   .then(() => peopleInitServersV1())
+  .then(() => peopleMigrateStoredMessageEncryption())
   // === PEOPLE_DELETE_EMPTY_ON_STARTUP_V1 ===
   .then(() => peopleDeleteAllEmptyServers())
   .then(() => {

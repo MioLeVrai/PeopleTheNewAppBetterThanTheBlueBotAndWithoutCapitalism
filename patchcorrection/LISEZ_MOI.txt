@@ -1,0 +1,143 @@
+PEOPLE — CHIFFREMENT DES MESSAGES V1
+
+CE QUE ÇA FAIT
+==============
+
+Les textes stockés ne restent plus lisibles directement dans :
+
+- PostgreSQL
+- people-social.local.json
+- people-general.local.json
+- sauvegardes / dumps de ces données
+
+Algorithme :
+
+AES-256-GCM
+IV aléatoire 12 octets par message
+tag d'authentification 16 octets
+AAD fixe People v1
+
+Chaque message reçoit un IV différent.
+
+EXEMPLE
+=======
+
+Avant dans la DB :
+
+salut tu fais quoi ce soir
+
+Après :
+
+people-msg:v1:<iv>.<tag>.<ciphertext>
+
+Le serveur déchiffre uniquement quand son code a besoin de renvoyer
+le message à un utilisateur qui a déjà passé les contrôles d'accès.
+
+CE N'EST PAS DE L'E2EE
+======================
+
+C'est du chiffrement au repos côté serveur.
+
+Le serveur People possède la clé et peut donc déchiffrer les messages.
+
+Une future vraie E2EE des MP serait différente :
+les clés seraient sur les appareils utilisateurs et le serveur
+ne pourrait pas lire le contenu.
+
+COUVERT
+=======
+
+- MP texte
+- réponses de MP
+- previews de conversations
+- messages texte de serveurs
+- réponses de serveurs
+- messages système de serveurs
+- événements d'historique des appels MP
+- PostgreSQL
+- fallback JSON local
+
+Les images ne sont PAS encore chiffrées dans cette V1.
+
+MIGRATION AUTOMATIQUE
+=====================
+
+Au démarrage du serveur :
+
+1. vérification de la clé
+2. colonnes body PostgreSQL converties en TEXT
+3. validation des messages déjà chiffrés
+4. anciens messages en clair chiffrés
+5. seulement ensuite People démarre HTTP
+
+Si la clé ne permet pas de déchiffrer un ancien ciphertext :
+le démarrage échoue au lieu d'écraser les données.
+
+RENDER — OBLIGATOIRE
+=====================
+
+AVANT de déployer le server.js patché :
+
+1. lance :
+
+CREER_CLE_CHIFFREMENT_MESSAGES.bat
+
+2. copie la valeur générée
+
+3. dans Render :
+
+Environment
+
+4. ajoute :
+
+PEOPLE_MESSAGE_ENCRYPTION_KEY
+
+avec la valeur générée.
+
+NE JAMAIS :
+- commit la clé dans GitHub
+- l'écrire dans server.js
+- changer la clé après migration
+- supprimer la clé Render sans sauvegarde sûre
+
+Si la clé est perdue, les messages chiffrés ne peuvent plus être lus.
+
+LOCAL
+=====
+
+En développement local, si la variable d'environnement n'existe pas,
+People crée automatiquement :
+
+.people-message-encryption-key
+
+à côté de server.js.
+
+Ce fichier est uniquement pour le fallback local.
+
+FICHIER PROJET MODIFIÉ
+======================
+
+UNIQUEMENT :
+
+D:\crack\Discord 2\server.js
+
+BACKUP
+======
+
+D:\crack\Discord 2\backup\<timestamp>\server.js
+
+INSTALLATION
+============
+
+1. PATCH_CHIFFREMENT_MESSAGES_V1.bat
+2. CREER_CLE_CHIFFREMENT_MESSAGES.bat
+3. ajouter la clé dans Render
+4. commit/push server.js
+5. laisser Render redéployer
+
+IMPORTANT
+=========
+
+La migration touche les données au prochain démarrage du serveur.
+Fais donc une sauvegarde PostgreSQL si tu veux une protection
+supplémentaire avant le premier déploiement.
