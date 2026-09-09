@@ -13,3 +13,12 @@ people-avatar-meta.local.json
 people-message-images/
 people-message-images.local.json
 people-servers.local.json
+.env.*
+!.env.example
+.people-message-encryption-key
+people-*.local.json
+backup_security_*/
+People_SOURCE_SAFE_*.zip
+.env.example
+backup_security_v2_*/
+People_SOURCE_SAFE_V2*.zip

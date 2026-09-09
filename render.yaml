@@ -8,5 +8,7 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      - key: PEOPLE_MESSAGE_ENCRYPTION_KEY
+        sync: false
       - key: NODE_ENV
         value: production
