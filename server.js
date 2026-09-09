@@ -5793,11 +5793,20 @@ app.get("/api/dm/:username", async (req, res) => {
       });
     }
 
-    const messages =
-      await peopleDmHistory(
-        session.id,
-        target.id
-      );
+    // === PEOPLE_NAVIGATION_PARALLEL_V1_DM ===
+    // L'historique et la relation d'amitié sont indépendants : les attendre
+    // en parallèle réduit la latence réelle du premier affichage d'un MP.
+    const [messages, isFriend] =
+      await Promise.all([
+        peopleDmHistory(
+          session.id,
+          target.id
+        ),
+        peopleHasFriend(
+          session.id,
+          target.id
+        )
+      ]);
 
     res.json({
       ok: true,
@@ -5809,11 +5818,7 @@ app.get("/api/dm/:username", async (req, res) => {
           peopleAccountIsOnline(
             target.id
           ),
-        isFriend:
-          await peopleHasFriend(
-            session.id,
-            target.id
-          )
+        isFriend
       },
       messages:
         messages.map(
@@ -8039,60 +8044,6 @@ async function peopleServerSaveMessage(
     return null;
   }
 
-  if (
-    peoplePool &&
-    !imageKey &&
-    !replyKey
-  ) {
-    /*
-      Chemin rapide pour le cas ultra fréquent :
-      message texte simple, sans image ni réponse.
-
-      Pas besoin de BEGIN / COMMIT ici : l'INSERT est
-      déjà atomique. On économise donc plusieurs
-      allers-retours PostgreSQL avant le broadcast.
-    */
-    const result =
-      await peoplePool.query(
-        "INSERT INTO people_general_messages " +
-        "(server_id, sender_id, username, body, reply_to_id) " +
-        "VALUES ($1, $2, $3, $4, NULL) " +
-        "RETURNING id, username, body, reply_to_id, created_at",
-        [
-          sid,
-          String(senderId),
-          cleanUsername,
-          peopleEncryptMessageText(
-            cleanText
-          )
-        ]
-      );
-
-    const row =
-      result.rows[0];
-
-    return {
-      id:
-        String(row.id),
-      serverId:
-        sid,
-      username:
-        row.username,
-      text:
-        peopleDecryptMessageText(
-          row.body
-        ),
-      imageId:
-        null,
-      replyTo:
-        null,
-      time:
-        new Date(
-          row.created_at
-        ).getTime()
-    };
-  }
-
   if (peoplePool) {
     const client =
       await peoplePool.connect();
@@ -8879,16 +8830,17 @@ app.get(
         });
       }
 
-      const joined =
-        await peopleIsServerMember(
-          session.id,
-          server.id
-        );
-
-      const memberCount =
-        await peopleServerMemberCount(
-          server.id
-        );
+      // === PEOPLE_NAVIGATION_PARALLEL_V1_INVITE ===
+      const [joined, memberCount] =
+        await Promise.all([
+          peopleIsServerMember(
+            session.id,
+            server.id
+          ),
+          peopleServerMemberCount(
+            server.id
+          )
+        ]);
 
       res.json({
         ok: true,
@@ -12008,16 +11960,18 @@ io.on("connection", (socket) => {
           )
         );
 
-        const history =
-          await peopleServerLoadMessages(
-            server.id,
-            100
-          );
-
-        const online =
-          await peopleServerPresenceRoster(
-            server.id
-          );
+        // === PEOPLE_NAVIGATION_PARALLEL_V1_SERVER ===
+        // Historique et présence ne dépendent pas l'un de l'autre.
+        const [history, online] =
+          await Promise.all([
+            peopleServerLoadMessages(
+              server.id,
+              100
+            ),
+            peopleServerPresenceRoster(
+              server.id
+            )
+          ]);
 
         const voice =
           peopleVoiceRoster(
@@ -12054,6 +12008,7 @@ io.on("connection", (socket) => {
     }
   );
 
+  // === PEOPLE_GENERAL_OPTIMISTIC_SERVER_V1_START ===
   socket.on(
     "chat-message",
     async (
@@ -12065,43 +12020,25 @@ io.on("connection", (socket) => {
       } = {},
       ack = () => {}
     ) => {
+      const reply =
+        typeof ack === "function"
+          ? ack
+          : () => {};
+
       const username =
-        users.get(
-          socket.id
-        );
+        users.get(socket.id);
 
       const senderId =
-        userIds.get(
-          socket.id
-        );
+        userIds.get(socket.id);
 
       const serverId =
-        socketServerIds.get(
-          socket.id
-        );
+        socketServerIds.get(socket.id);
 
-      const cleanClientId =
-        String(
-          clientId || ""
-        )
-          .trim()
-          .slice(
-            0,
-            100
-          );
-
-      if (
-        !username ||
-        !senderId ||
-        !serverId
-      ) {
-        ack({
-          ok:
-            false,
-          error:
-            "Session de chat invalide."
+      if (!username || !senderId || !serverId) {
+        reply({
+          ok: false,
+          error: "Session ou serveur invalide."
         });
-
         return;
       }
 
@@ -12111,23 +12048,22 @@ io.on("connection", (socket) => {
           .slice(0, 1000);
 
       const imageKey =
-        peopleNormalizeMessageImageId(
-          imageId
-        );
+        peopleNormalizeMessageImageId(imageId);
 
-      if (
-        !cleanText &&
-        !imageKey
-      ) {
-        ack({
-          ok:
-            false,
-          error:
-            "Message vide."
+      if (!cleanText && !imageKey) {
+        reply({
+          ok: false,
+          error: "Message vide."
         });
-
         return;
       }
+
+      // Identifiant purement client : il sert uniquement à remplacer le
+      // message optimiste local par la version persistée du serveur.
+      const cleanClientId =
+        String(clientId || "")
+          .trim()
+          .slice(0, 120);
 
       try {
         const saved =
@@ -12141,39 +12077,28 @@ io.on("connection", (socket) => {
           );
 
         if (!saved) {
-          ack({
-            ok:
-              false,
-            error:
-              "Le message n'a pas pu être sauvegardé."
+          reply({
+            ok: false,
+            error: "Impossible d'enregistrer le message."
           });
-
           return;
         }
 
-        const outgoing =
+        const payload =
           cleanClientId
-            ? {
-                ...saved,
-                clientId:
-                  cleanClientId
-              }
+            ? { ...saved, clientId: cleanClientId }
             : saved;
 
         io.to(
-          peopleServerRoom(
-            serverId
-          )
+          peopleServerRoom(serverId)
         ).emit(
           "chat-message",
-          outgoing
+          payload
         );
 
-        ack({
-          ok:
-            true,
-          message:
-            outgoing
+        reply({
+          ok: true,
+          message: payload
         });
       } catch (err) {
         console.error(
@@ -12182,37 +12107,30 @@ io.on("connection", (socket) => {
         );
 
         const errorText =
-          err?.code ===
-            "IMAGE_INVALID"
+          err?.code === "IMAGE_INVALID"
             ? "Cette image n'est plus disponible. Réessaie de la sélectionner."
-            : err?.code ===
-                "REPLY_INVALID"
+            : err?.code === "REPLY_INVALID"
               ? "Le message auquel tu réponds n'est plus disponible."
               : "Le message n'a pas pu être sauvegardé.";
 
-        ack({
-          ok:
-            false,
-          error:
-            errorText
-        });
-
-        /*
-          Compatibilité avec les anciens clients People
-          qui n'utilisent pas encore l'ack Socket.IO.
-        */
+        // Comportement historique conservé pour tous les anciens clients.
         socket.emit(
           "system-message",
           {
-            text:
-              errorText,
-            time:
-              Date.now()
+            text: errorText,
+            time: Date.now()
           }
         );
+
+        // Les clients récents peuvent en plus retirer leur bulle optimiste.
+        reply({
+          ok: false,
+          error: errorText
+        });
       }
     }
   );
+  // === PEOPLE_GENERAL_OPTIMISTIC_SERVER_V1_END ===
 
   socket.on(
     "chat-message-delete",

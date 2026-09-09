@@ -81,13 +81,6 @@
       "inviteServerIcon"
     );
 
-  // === PEOPLE_INVITE_UNAVAILABLE_V1_START ===
-  const inviteIntro =
-    document.getElementById(
-      "inviteIntroText"
-    );
-  // === PEOPLE_INVITE_UNAVAILABLE_V1_END ===
-
   const inviteName =
     document.getElementById(
       "inviteServerName"
@@ -115,12 +108,7 @@
   let authenticated = false;
   let inviteCode = null;
   let invitePreview = null;
-
-  // === PEOPLE_SERVER_CREATE_LOCK_V1_START ===
-  let peopleServerCreatePending =
-    false;
-  // === PEOPLE_SERVER_CREATE_LOCK_V1_END ===
-  let inviteUnavailable = false;
+  let openServerRequestVersion = 0;
 
   function initials(value) {
     return (
@@ -172,279 +160,6 @@
 
     return data;
   }
-
-  // === PEOPLE_BROWSER_HISTORY_V1_START ===
-  const PEOPLE_HISTORY_KEY =
-    "peopleNavigationV1";
-
-  let peopleHistoryRestoring =
-    false;
-
-  function peopleHistoryEntry(
-    state
-  ) {
-    return (
-      state &&
-      typeof state ===
-        "object"
-        ? state[
-            PEOPLE_HISTORY_KEY
-          ]
-        : null
-    );
-  }
-
-  function peopleHistorySame(
-    left,
-    right
-  ) {
-    if (
-      !left ||
-      !right ||
-      left.view !==
-        right.view
-    ) {
-      return false;
-    }
-
-    if (
-      left.view ===
-        "dm"
-    ) {
-      return (
-        String(
-          left.username ||
-          ""
-        ) ===
-        String(
-          right.username ||
-          ""
-        )
-      );
-    }
-
-    if (
-      left.view ===
-        "server"
-    ) {
-      return (
-        String(
-          left.serverId ||
-          ""
-        ) ===
-        String(
-          right.serverId ||
-          ""
-        )
-      );
-    }
-
-    return true;
-  }
-
-  function peopleHistoryState(
-    entry
-  ) {
-    const base =
-      history.state &&
-      typeof history.state ===
-        "object"
-        ? {
-            ...history.state
-          }
-        : {};
-
-    base[
-      PEOPLE_HISTORY_KEY
-    ] = entry;
-
-    return base;
-  }
-
-  function peopleHistoryReplace(
-    entry
-  ) {
-    if (
-      !entry?.view
-    ) {
-      return;
-    }
-
-    history.replaceState(
-      peopleHistoryState(
-        entry
-      ),
-      "",
-      location.href
-    );
-  }
-
-  function peopleHistoryPush(
-    entry
-  ) {
-    if (
-      peopleHistoryRestoring ||
-      !authenticated ||
-      !entry?.view
-    ) {
-      return;
-    }
-
-    const current =
-      peopleHistoryEntry(
-        history.state
-      );
-
-    if (
-      peopleHistorySame(
-        current,
-        entry
-      )
-    ) {
-      return;
-    }
-
-    /*
-      Première vue People de l'onglet :
-      on initialise l'entrée courante au lieu de créer
-      artificiellement une page "vide" derrière.
-    */
-    if (!current) {
-      peopleHistoryReplace(
-        entry
-      );
-
-      return;
-    }
-
-    history.pushState(
-      peopleHistoryState(
-        entry
-      ),
-      "",
-      location.href
-    );
-  }
-
-  async function peopleHistoryRestore(
-    entry
-  ) {
-    if (
-      !authenticated
-    ) {
-      return;
-    }
-
-    const target =
-      entry &&
-      typeof entry ===
-        "object"
-        ? entry
-        : {
-            view:
-              "friends"
-          };
-
-    peopleHistoryRestoring =
-      true;
-
-    try {
-      if (
-        target.view ===
-          "dm" &&
-        target.username
-      ) {
-        await window
-          .PeopleSocialNavigation
-          ?.openDm?.(
-            String(
-              target.username
-            ),
-            {
-              history:
-                false
-            }
-          );
-
-        return;
-      }
-
-      if (
-        target.view ===
-          "server" &&
-        target.serverId
-      ) {
-        let server =
-          serverById.get(
-            String(
-              target.serverId
-            )
-          );
-
-        if (!server) {
-          await refreshServers();
-
-          server =
-            serverById.get(
-              String(
-                target.serverId
-              )
-            );
-        }
-
-        if (server) {
-          await openServer(
-            server,
-            {
-              history:
-                false
-            }
-          );
-
-          return;
-        }
-      }
-
-      viewingHome =
-        true;
-
-      updateRailSelection();
-
-      window
-        .PeopleSocialNavigation
-        ?.showFriends?.(
-          {
-            history:
-              false
-          }
-        );
-    } finally {
-      peopleHistoryRestoring =
-        false;
-    }
-  }
-
-  window.PeopleNavigationHistory = {
-    push:
-      peopleHistoryPush,
-    replace:
-      peopleHistoryReplace,
-    isRestoring() {
-      return peopleHistoryRestoring;
-    }
-  };
-
-  window.addEventListener(
-    "popstate",
-    (event) => {
-      void peopleHistoryRestore(
-        peopleHistoryEntry(
-          event.state
-        )
-      );
-    }
-  );
-  // === PEOPLE_BROWSER_HISTORY_V1_END ===
 
   function readInvitePath() {
     const match =
@@ -962,73 +677,58 @@
     renderRail();
   }
 
+  // === PEOPLE_SERVER_INSTANT_CHROME_V2_START ===
   async function openServer(
-    server,
-    options = null
+    server
   ) {
-    if (!server?.id) {
-      return;
-    }
+    if (!server?.id) return;
+
+    const requestVersion = ++openServerRequestVersion;
+    const previousServer = activeServer ? { ...activeServer } : null;
+    const previousViewingHome = viewingHome;
+
+    // Le rail, le titre et la vue changent tout de suite. Le chargement
+    // socket du contenu se fait ensuite via PeopleServerRuntime.
+    activeServer = { ...server };
+    viewingHome = false;
+    updateServerChrome(activeServer);
+    updateRailSelection();
+    window.PeopleSocialNavigation?.setMode("server");
 
     try {
       const result =
-        await window
-          .PeopleServerRuntime
-          ?.selectServer(
-            server
-          );
+        await window.PeopleServerRuntime?.selectServer(server);
 
-      if (
-        result &&
-        result.ok === false
-      ) {
-        throw new Error(
-          result.error ||
-          "Impossible d'ouvrir ce serveur."
-        );
+      // Si l'utilisateur a cliqué ailleurs pendant l'aller-retour, cette
+      // ancienne réponse n'a plus le droit de modifier l'interface.
+      if (requestVersion !== openServerRequestVersion) {
+        return;
       }
 
-      activeServer = {
-        ...server
-      };
-
-      viewingHome = false;
-
-      updateServerChrome(
-        activeServer
-      );
-
-      updateRailSelection();
-
-      window
-        .PeopleSocialNavigation
-        ?.setMode(
-          "server"
-        );
-
-      if (
-        options?.history !==
-          false
-      ) {
-        peopleHistoryPush(
-          {
-            view:
-              "server",
-            serverId:
-              String(
-                activeServer.id
-              )
-          }
+      if (result && result.ok === false) {
+        throw new Error(
+          result.error || "Impossible d'ouvrir ce serveur."
         );
       }
     } catch (err) {
-      alert(
-        err.message
-      );
+      if (requestVersion !== openServerRequestVersion) return;
 
-      await refreshServers();
+      activeServer = previousServer;
+      viewingHome = previousViewingHome;
+
+      if (activeServer && !viewingHome) {
+        updateServerChrome(activeServer);
+        window.PeopleSocialNavigation?.setMode("server");
+      } else {
+        window.PeopleSocialNavigation?.setMode("home");
+      }
+
+      updateRailSelection();
+      alert(err.message);
+      void refreshServers();
     }
   }
+  // === PEOPLE_SERVER_INSTANT_CHROME_V2_END ===
 
   function openCreateModal() {
     createError.textContent =
@@ -1096,85 +796,6 @@
     );
   }
 
-  function resetInviteAvailableUi() {
-    inviteUnavailable =
-      false;
-
-    if (inviteIntro) {
-      inviteIntro.textContent =
-        "Tu as reçu une invitation pour rejoindre";
-
-      inviteIntro.classList.remove(
-        "hidden"
-      );
-    }
-
-    inviteName.classList.remove(
-      "people-invite-unavailable-message"
-    );
-
-    inviteMembers.classList.remove(
-      "hidden"
-    );
-
-    inviteError.classList.remove(
-      "hidden"
-    );
-
-    inviteJoin.textContent =
-      "Rejoindre le serveur";
-  }
-
-  function showInviteUnavailableUi() {
-    invitePreview =
-      null;
-
-    inviteUnavailable =
-      true;
-
-    inviteIcon.textContent =
-      "?";
-
-    if (inviteIntro) {
-      inviteIntro.textContent =
-        "";
-      inviteIntro.classList.add(
-        "hidden"
-      );
-    }
-
-    inviteName.textContent =
-      "Le serveur n'est plus disponible ou l'utilisateur a été banni.";
-
-    inviteName.classList.add(
-      "people-invite-unavailable-message"
-    );
-
-    inviteMembers.textContent =
-      "";
-
-    inviteMembers.classList.add(
-      "hidden"
-    );
-
-    inviteError.textContent =
-      "";
-
-    inviteError.classList.add(
-      "hidden"
-    );
-
-    inviteJoin.disabled =
-      false;
-
-    inviteJoin.textContent =
-      "Fermer";
-
-    inviteModal.classList.remove(
-      "hidden"
-    );
-  }
-
   async function showInvite() {
     if (
       !authenticated ||
@@ -1184,8 +805,6 @@
     }
 
     try {
-      resetInviteAvailableUi();
-
       const data =
         await api(
           "/api/servers/invite/" +
@@ -1231,32 +850,18 @@
         "hidden"
       );
     } catch (err) {
-      console.warn(
-        "[People invite/unavailable]",
-        err?.message ||
-        err
-      );
+      invitePreview = null;
 
-      showInviteUnavailableUi();
+      inviteError.textContent =
+        err.message;
+
+      inviteModal.classList.remove(
+        "hidden"
+      );
     }
   }
 
   async function joinInvite() {
-    if (inviteUnavailable) {
-      closeInviteModal();
-
-      history.replaceState(
-        {},
-        "",
-        "/"
-      );
-
-      inviteCode =
-        null;
-
-      return;
-    }
-
     if (
       !inviteCode ||
       !invitePreview
@@ -1388,35 +993,6 @@
     async (event) => {
       event.preventDefault();
 
-      /*
-        Double-clic / double-submit :
-        le premier passage pose ce verrou immédiatement,
-        avant toute requête réseau.
-      */
-      if (peopleServerCreatePending) {
-        return;
-      }
-
-      peopleServerCreatePending =
-        true;
-
-      const submitButton =
-        createForm.querySelector(
-          'button[type="submit"]'
-        );
-
-      const previousLabel =
-        submitButton?.textContent ||
-        "Créer";
-
-      if (submitButton) {
-        submitButton.disabled =
-          true;
-
-        submitButton.textContent =
-          "Création…";
-      }
-
       createError.textContent =
         "";
 
@@ -1427,17 +1003,6 @@
       } catch (err) {
         createError.textContent =
           err.message;
-      } finally {
-        peopleServerCreatePending =
-          false;
-
-        if (submitButton) {
-          submitButton.disabled =
-            false;
-
-          submitButton.textContent =
-            previousLabel;
-        }
       }
     }
   );
@@ -1467,19 +1032,7 @@
 
       window
         .PeopleSocialNavigation
-        ?.showFriends(
-          {
-            history:
-              false
-          }
-        );
-
-      peopleHistoryReplace(
-        {
-          view:
-            "friends"
-        }
-      );
+        ?.showFriends();
     }
   );
 

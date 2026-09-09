@@ -1494,6 +1494,44 @@ function attachRemoteMedia(peerId, stream) {
 // === PEOPLE_SERVER_RUNTIME_V1_START ===
 let peopleActiveServerId = null;
 
+// === PEOPLE_SERVER_INSTANT_OPEN_V2_START ===
+// Les derniers payloads de serveurs visités restent en RAM afin que le
+// changement de serveur soit visuellement immédiat, puis le socket remplace
+// ce cache par l'état frais du serveur.
+const PEOPLE_SERVER_VIEW_CACHE_MAX = 8;
+const peopleServerViewCache = new Map();
+let peopleServerSelectRequestVersion = 0;
+
+function peopleRememberServerPayload(serverId, payload) {
+  const key = String(serverId || "");
+  if (!key || !payload?.ok) return;
+
+  peopleServerViewCache.delete(key);
+  peopleServerViewCache.set(key, {
+    ...payload,
+    history: Array.isArray(payload.history) ? payload.history : [],
+    online: Array.isArray(payload.online) ? payload.online : [],
+    voice: Array.isArray(payload.voice) ? payload.voice : []
+  });
+
+  while (peopleServerViewCache.size > PEOPLE_SERVER_VIEW_CACHE_MAX) {
+    const first = peopleServerViewCache.keys().next().value;
+    if (first === undefined) break;
+    peopleServerViewCache.delete(first);
+  }
+}
+
+function peopleCachedServerPayload(serverId) {
+  const key = String(serverId || "");
+  const cached = peopleServerViewCache.get(key);
+  if (!cached) return null;
+
+  peopleServerViewCache.delete(key);
+  peopleServerViewCache.set(key, cached);
+  return cached;
+}
+// === PEOPLE_SERVER_INSTANT_OPEN_V2_END ===
+
 function peopleApplySelectedServerPayload(
   payload
 ) {
@@ -1553,24 +1591,13 @@ window.PeopleServerRuntime = {
       Accueil / Amis / MP n'ont plus aucun effet
       sur le vocal WebRTC actif.
     */
-    peopleActiveServerId =
-      null;
+    peopleActiveServerId = null;
+    peopleServerSelectRequestVersion += 1;
 
-    renderChatHistory(
-      []
-    );
-
-    peopleRenderOnlineUsers(
-      []
-    );
-
-    userCount.textContent =
-      "0";
-
-    renderVoiceUsers(
-      []
-    );
-
+    renderChatHistory([]);
+    peopleRenderOnlineUsers([]);
+    userCount.textContent = "0";
+    renderVoiceUsers([]);
     peopleSyncVoiceUiContext();
   },
 
@@ -1578,75 +1605,95 @@ window.PeopleServerRuntime = {
     if (!server?.id) {
       return {
         ok: false,
-        error:
-          "Serveur invalide."
+        error: "Serveur invalide."
       };
     }
 
+    const serverId = String(server.id);
+    const previousId = peopleActiveServerId;
+    const previousPayload = peopleCachedServerPayload(previousId);
+    const requestVersion = ++peopleServerSelectRequestVersion;
+
     /*
-      On change uniquement le serveur affiché.
-      Le vocal actif de cet onglet reste connecté.
+      L'état visuel change immédiatement. Si le serveur a déjà été visité,
+      son dernier historique apparaît sans attendre le socket. Sinon on vide
+      proprement l'ancien serveur au lieu de le laisser affiché.
     */
-    const response =
-      await peopleSelectServerSocket(
-        server.id
-      );
+    peopleActiveServerId = serverId;
+    peopleGeneralReplyController?.clear();
+    peopleGeneralImagePicker?.clear();
+
+    const cached = peopleCachedServerPayload(serverId);
+    peopleApplySelectedServerPayload(
+      cached || { history: [], online: [], voice: [] }
+    );
+    peopleSyncVoiceUiContext();
+
+    const response = await peopleSelectServerSocket(serverId);
 
     if (!response?.ok) {
+      if (
+        requestVersion === peopleServerSelectRequestVersion &&
+        peopleActiveServerId === serverId
+      ) {
+        peopleActiveServerId = previousId || null;
+        peopleApplySelectedServerPayload(
+          previousPayload || { history: [], online: [], voice: [] }
+        );
+        peopleSyncVoiceUiContext();
+      }
       return response;
     }
 
-    peopleActiveServerId =
-      String(server.id);
+    peopleRememberServerPayload(serverId, response);
 
-    peopleGeneralReplyController
-      ?.clear();
-
-    peopleGeneralImagePicker
-      ?.clear();
-
-    peopleApplySelectedServerPayload(
-      response
-    );
-
-    peopleSyncVoiceUiContext();
+    // Une réponse lente d'un ancien clic ne doit jamais écraser le serveur
+    // sélectionné entre-temps.
+    if (
+      requestVersion === peopleServerSelectRequestVersion &&
+      peopleActiveServerId === serverId
+    ) {
+      peopleApplySelectedServerPayload(response);
+      peopleSyncVoiceUiContext();
+    }
 
     return response;
   },
 
   async reselect() {
-    if (!peopleActiveServerId) {
-      return;
-    }
+    if (!peopleActiveServerId) return;
 
-    const response =
-      await peopleSelectServerSocket(
-        peopleActiveServerId
-      );
+    const serverId = String(peopleActiveServerId);
+    const requestVersion = ++peopleServerSelectRequestVersion;
+    const response = await peopleSelectServerSocket(serverId);
 
     if (!response?.ok) {
-      peopleActiveServerId =
-        null;
-
-      window.dispatchEvent(
-        new CustomEvent(
-          "people-server-invalid"
-        )
-      );
-
+      if (
+        requestVersion === peopleServerSelectRequestVersion &&
+        peopleActiveServerId === serverId
+      ) {
+        peopleActiveServerId = null;
+        window.dispatchEvent(
+          new CustomEvent("people-server-invalid")
+        );
+      }
       return;
     }
 
-    peopleApplySelectedServerPayload(
-      response
-    );
+    peopleRememberServerPayload(serverId, response);
 
-    /*
-      Le reselect concerne seulement le serveur TEXTE affiché.
-      La reconnexion du vocal utilise activeVoiceServerId
-      via l'événement people-ready.
-    */
-    peopleSyncVoiceUiContext();
+    if (
+      requestVersion === peopleServerSelectRequestVersion &&
+      peopleActiveServerId === serverId
+    ) {
+      peopleApplySelectedServerPayload(response);
+      /*
+        Le reselect concerne seulement le serveur TEXTE affiché.
+        La reconnexion du vocal utilise activeVoiceServerId
+        via l'événement people-ready.
+      */
+      peopleSyncVoiceUiContext();
+    }
   },
 
   getActiveServerId() {

@@ -165,6 +165,116 @@
   let directoryRequestVersion = 0;
   let conversationsByUsername = new Map();
 
+  // === PEOPLE_DM_INSTANT_OPEN_V3_START ===
+  // Cache court en mémoire : un MP déjà ouvert réapparaît immédiatement.
+  // Les réponses réseau restent la source de vérité et remplacent le cache
+  // dès qu'elles arrivent.
+  const PEOPLE_DM_VIEW_CACHE_MAX = 8;
+  const PEOPLE_DM_DECRYPT_CACHE_MAX = 1400;
+  const PEOPLE_DM_PREFETCH_MAX_AGE_MS = 30000;
+
+  const peopleDmViewCache = new Map();
+  const peopleDmDecryptCache = new Map();
+  const peopleDmPrefetchPromises = new Map();
+  let peopleDmLoadRequestVersion = 0;
+  let peopleDmPrefetchTimer = null;
+
+  function peopleDmUsernameKey(value) {
+    return String(value || "")
+      .trim()
+      .toLocaleLowerCase("fr-FR");
+  }
+
+  function peopleDmTrimMap(map, max) {
+    while (map.size > max) {
+      const first = map.keys().next().value;
+      if (first === undefined) break;
+      map.delete(first);
+    }
+  }
+
+  function peopleDmRememberView(username, user, messages) {
+    const key = peopleDmUsernameKey(username);
+    if (!key) return;
+
+    const value = {
+      user: {
+        ...(user || {}),
+        username: String(user?.username || username || "")
+      },
+      messages: Array.isArray(messages) ? messages : [],
+      updatedAt: Date.now()
+    };
+
+    // delete + set = entrée récemment utilisée à la fin de la Map.
+    peopleDmViewCache.delete(key);
+    peopleDmViewCache.set(key, value);
+    peopleDmTrimMap(peopleDmViewCache, PEOPLE_DM_VIEW_CACHE_MAX);
+  }
+
+  function peopleDmCachedView(username) {
+    const key = peopleDmUsernameKey(username);
+    const cached = peopleDmViewCache.get(key);
+    if (!cached) return null;
+
+    peopleDmViewCache.delete(key);
+    peopleDmViewCache.set(key, cached);
+    return cached;
+  }
+
+  function peopleDmDecryptCacheKey(message) {
+    const reply = message?.replyTo || null;
+    return [
+      String(message?.id || ""),
+      String(message?.body || ""),
+      String(message?.imageId || ""),
+      String(reply?.id || ""),
+      String(reply?.text || ""),
+      String(reply?.imageId || "")
+    ].join("\u001f");
+  }
+
+  async function peopleDmE2eeDecryptMessagesCached(list) {
+    const messages = Array.isArray(list) ? list : [];
+
+    return Promise.all(
+      messages.map(async (message) => {
+        const key = peopleDmDecryptCacheKey(message);
+        if (key && peopleDmDecryptCache.has(key)) {
+          return peopleDmDecryptCache.get(key);
+        }
+
+        const decrypted = await peopleDmE2eeDecryptMessage(message);
+
+        if (key) {
+          peopleDmDecryptCache.set(key, decrypted);
+          peopleDmTrimMap(
+            peopleDmDecryptCache,
+            PEOPLE_DM_DECRYPT_CACHE_MAX
+          );
+        }
+
+        return decrypted;
+      })
+    );
+  }
+
+  function peopleDmConversationUser(username) {
+    const wanted = peopleDmUsernameKey(username);
+    if (!wanted) return null;
+
+    for (const conversation of conversationsByUsername.values()) {
+      if (
+        peopleDmUsernameKey(conversation?.user?.username) === wanted
+      ) {
+        return conversation.user || null;
+      }
+    }
+
+    return null;
+  }
+  // === PEOPLE_DM_INSTANT_OPEN_V3_END ===
+
   // === PEOPLE_DM_OPTIMISTIC_V2_START ===
   // Les MP texte sont affichés immédiatement, avant le chiffrement E2EE
   // et avant l'aller-retour HTTP. Les messages restent dans cette file
@@ -2662,6 +2772,41 @@
   }
 
 
+  // Préchargement léger au survol/focus : sur desktop, le réseau et le
+  // déchiffrement peuvent commencer avant le clic réel. Aucun MP n'est
+  // marqué lu par ce préchargement.
+  dmConversationList?.addEventListener(
+    "pointerover",
+    (event) => {
+      const row = event.target?.closest?.(".dm-conversation-row");
+      const username = String(row?.dataset?.username || "").trim();
+      if (!username) return;
+
+      if (
+        event.relatedTarget instanceof Node &&
+        row?.contains(event.relatedTarget)
+      ) {
+        return;
+      }
+
+      clearTimeout(peopleDmPrefetchTimer);
+      peopleDmPrefetchTimer = setTimeout(
+        () => void peopleDmPrefetch(username),
+        70
+      );
+    },
+    { passive: true }
+  );
+
+  dmConversationList?.addEventListener(
+    "focusin",
+    (event) => {
+      const row = event.target?.closest?.(".dm-conversation-row");
+      const username = String(row?.dataset?.username || "").trim();
+      if (username) void peopleDmPrefetch(username);
+    }
+  );
+
   dmConversationList?.addEventListener(
     "click",
     (event) => {
@@ -3386,110 +3531,198 @@ function dmTextLine(
   }
   // === PEOPLE_DM_GROUPING_V1_END ===
 
-  async function loadActiveDm() {
+  // === PEOPLE_DM_INSTANT_OPEN_V3_RENDER_START ===
+  function peopleDmRenderConversation(
+    username,
+    user,
+    decryptedMessages
+  ) {
+    if (!dmMessages) return false;
+
+    const wanted = peopleDmUsernameKey(username);
+    if (
+      !wanted ||
+      peopleDmUsernameKey(activeDmUser?.username) !== wanted
+    ) {
+      return false;
+    }
+
+    activeDmUser = {
+      ...(activeDmUser || {}),
+      ...(user || {}),
+      username: String(user?.username || username || "")
+    };
+
+    peoplePreloadSocialAvatars([
+      activeDmUser?.username,
+      me?.username
+    ]);
+
+    if (dmHeaderName) {
+      dmHeaderName.textContent = activeDmUser.username;
+    }
+
+    if (dmHeaderAvatar) {
+      window.PeopleAvatars?.apply(
+        dmHeaderAvatar,
+        activeDmUser.username
+      );
+    }
+
+    // === PEOPLE_DM_HEADER_PROFILE_V3 ===
+    peopleBindSocialProfileUi(
+      dmHeaderAvatar,
+      activeDmUser.username,
+      "avatar"
+    );
+
+    peopleBindSocialProfileUi(
+      dmHeaderName,
+      activeDmUser.username,
+      "name"
+    );
+
+    if (dmHeaderStatus) {
+      dmHeaderStatus.textContent =
+        activeDmUser.online === true
+          ? "En ligne"
+          : activeDmUser.online === false
+            ? "Hors ligne"
+            : "";
+    }
+
+    if (dmWelcomeTitle) {
+      dmWelcomeTitle.textContent = activeDmUser.username;
+    }
+
+    const fragment = document.createDocumentFragment();
+    const welcome = document.createElement("div");
+    welcome.className = "dm-welcome";
+
+    const title = document.createElement("h2");
+    title.textContent =
+      "Début de ta conversation avec " + activeDmUser.username;
+
+    const subtitle = document.createElement("p");
+    subtitle.textContent =
+      "Les nouveaux MP texte sont chiffrés de bout en bout.";
+
+    welcome.append(title, subtitle);
+    fragment.appendChild(welcome);
+
+    renderDmMessageGroups(
+      Array.isArray(decryptedMessages) ? decryptedMessages : [],
+      fragment
+    );
+
+    peopleDmAppendPending(activeDmUser.username, fragment);
+    dmMessages.replaceChildren(fragment);
+    peopleDmScrollToBottom();
+    return true;
+  }
+
+  async function peopleDmFetchAndDecrypt(username) {
+    const data = await api(
+      "/api/dm/" + encodeURIComponent(username)
+    );
+
+    const decryptedMessages =
+      await peopleDmE2eeDecryptMessagesCached(data.messages || []);
+
+    peopleDmRememberView(
+      username,
+      data.user,
+      decryptedMessages
+    );
+
+    return {
+      user: data.user,
+      messages: decryptedMessages
+    };
+  }
+
+  async function peopleDmPrefetch(username) {
+    const clean = String(username || "").trim();
+    const key = peopleDmUsernameKey(clean);
+    if (!key || !socialReady) return;
+
+    const cached = peopleDmViewCache.get(key);
+    if (
+      cached &&
+      Date.now() - Number(cached.updatedAt || 0) <
+        PEOPLE_DM_PREFETCH_MAX_AGE_MS
+    ) {
+      return cached;
+    }
+
+    if (peopleDmPrefetchPromises.has(key)) {
+      return peopleDmPrefetchPromises.get(key);
+    }
+
+    const promise = peopleDmFetchAndDecrypt(clean)
+      .catch(() => null)
+      .finally(() => {
+        peopleDmPrefetchPromises.delete(key);
+      });
+
+    peopleDmPrefetchPromises.set(key, promise);
+    return promise;
+  }
+
+  async function loadActiveDm(options = null) {
     if (!activeDmUser || !dmMessages) return;
 
+    const username = String(activeDmUser.username || "").trim();
+    if (!username) return;
+
+    const wanted = peopleDmUsernameKey(username);
+    const requestVersion = ++peopleDmLoadRequestVersion;
+    const cached = peopleDmCachedView(username);
+
+    if (cached && options?.skipCache !== true) {
+      peopleDmRenderConversation(
+        username,
+        cached.user,
+        cached.messages
+      );
+    }
+
     try {
-      const data = await api(
-        "/api/dm/" +
-          encodeURIComponent(activeDmUser.username)
-      );
+      const prefetched = peopleDmPrefetchPromises.get(wanted);
+      let fresh = prefetched
+        ? await prefetched
+        : null;
 
-      activeDmUser = data.user;
-
-      peoplePreloadSocialAvatars(
-        [
-          activeDmUser?.username,
-          me?.username
-        ]
-      );
-
-      if (dmHeaderName) {
-        dmHeaderName.textContent =
-          activeDmUser.username;
+      // Un préchargement peut avoir échoué silencieusement. Au clic, on
+      // retente alors normalement au lieu de laisser une vue vide.
+      if (!fresh) {
+        fresh = await peopleDmFetchAndDecrypt(username);
       }
 
-      if (dmHeaderAvatar) {
-        window.PeopleAvatars?.apply(
-          dmHeaderAvatar,
-          activeDmUser.username
+      if (
+        requestVersion === peopleDmLoadRequestVersion &&
+        peopleDmUsernameKey(activeDmUser?.username) === wanted
+      ) {
+        peopleDmRenderConversation(
+          username,
+          fresh.user,
+          fresh.messages
         );
       }
 
-      // === PEOPLE_DM_HEADER_PROFILE_V3 ===
-      peopleBindSocialProfileUi(
-        dmHeaderAvatar,
-        activeDmUser.username,
-        "avatar"
-      );
-
-      peopleBindSocialProfileUi(
-        dmHeaderName,
-        activeDmUser.username,
-        "name"
-      );
-
-      if (dmHeaderStatus) {
-        dmHeaderStatus.textContent =
-          activeDmUser.online
-            ? "En ligne"
-            : "Hors ligne";
-      }
-
-      if (dmWelcomeTitle) {
-        dmWelcomeTitle.textContent =
-          activeDmUser.username;
-      }
-
-      const fragment =
-        document.createDocumentFragment();
-
-      const welcome = document.createElement("div");
-      welcome.className = "dm-welcome";
-
-      const title = document.createElement("h2");
-      title.textContent =
-        "Début de ta conversation avec " +
-        activeDmUser.username;
-
-      const subtitle = document.createElement("p");
-      subtitle.textContent =
-        "Les nouveaux MP texte sont chiffrés de bout en bout.";
-
-      welcome.append(title, subtitle);
-      fragment.appendChild(welcome);
-
-      const decryptedMessages =
-        await peopleDmE2eeDecryptMessages(
-          data.messages || []
-        );
-
-      renderDmMessageGroups(
-        decryptedMessages,
-        fragment
-      );
-
-      peopleDmAppendPending(
-        activeDmUser.username,
-        fragment
-      );
-
-      dmMessages.replaceChildren(
-        fragment
-      );
-
-      peopleDmScrollToBottom();
-
-      await api(
-        "/api/dm/" +
-          encodeURIComponent(activeDmUser.username) +
-          "/read",
+      // Marquage lu + sidebar ne bloquent plus l'ouverture du MP.
+      void api(
+        "/api/dm/" + encodeURIComponent(username) + "/read",
         { method: "POST" }
-      );
-
-      await refreshConversations();
+      )
+        .then(() => refreshConversations())
+        .catch(() => {});
     } catch (err) {
-      if (dmMessages) {
+      if (
+        !cached &&
+        requestVersion === peopleDmLoadRequestVersion &&
+        peopleDmUsernameKey(activeDmUser?.username) === wanted
+      ) {
         const empty = document.createElement("div");
         empty.className = "home-empty";
         empty.textContent = err.message;
@@ -3502,30 +3735,24 @@ function dmTextLine(
     username,
     options = null
   ) {
-    if (!username) return;
+    const cleanUsername = String(username || "").trim();
+    if (!cleanUsername) return;
 
-    // === PEOPLE_DM_REOPEN_CLIENT_V1 ===
-    try {
-      await api(
-        "/api/dm/" +
-          encodeURIComponent(
-            username
-          ) +
-          "/open",
-        {
-          method:
-            "POST"
-        }
-      );
-    } catch {}
-
+    // L'interface bascule AVANT tout aller-retour réseau.
     setMode("home");
     homeMain?.classList.add("dm-open");
     friendsView?.classList.add("hidden");
     dmView?.classList.remove("hidden");
 
+    const cached = peopleDmCachedView(cleanUsername);
+    const seedUser =
+      cached?.user ||
+      peopleDmConversationUser(cleanUsername) ||
+      { username: cleanUsername };
+
     activeDmUser = {
-      username: String(username)
+      ...seedUser,
+      username: String(seedUser?.username || cleanUsername)
     };
 
     if (homeMainTitle) {
@@ -3534,25 +3761,46 @@ function dmTextLine(
 
     if (homeMainSubtitle) {
       homeMainSubtitle.textContent =
-        "Conversation avec " + username;
+        "Conversation avec " + activeDmUser.username;
     }
 
-    await loadActiveDm();
+    if (cached) {
+      peopleDmRenderConversation(
+        cleanUsername,
+        cached.user,
+        cached.messages
+      );
+    } else {
+      // Même sans cache, le header apparaît immédiatement et on évite
+      // de laisser les messages du MP précédent à l'écran.
+      peopleDmRenderConversation(
+        cleanUsername,
+        activeDmUser,
+        []
+      );
+    }
+
     renderConversationList();
     dmInput?.focus();
 
     peopleRecordBrowserNavigation(
       {
-        view:
-          "dm",
-        username:
-          String(
-            username
-          )
+        view: "dm",
+        username: cleanUsername
       },
       options
     );
+
+    // Réouvrir côté serveur est une opération secondaire : elle ne bloque
+    // plus l'affichage.
+    void api(
+      "/api/dm/" + encodeURIComponent(cleanUsername) + "/open",
+      { method: "POST" }
+    ).catch(() => {});
+
+    await loadActiveDm({ skipCache: true });
   }
+  // === PEOPLE_DM_INSTANT_OPEN_V3_RENDER_END ===
 
   function closeProfile() {
     profileModal?.classList.add("hidden");
