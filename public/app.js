@@ -485,6 +485,223 @@ function peopleMessageTime(value) {
     : Date.now();
 }
 
+
+// === PEOPLE_GENERAL_OPTIMISTIC_SEND_V1_START ===
+const peopleRecentGeneralClientIds =
+  new Set();
+
+function peopleNewGeneralClientId() {
+  if (
+    typeof crypto?.randomUUID ===
+      "function"
+  ) {
+    return crypto.randomUUID();
+  }
+
+  return (
+    Date.now().toString(36) +
+    "-" +
+    Math.random()
+      .toString(36)
+      .slice(2)
+  );
+}
+
+function peopleRememberGeneralClientId(
+  clientId
+) {
+  const id =
+    String(
+      clientId || ""
+    );
+
+  if (!id) return;
+
+  peopleRecentGeneralClientIds.add(
+    id
+  );
+
+  setTimeout(
+    () => {
+      peopleRecentGeneralClientIds.delete(
+        id
+      );
+    },
+    15000
+  );
+}
+
+function peopleFindPendingGeneralUnit(
+  clientId
+) {
+  const wanted =
+    String(
+      clientId || ""
+    );
+
+  if (!wanted) {
+    return null;
+  }
+
+  return (
+    Array.from(
+      messages.querySelectorAll(
+        "[data-people-client-id]"
+      )
+    ).find(
+      (element) =>
+        String(
+          element.dataset
+            .peopleClientId || ""
+        ) === wanted
+    ) ||
+    null
+  );
+}
+
+function peopleConfirmPendingGeneralMessage(
+  data
+) {
+  const clientId =
+    String(
+      data?.clientId || ""
+    );
+
+  if (!clientId) {
+    return false;
+  }
+
+  const unit =
+    peopleFindPendingGeneralUnit(
+      clientId
+    );
+
+  if (!unit) {
+    return false;
+  }
+
+  const grouped =
+    Boolean(
+      unit.querySelector(
+        ".people-grouped-message-line"
+      )
+    );
+
+  const row =
+    unit.closest(
+      ".message"
+    );
+
+  const confirmedData = {
+    ...data,
+    clientId:
+      null,
+    pending:
+      false
+  };
+
+  const replacement =
+    peopleGeneralTextLine(
+      confirmedData,
+      grouped
+    );
+
+  unit.replaceWith(
+    replacement
+  );
+
+  if (
+    !grouped &&
+    row
+  ) {
+    const time =
+      row.querySelector(
+        "time"
+      );
+
+    if (time) {
+      time.textContent =
+        timeText(
+          data.time
+        );
+    }
+  }
+
+  return true;
+}
+
+function peopleFailPendingGeneralMessage(
+  clientId
+) {
+  const unit =
+    peopleFindPendingGeneralUnit(
+      clientId
+    );
+
+  if (!unit) {
+    return;
+  }
+
+  const row =
+    unit.closest(
+      ".message"
+    );
+
+  const body =
+    unit.closest(
+      ".people-message-group-body"
+    );
+
+  unit.remove();
+
+  if (
+    body &&
+    !body.querySelector(
+      ".people-message-unit"
+    )
+  ) {
+    row?.remove();
+  }
+
+  peopleResetGeneralGroup();
+}
+
+function peopleHandleIncomingGeneralMessage(
+  data
+) {
+  const clientId =
+    String(
+      data?.clientId || ""
+    );
+
+  if (
+    clientId &&
+    peopleRecentGeneralClientIds.has(
+      clientId
+    )
+  ) {
+    return;
+  }
+
+  if (
+    clientId &&
+    peopleConfirmPendingGeneralMessage(
+      data
+    )
+  ) {
+    peopleRememberGeneralClientId(
+      clientId
+    );
+
+    return;
+  }
+
+  addChatMessage(
+    data
+  );
+}
+// === PEOPLE_GENERAL_OPTIMISTIC_SEND_V1_END ===
+
 function peopleGeneralTextLine(
   data,
   grouped = false
@@ -500,9 +717,26 @@ function peopleGeneralTextLine(
       data?.id || ""
     );
 
+  const clientId =
+    String(
+      data?.clientId || ""
+    );
+
   if (messageId) {
     unit.dataset.messageId =
       messageId;
+  }
+
+  if (
+    clientId &&
+    data?.pending
+  ) {
+    unit.dataset.peopleClientId =
+      clientId;
+
+    unit.classList.add(
+      "people-message-pending"
+    );
   }
 
   const replyPreview =
@@ -547,7 +781,10 @@ function peopleGeneralTextLine(
 
   unit.appendChild(text);
 
-  if (messageId) {
+  if (
+    messageId &&
+    !data?.pending
+  ) {
     window.PeopleMessageActions
       ?.bindContext(
         unit,
@@ -1650,21 +1887,35 @@ messageForm.addEventListener(
       return;
     }
 
+    const reply =
+      peopleGeneralReplyController
+        ?.get() ||
+      null;
+
     const submitButton =
       messageForm.querySelector(
         'button[type="submit"]'
       );
 
-    messageInput.disabled =
-      true;
-
-    if (submitButton) {
-      submitButton.disabled =
+    /*
+      Un message texte ne bloque plus le champ :
+      il apparaît immédiatement et le serveur le
+      confirme ensuite avec le même clientId.
+      Pour une image, on garde le verrou uniquement
+      pendant l'upload réel.
+    */
+    if (file) {
+      messageInput.disabled =
         true;
-    }
 
-    peopleGeneralImagePicker
-      ?.setBusy(true);
+      if (submitButton) {
+        submitButton.disabled =
+          true;
+      }
+
+      peopleGeneralImagePicker
+        ?.setBusy(true);
+    }
 
     try {
       let imageId =
@@ -1679,16 +1930,37 @@ messageForm.addEventListener(
             );
       }
 
-      socket.emit(
-        "chat-message",
-        {
-          text,
-          imageId,
-          replyToId:
-            peopleGeneralReplyController
-              ?.get()?.id || null
-        }
-      );
+      const clientId =
+        peopleNewGeneralClientId();
+
+      addChatMessage({
+        username,
+        text,
+        imageId,
+        replyTo:
+          reply
+            ? {
+                id:
+                  String(
+                    reply.id || ""
+                  ),
+                username:
+                  reply.username,
+                text:
+                  reply.text,
+                imageId:
+                  reply.imageId ||
+                  null,
+                deleted:
+                  false
+              }
+            : null,
+        time:
+          Date.now(),
+        clientId,
+        pending:
+          true
+      });
 
       peopleGeneralReplyController
         ?.clear();
@@ -1698,26 +1970,72 @@ messageForm.addEventListener(
 
       peopleGeneralImagePicker
         ?.clear();
+
+      socket.emit(
+        "chat-message",
+        {
+          text,
+          imageId,
+          replyToId:
+            reply?.id ||
+            null,
+          clientId
+        },
+        (response) => {
+          if (
+            response?.ok
+          ) {
+            if (
+              response.message
+            ) {
+              peopleHandleIncomingGeneralMessage(
+                response.message
+              );
+            }
+
+            return;
+          }
+
+          peopleFailPendingGeneralMessage(
+            clientId
+          );
+
+          /*
+            En cas d'échec, on remet le texte seulement
+            si l'utilisateur n'a pas déjà commencé à
+            écrire autre chose.
+          */
+          if (
+            text &&
+            !messageInput.value
+          ) {
+            messageInput.value =
+              text;
+          }
+        }
+      );
     } catch (err) {
       alert(
         err.message
       );
     } finally {
-      messageInput.disabled =
-        false;
-
-      if (submitButton) {
-        submitButton.disabled =
+      if (file) {
+        messageInput.disabled =
           false;
-      }
 
-      peopleGeneralImagePicker
-        ?.setBusy(false);
+        if (submitButton) {
+          submitButton.disabled =
+            false;
+        }
+
+        peopleGeneralImagePicker
+          ?.setBusy(false);
+      }
 
       messageInput.focus();
     }
   }
-);
+)
 
 socket.on("connect", () => {
   if (!username) return;
@@ -1794,7 +2112,10 @@ socket.on(
 );
 // === PEOPLE_GENERAL_DELETE_CLIENT_V1_END ===
 
-socket.on("chat-message", addChatMessage);
+socket.on(
+  "chat-message",
+  peopleHandleIncomingGeneralMessage
+);
 socket.on("system-message", addSystemMessage);
 socket.on("user-count", count => userCount.textContent = count);
 socket.on(

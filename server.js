@@ -8039,6 +8039,60 @@ async function peopleServerSaveMessage(
     return null;
   }
 
+  if (
+    peoplePool &&
+    !imageKey &&
+    !replyKey
+  ) {
+    /*
+      Chemin rapide pour le cas ultra fréquent :
+      message texte simple, sans image ni réponse.
+
+      Pas besoin de BEGIN / COMMIT ici : l'INSERT est
+      déjà atomique. On économise donc plusieurs
+      allers-retours PostgreSQL avant le broadcast.
+    */
+    const result =
+      await peoplePool.query(
+        "INSERT INTO people_general_messages " +
+        "(server_id, sender_id, username, body, reply_to_id) " +
+        "VALUES ($1, $2, $3, $4, NULL) " +
+        "RETURNING id, username, body, reply_to_id, created_at",
+        [
+          sid,
+          String(senderId),
+          cleanUsername,
+          peopleEncryptMessageText(
+            cleanText
+          )
+        ]
+      );
+
+    const row =
+      result.rows[0];
+
+    return {
+      id:
+        String(row.id),
+      serverId:
+        sid,
+      username:
+        row.username,
+      text:
+        peopleDecryptMessageText(
+          row.body
+        ),
+      imageId:
+        null,
+      replyTo:
+        null,
+      time:
+        new Date(
+          row.created_at
+        ).getTime()
+    };
+  }
+
   if (peoplePool) {
     const client =
       await peoplePool.connect();
@@ -12002,11 +12056,15 @@ io.on("connection", (socket) => {
 
   socket.on(
     "chat-message",
-    async ({
-      text,
-      imageId,
-      replyToId
-    } = {}) => {
+    async (
+      {
+        text,
+        imageId,
+        replyToId,
+        clientId
+      } = {},
+      ack = () => {}
+    ) => {
       const username =
         users.get(
           socket.id
@@ -12022,11 +12080,28 @@ io.on("connection", (socket) => {
           socket.id
         );
 
+      const cleanClientId =
+        String(
+          clientId || ""
+        )
+          .trim()
+          .slice(
+            0,
+            100
+          );
+
       if (
         !username ||
         !senderId ||
         !serverId
       ) {
+        ack({
+          ok:
+            false,
+          error:
+            "Session de chat invalide."
+        });
+
         return;
       }
 
@@ -12044,6 +12119,13 @@ io.on("connection", (socket) => {
         !cleanText &&
         !imageKey
       ) {
+        ack({
+          ok:
+            false,
+          error:
+            "Message vide."
+        });
+
         return;
       }
 
@@ -12059,8 +12141,24 @@ io.on("connection", (socket) => {
           );
 
         if (!saved) {
+          ack({
+            ok:
+              false,
+            error:
+              "Le message n'a pas pu être sauvegardé."
+          });
+
           return;
         }
+
+        const outgoing =
+          cleanClientId
+            ? {
+                ...saved,
+                clientId:
+                  cleanClientId
+              }
+            : saved;
 
         io.to(
           peopleServerRoom(
@@ -12068,25 +12166,46 @@ io.on("connection", (socket) => {
           )
         ).emit(
           "chat-message",
-          saved
+          outgoing
         );
+
+        ack({
+          ok:
+            true,
+          message:
+            outgoing
+        });
       } catch (err) {
         console.error(
           "[People server message/save]",
           err
         );
 
+        const errorText =
+          err?.code ===
+            "IMAGE_INVALID"
+            ? "Cette image n'est plus disponible. Réessaie de la sélectionner."
+            : err?.code ===
+                "REPLY_INVALID"
+              ? "Le message auquel tu réponds n'est plus disponible."
+              : "Le message n'a pas pu être sauvegardé.";
+
+        ack({
+          ok:
+            false,
+          error:
+            errorText
+        });
+
+        /*
+          Compatibilité avec les anciens clients People
+          qui n'utilisent pas encore l'ack Socket.IO.
+        */
         socket.emit(
           "system-message",
           {
             text:
-              err?.code ===
-                "IMAGE_INVALID"
-                ? "Cette image n'est plus disponible. Réessaie de la sélectionner."
-                : err?.code ===
-                    "REPLY_INVALID"
-                  ? "Le message auquel tu réponds n'est plus disponible."
-                  : "Le message n'a pas pu être sauvegardé.",
+              errorText,
             time:
               Date.now()
           }
