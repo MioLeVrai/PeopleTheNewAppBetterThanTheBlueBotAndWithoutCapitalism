@@ -53,6 +53,7 @@
   };
 
   let call = null;
+  let joinableCall = null;
   let peer = null;
   let localStream = null;
   let remoteStream = null;
@@ -696,6 +697,56 @@
     }
 
     return username;
+  }
+
+  function sameDmUsername(
+    left,
+    right
+  ) {
+    return (
+      String(left || "")
+        .trim()
+        .toLocaleLowerCase() ===
+      String(right || "")
+        .trim()
+        .toLocaleLowerCase()
+    );
+  }
+
+  function updateCallButtonLabel() {
+    const dmUsername =
+      currentDmUsername();
+
+    const canRejoin =
+      Boolean(
+        dmUsername &&
+        joinableCall &&
+        sameDmUsername(
+          joinableCall.username,
+          dmUsername
+        )
+      );
+
+    const label =
+      canRejoin
+        ? "Rejoindre"
+        : "Appeler";
+
+    callButton.title = label;
+
+    callButton.setAttribute(
+      "aria-label",
+      label
+    );
+
+    const strong =
+      callButton.querySelector(
+        "strong"
+      );
+
+    if (strong) {
+      strong.textContent = label;
+    }
   }
 
   function updateMediaButtons() {
@@ -2261,7 +2312,34 @@
     const oldCall =
       call;
 
+    const keepJoinable =
+      Boolean(
+        oldCall &&
+        [
+          "left",
+          "declined",
+          "disconnected"
+        ].includes(
+          String(reason || "")
+        )
+      );
+
+    if (keepJoinable) {
+      joinableCall = {
+        id: oldCall.id,
+        username: oldCall.username
+      };
+    } else if (
+      joinableCall &&
+      oldCall &&
+      String(joinableCall.id) ===
+        String(oldCall.id)
+    ) {
+      joinableCall = null;
+    }
+
     call = null;
+    updateCallButtonLabel();
 
     showMode(
       "none"
@@ -2297,6 +2375,19 @@
     if (call) {
       return;
     }
+
+    joinableCall = {
+      id: String(
+        payload?.callId ||
+        ""
+      ),
+      username: String(
+        payload?.caller?.username ||
+        "Utilisateur"
+      )
+    };
+
+    updateCallButtonLabel();
 
     call = {
       id:
@@ -2609,6 +2700,9 @@
           return;
         }
 
+        joinableCall = null;
+        updateCallButtonLabel();
+
         call = {
           id:
             String(
@@ -2730,6 +2824,9 @@
           }
 
           if (call) {
+            joinableCall = null;
+            updateCallButtonLabel();
+
             call.role =
               "member";
 
@@ -2861,6 +2958,9 @@
           ""
         ) === call.id
       ) {
+        joinableCall = null;
+        updateCallButtonLabel();
+
         call.role =
           "member";
       }
@@ -2990,12 +3090,27 @@
   socket.on(
     "dm-call-ended",
     (payload) => {
-      if (
-        !call ||
+      const endedCallId =
         String(
           payload?.callId ||
           ""
-        ) !== call.id
+        );
+
+      if (
+        joinableCall &&
+        endedCallId ===
+          String(
+            joinableCall.id ||
+            ""
+          )
+      ) {
+        joinableCall = null;
+        updateCallButtonLabel();
+      }
+
+      if (
+        !call ||
+        endedCallId !== call.id
       ) {
         return;
       }
@@ -3125,6 +3240,32 @@
       );
     }
   );
+
+  const callButtonContextObserver =
+    new MutationObserver(
+      updateCallButtonLabel
+    );
+
+  callButtonContextObserver.observe(
+    dmView,
+    {
+      attributes: true,
+      attributeFilter: [
+        "class"
+      ]
+    }
+  );
+
+  callButtonContextObserver.observe(
+    dmHeaderName,
+    {
+      childList: true,
+      subtree: true,
+      characterData: true
+    }
+  );
+
+  updateCallButtonLabel();
 
   window.PeopleDmCalls = {
     getState() {
