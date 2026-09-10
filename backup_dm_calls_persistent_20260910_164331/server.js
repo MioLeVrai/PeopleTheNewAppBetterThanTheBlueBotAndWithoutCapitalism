@@ -9533,17 +9533,11 @@ const peopleDmCalls =
 const peopleDmCallTimers =
   new Map();
 
-const peopleDmCallRingTimers =
-  new Map();
-
 const peopleDmCallLastStart =
   new Map();
 
 const PEOPLE_DM_CALL_RING_MS =
   35 * 1000;
-
-const PEOPLE_DM_CALL_SOLO_MS =
-  3 * 60 * 1000;
 
 async function peopleDmCallFindAccountByUsername(
   value
@@ -9610,33 +9604,24 @@ function peopleDmCallAccountBusy(
       ""
     );
 
-  if (!wanted) {
-    return false;
-  }
-
   for (
     const call of
     peopleDmCalls.values()
   ) {
     if (
-      call.status !==
-        "active"
+      call.status !== "ringing" &&
+      call.status !== "active"
     ) {
       continue;
     }
 
-    const role =
-      peopleDmCallRoleForAccount(
-        call,
-        wanted
-      );
-
     if (
-      role &&
-      peopleDmCallSocketForRole(
-        call,
-        role
-      )
+      String(
+        call.callerAccountId
+      ) === wanted ||
+      String(
+        call.calleeAccountId
+      ) === wanted
     ) {
       return true;
     }
@@ -9676,279 +9661,6 @@ function peopleDmCallEmitSocketIds(
   }
 }
 
-function peopleDmCallClearTimer(
-  map,
-  callId
-) {
-  const id =
-    String(
-      callId ||
-      ""
-    );
-
-  const timer =
-    map.get(
-      id
-    );
-
-  if (timer) {
-    clearTimeout(
-      timer
-    );
-  }
-
-  map.delete(
-    id
-  );
-}
-
-function peopleDmCallParticipantCount(
-  call
-) {
-  if (!call) {
-    return 0;
-  }
-
-  let count = 0;
-
-  if (
-    String(
-      call.callerSocketId ||
-      ""
-    )
-  ) {
-    count += 1;
-  }
-
-  if (
-    String(
-      call.calleeSocketId ||
-      ""
-    )
-  ) {
-    count += 1;
-  }
-
-  return count;
-}
-
-function peopleDmCallRoleForAccount(
-  call,
-  accountId
-) {
-  const wanted =
-    String(
-      accountId ||
-      ""
-    );
-
-  if (
-    wanted &&
-    String(
-      call?.callerAccountId ||
-      ""
-    ) === wanted
-  ) {
-    return "caller";
-  }
-
-  if (
-    wanted &&
-    String(
-      call?.calleeAccountId ||
-      ""
-    ) === wanted
-  ) {
-    return "callee";
-  }
-
-  return "";
-}
-
-function peopleDmCallSocketForRole(
-  call,
-  role
-) {
-  return String(
-    role === "caller"
-      ? call?.callerSocketId || ""
-      : role === "callee"
-        ? call?.calleeSocketId || ""
-        : ""
-  );
-}
-
-function peopleDmCallSetSocketForRole(
-  call,
-  role,
-  socketId
-) {
-  const value =
-    String(
-      socketId ||
-      ""
-    ) || null;
-
-  if (role === "caller") {
-    call.callerSocketId =
-      value;
-  } else if (
-    role === "callee"
-  ) {
-    call.calleeSocketId =
-      value;
-  }
-}
-
-function peopleDmCallMediaForRole(
-  call,
-  role
-) {
-  const value =
-    role === "caller"
-      ? call?.callerMedia
-      : call?.calleeMedia;
-
-  return {
-    muted:
-      Boolean(
-        value?.muted
-      ),
-    camera:
-      Boolean(
-        value?.camera
-      ),
-    screen:
-      Boolean(
-        value?.screen
-      )
-  };
-}
-
-function peopleDmCallSetMediaForRole(
-  call,
-  role,
-  media = {}
-) {
-  const value = {
-    muted:
-      Boolean(
-        media?.muted
-      ),
-    camera:
-      Boolean(
-        media?.camera
-      ),
-    screen:
-      Boolean(
-        media?.screen
-      )
-  };
-
-  if (role === "caller") {
-    call.callerMedia =
-      value;
-  } else if (
-    role === "callee"
-  ) {
-    call.calleeMedia =
-      value;
-  }
-}
-
-function peopleDmCallOtherRole(
-  role
-) {
-  return role === "caller"
-    ? "callee"
-    : role === "callee"
-      ? "caller"
-      : "";
-}
-
-function peopleDmCallUsernameForRole(
-  call,
-  role
-) {
-  return String(
-    role === "caller"
-      ? call?.callerUsername || "Utilisateur"
-      : role === "callee"
-        ? call?.calleeUsername || "Utilisateur"
-        : "Utilisateur"
-  );
-}
-
-function peopleDmCallAccountIdForRole(
-  call,
-  role
-) {
-  return String(
-    role === "caller"
-      ? call?.callerAccountId || ""
-      : role === "callee"
-        ? call?.calleeAccountId || ""
-        : ""
-  );
-}
-
-function peopleDmCallFindBetween(
-  accountA,
-  accountB
-) {
-  const a =
-    String(
-      accountA ||
-      ""
-    );
-
-  const b =
-    String(
-      accountB ||
-      ""
-    );
-
-  if (!a || !b) {
-    return null;
-  }
-
-  for (
-    const call of
-    peopleDmCalls.values()
-  ) {
-    if (
-      call.status !==
-        "active"
-    ) {
-      continue;
-    }
-
-    const samePair =
-      (
-        String(
-          call.callerAccountId
-        ) === a &&
-        String(
-          call.calleeAccountId
-        ) === b
-      ) ||
-      (
-        String(
-          call.callerAccountId
-        ) === b &&
-        String(
-          call.calleeAccountId
-        ) === a
-      );
-
-    if (samePair) {
-      return call;
-    }
-  }
-
-  return null;
-}
-
 function peopleDmCallFinish(
   callId,
   reason = "hangup"
@@ -9968,13 +9680,23 @@ function peopleDmCallFinish(
     return false;
   }
 
-  peopleDmCallClearTimer(
-    peopleDmCallTimers,
-    id
-  );
+  // === PEOPLE_DM_CALL_FINISH_VOICE_REFRESH_V3 ===
+  const wasActive =
+    call.status ===
+    "active";
 
-  peopleDmCallClearTimer(
-    peopleDmCallRingTimers,
+  const timer =
+    peopleDmCallTimers.get(
+      id
+    );
+
+  if (timer) {
+    clearTimeout(
+      timer
+    );
+  }
+
+  peopleDmCallTimers.delete(
     id
   );
 
@@ -10008,17 +9730,26 @@ function peopleDmCallFinish(
     durationSeconds
   );
 
-  peopleDmCallEmitSocketIds(
-    [
-      call.callerSocketId,
-      call.calleeSocketId,
-      ...peopleDmCallAccountSocketIds(
-        call.callerAccountId
-      ),
+  const recipients = [
+    call.callerSocketId
+  ];
+
+  if (
+    call.calleeSocketId
+  ) {
+    recipients.push(
+      call.calleeSocketId
+    );
+  } else {
+    recipients.push(
       ...peopleDmCallAccountSocketIds(
         call.calleeAccountId
       )
-    ],
+    );
+  }
+
+  peopleDmCallEmitSocketIds(
+    recipients,
     "dm-call-ended",
     {
       callId:
@@ -10031,159 +9762,17 @@ function peopleDmCallFinish(
     }
   );
 
-  peopleVoiceRefreshAccount(
-    call.callerAccountId
-  );
+  if (wasActive) {
+    peopleVoiceRefreshAccount(
+      call.callerAccountId
+    );
 
-  peopleVoiceRefreshAccount(
-    call.calleeAccountId
-  );
+    peopleVoiceRefreshAccount(
+      call.calleeAccountId
+    );
+  }
 
   return true;
-}
-
-function peopleDmCallScheduleSoloTimeout(
-  call
-) {
-  if (!call) {
-    return;
-  }
-
-  peopleDmCallClearTimer(
-    peopleDmCallTimers,
-    call.id
-  );
-
-  const count =
-    peopleDmCallParticipantCount(
-      call
-    );
-
-  if (count === 0) {
-    peopleDmCallFinish(
-      call.id,
-      "empty"
-    );
-
-    return;
-  }
-
-  if (count !== 1) {
-    return;
-  }
-
-  call.soloSince =
-    Date.now();
-
-  const timer =
-    setTimeout(
-      () => {
-        const current =
-          peopleDmCalls.get(
-            String(
-              call.id
-            )
-          );
-
-        if (
-          !current ||
-          peopleDmCallParticipantCount(
-            current
-          ) !== 1
-        ) {
-          return;
-        }
-
-        peopleDmCallFinish(
-          current.id,
-          "alone-timeout"
-        );
-      },
-      PEOPLE_DM_CALL_SOLO_MS
-    );
-
-  peopleDmCallTimers.set(
-    String(
-      call.id
-    ),
-    timer
-  );
-}
-
-function peopleDmCallStopRinging(
-  call
-) {
-  if (!call) {
-    return;
-  }
-
-  call.ringActive =
-    false;
-
-  peopleDmCallClearTimer(
-    peopleDmCallRingTimers,
-    call.id
-  );
-
-  peopleDmCallEmitSocketIds(
-    [
-      ...peopleDmCallAccountSocketIds(
-        call.callerAccountId
-      ),
-      ...peopleDmCallAccountSocketIds(
-        call.calleeAccountId
-      )
-    ],
-    "dm-call-ring-ended",
-    {
-      callId:
-        call.id
-    }
-  );
-}
-
-function peopleDmCallScheduleRingTimeout(
-  call
-) {
-  if (!call) {
-    return;
-  }
-
-  peopleDmCallClearTimer(
-    peopleDmCallRingTimers,
-    call.id
-  );
-
-  call.ringActive =
-    true;
-
-  const timer =
-    setTimeout(
-      () => {
-        const current =
-          peopleDmCalls.get(
-            String(
-              call.id
-            )
-          );
-
-        if (!current) {
-          return;
-        }
-
-        peopleDmCallStopRinging(
-          current
-        );
-      },
-      PEOPLE_DM_CALL_RING_MS
-    );
-
-  peopleDmCallRingTimers.set(
-    String(
-      call.id
-    ),
-    timer
-  );
 }
 
 function peopleDmCallForActiveSocket(
@@ -10214,12 +9803,10 @@ function peopleDmCallForActiveSocket(
 
   if (
     String(
-      call.callerSocketId ||
-      ""
+      call.callerSocketId
     ) !== currentSocket &&
     String(
-      call.calleeSocketId ||
-      ""
+      call.calleeSocketId
     ) !== currentSocket
   ) {
     return null;
@@ -10240,8 +9827,7 @@ function peopleDmCallOtherSocket(
 
   if (
     String(
-      call.callerSocketId ||
-      ""
+      call.callerSocketId
     ) === current
   ) {
     return String(
@@ -10252,8 +9838,7 @@ function peopleDmCallOtherSocket(
 
   if (
     String(
-      call.calleeSocketId ||
-      ""
+      call.calleeSocketId
     ) === current
   ) {
     return String(
@@ -10263,371 +9848,6 @@ function peopleDmCallOtherSocket(
   }
 
   return "";
-}
-
-function peopleDmCallNotifyConnected(
-  call,
-  joiningSocketId
-) {
-  const callerSocket =
-    String(
-      call?.callerSocketId ||
-      ""
-    );
-
-  const calleeSocket =
-    String(
-      call?.calleeSocketId ||
-      ""
-    );
-
-  if (
-    !callerSocket ||
-    !calleeSocket
-  ) {
-    return false;
-  }
-
-  peopleDmCallClearTimer(
-    peopleDmCallTimers,
-    call.id
-  );
-
-  call.soloSince =
-    null;
-
-  peopleDmCallStopRinging(
-    call
-  );
-
-  const callerMedia =
-    peopleDmCallMediaForRole(
-      call,
-      "caller"
-    );
-
-  const calleeMedia =
-    peopleDmCallMediaForRole(
-      call,
-      "callee"
-    );
-
-  io.to(
-    callerSocket
-  ).emit(
-    "dm-call-accepted",
-    {
-      callId:
-        call.id,
-      peerSocketId:
-        calleeSocket,
-      peerUsername:
-        call.calleeUsername,
-      initiator:
-        String(
-          callerSocket
-        ) !== String(
-          joiningSocketId ||
-          ""
-        ),
-      peerMuted:
-        calleeMedia.muted,
-      peerCamera:
-        calleeMedia.camera,
-      peerScreen:
-        calleeMedia.screen
-    }
-  );
-
-  io.to(
-    calleeSocket
-  ).emit(
-    "dm-call-accepted",
-    {
-      callId:
-        call.id,
-      peerSocketId:
-        callerSocket,
-      peerUsername:
-        call.callerUsername,
-      initiator:
-        String(
-          calleeSocket
-        ) !== String(
-          joiningSocketId ||
-          ""
-        ),
-      peerMuted:
-        callerMedia.muted,
-      peerCamera:
-        callerMedia.camera,
-      peerScreen:
-        callerMedia.screen
-    }
-  );
-
-  return true;
-}
-
-function peopleDmCallJoinParticipant(
-  call,
-  accountId,
-  socketId
-) {
-  if (
-    !call ||
-    call.status !==
-      "active"
-  ) {
-    return {
-      ok: false,
-      reason:
-        "unavailable"
-    };
-  }
-
-  const role =
-    peopleDmCallRoleForAccount(
-      call,
-      accountId
-    );
-
-  if (!role) {
-    return {
-      ok: false,
-      reason:
-        "unavailable"
-    };
-  }
-
-  const currentSocket =
-    peopleDmCallSocketForRole(
-      call,
-      role
-    );
-
-  if (currentSocket) {
-    return {
-      ok: false,
-      reason:
-        "already-joined"
-    };
-  }
-
-  if (
-    !peopleAccountHasVoiceSlot(
-      accountId
-    )
-  ) {
-    return {
-      ok: false,
-      reason:
-        "limit"
-    };
-  }
-
-  peopleDmCallSetSocketForRole(
-    call,
-    role,
-    socketId
-  );
-
-  peopleDmCallSetMediaForRole(
-    call,
-    role,
-    {
-      muted: false,
-      camera: false,
-      screen: false
-    }
-  );
-
-  peopleDmCalls.set(
-    call.id,
-    call
-  );
-
-  peopleVoiceRefreshAccount(
-    accountId
-  );
-
-  const otherRole =
-    peopleDmCallOtherRole(
-      role
-    );
-
-  const peerSocketId =
-    peopleDmCallSocketForRole(
-      call,
-      otherRole
-    );
-
-  if (peerSocketId) {
-    peopleDmCallNotifyConnected(
-      call,
-      socketId
-    );
-  } else {
-    peopleDmCallScheduleSoloTimeout(
-      call
-    );
-  }
-
-  const peerMedia =
-    peopleDmCallMediaForRole(
-      call,
-      otherRole
-    );
-
-  return {
-    ok: true,
-    role,
-    peerSocketId,
-    peerUsername:
-      peopleDmCallUsernameForRole(
-        call,
-        otherRole
-      ),
-    peerMuted:
-      peerMedia.muted,
-    peerCamera:
-      peerMedia.camera,
-    peerScreen:
-      peerMedia.screen,
-    initiator:
-      false
-  };
-}
-
-function peopleDmCallLeaveSocket(
-  call,
-  socketId,
-  reason = "left"
-) {
-  if (!call) {
-    return false;
-  }
-
-  const current =
-    String(
-      socketId ||
-      ""
-    );
-
-  let role = "";
-
-  if (
-    String(
-      call.callerSocketId ||
-      ""
-    ) === current
-  ) {
-    role = "caller";
-  } else if (
-    String(
-      call.calleeSocketId ||
-      ""
-    ) === current
-  ) {
-    role = "callee";
-  }
-
-  if (!role) {
-    return false;
-  }
-
-  const accountId =
-    peopleDmCallAccountIdForRole(
-      call,
-      role
-    );
-
-  const otherRole =
-    peopleDmCallOtherRole(
-      role
-    );
-
-  const otherSocket =
-    peopleDmCallSocketForRole(
-      call,
-      otherRole
-    );
-
-  peopleDmCallSetSocketForRole(
-    call,
-    role,
-    null
-  );
-
-  peopleDmCallSetMediaForRole(
-    call,
-    role,
-    {
-      muted: false,
-      camera: false,
-      screen: false
-    }
-  );
-
-  peopleDmCalls.set(
-    call.id,
-    call
-  );
-
-  io.to(
-    current
-  ).emit(
-    "dm-call-left",
-    {
-      callId:
-        call.id,
-      reason:
-        String(
-          reason ||
-          "left"
-        )
-    }
-  );
-
-  if (otherSocket) {
-    io.to(
-      otherSocket
-    ).emit(
-      "dm-call-peer-left",
-      {
-        callId:
-          call.id,
-        reason:
-          String(
-            reason ||
-            "left"
-          ),
-        rejoinWindowMs:
-          PEOPLE_DM_CALL_SOLO_MS
-      }
-    );
-  }
-
-  peopleVoiceRefreshAccount(
-    accountId
-  );
-
-  if (
-    peopleDmCallParticipantCount(
-      call
-    ) === 0
-  ) {
-    peopleDmCallFinish(
-      call.id,
-      "empty"
-    );
-  } else {
-    peopleDmCallScheduleSoloTimeout(
-      call
-    );
-  }
-
-  return true;
 }
 
 function peopleDmCallDisconnect(
@@ -10660,23 +9880,39 @@ function peopleDmCallDisconnect(
   ) {
     if (
       String(
-        call.callerSocketId ||
-        ""
-      ) === socketId ||
-      String(
-        call.calleeSocketId ||
-        ""
+        call.callerSocketId
       ) === socketId
     ) {
-      peopleDmCallLeaveSocket(
-        call,
-        socketId,
+      peopleDmCallFinish(
+        call.id,
         "disconnected"
       );
+
+      continue;
     }
+
+    if (
+      call.status ===
+        "active" &&
+      String(
+        call.calleeSocketId
+      ) === socketId
+    ) {
+      peopleDmCallFinish(
+        call.id,
+        "disconnected"
+      );
+
+      continue;
+    }
+
+    /*
+      V2 : si l'appelé ferme son dernier onglet pendant
+      que ça sonne, l'appel continue jusqu'au timeout.
+      S'il rouvre People avant, il reçoit l'appel.
+    */
   }
 }
-
 // === PEOPLE_DM_CALLS_V1_END ===
 
 // === PEOPLE_DM_CALLS_V2_START ===
@@ -10817,10 +10053,6 @@ function peopleDmCallConversationPreview(
       "📞 Appel annulé",
     timeout:
       "📞 Appel manqué",
-    "alone-timeout":
-      "📞 Appel terminé",
-    empty:
-      "📞 Appel terminé",
     disconnected:
       "📞 Appel interrompu",
     hangup:
@@ -11038,50 +10270,13 @@ function peopleDmCallDeliverPendingForAccount(
   ) {
     if (
       call.status !==
-        "active"
+        "ringing" ||
+      String(
+        call.calleeAccountId
+      ) !== wanted
     ) {
       continue;
     }
-
-    const role =
-      peopleDmCallRoleForAccount(
-        call,
-        wanted
-      );
-
-    if (!role) {
-      continue;
-    }
-
-    if (
-      peopleDmCallSocketForRole(
-        call,
-        role
-      )
-    ) {
-      continue;
-    }
-
-    const otherRole =
-      peopleDmCallOtherRole(
-        role
-      );
-
-    const otherSocket =
-      peopleDmCallSocketForRole(
-        call,
-        otherRole
-      );
-
-    if (!otherSocket) {
-      continue;
-    }
-
-    const initialRing =
-      role === "callee" &&
-      Boolean(
-        call.ringActive
-      );
 
     io.to(
       targetSocket
@@ -11092,25 +10287,16 @@ function peopleDmCallDeliverPendingForAccount(
           call.id,
         caller: {
           id:
-            peopleDmCallAccountIdForRole(
-              call,
-              otherRole
+            String(
+              call.callerAccountId
             ),
           username:
-            peopleDmCallUsernameForRole(
-              call,
-              otherRole
-            )
-        },
-        rejoin:
-          !initialRing,
-        silent:
-          !initialRing
+            call.callerUsername
+        }
       }
     );
   }
 }
-
 // === PEOPLE_DM_CALLS_V2_END ===
 
 function cleanUsername(value) {
@@ -11597,28 +10783,34 @@ function peopleAccountDmCallCount(
     const call of
     peopleDmCalls.values()
   ) {
+    const involved =
+      String(
+        call?.callerAccountId ||
+        ""
+      ) === wanted ||
+      String(
+        call?.calleeAccountId ||
+        ""
+      ) === wanted;
+
+    if (!involved) {
+      continue;
+    }
+
     if (
-      call.status !==
-        "active"
+      call.status ===
+      "active"
     ) {
-      continue;
-    }
+      count +=
+        1;
 
-    const role =
-      peopleDmCallRoleForAccount(
-        call,
-        wanted
-      );
-
-    if (!role) {
       continue;
     }
 
     if (
-      peopleDmCallSocketForRole(
-        call,
-        role
-      )
+      includeRinging &&
+      call.status ===
+        "ringing"
     ) {
       count +=
         1;
@@ -12019,106 +11211,6 @@ io.on("connection", (socket) => {
           });
         }
 
-        const target =
-          await peopleDmCallFindAccountByUsername(
-            targetUsername
-          );
-
-        if (!target) {
-          return ack({
-            ok: false,
-            error:
-              "Utilisateur introuvable."
-          });
-        }
-
-        if (
-          String(
-            target.id
-          ) ===
-          String(
-            callerAccountId
-          )
-        ) {
-          return ack({
-            ok: false,
-            error:
-              "Tu ne peux pas t'appeler toi-même."
-          });
-        }
-
-        const existingCall =
-          peopleDmCallFindBetween(
-            callerAccountId,
-            target.id
-          );
-
-        if (existingCall) {
-          const role =
-            peopleDmCallRoleForAccount(
-              existingCall,
-              callerAccountId
-            );
-
-          if (
-            peopleDmCallSocketForRole(
-              existingCall,
-              role
-            )
-          ) {
-            return ack({
-              ok: false,
-              error:
-                "Tu es déjà dans cet appel."
-            });
-          }
-
-          const joined =
-            peopleDmCallJoinParticipant(
-              existingCall,
-              callerAccountId,
-              socket.id
-            );
-
-          if (!joined.ok) {
-            return ack({
-              ok: false,
-              reason:
-                joined.reason,
-              error:
-                joined.reason === "limit"
-                  ? "Tu es déjà dans un vocal ou un autre appel."
-                  : "Impossible de rejoindre cet appel."
-            });
-          }
-
-          return ack({
-            ok: true,
-            callId:
-              existingCall.id,
-            target:
-              peoplePublicAccount(
-                target
-              ),
-            created:
-              false,
-            rejoined:
-              true,
-            peerSocketId:
-              joined.peerSocketId,
-            peerUsername:
-              joined.peerUsername,
-            peerMuted:
-              joined.peerMuted,
-            peerCamera:
-              joined.peerCamera,
-            peerScreen:
-              joined.peerScreen,
-            initiator:
-              joined.initiator
-          });
-        }
-
         const now =
           Date.now();
 
@@ -12149,6 +11241,39 @@ io.on("connection", (socket) => {
           now
         );
 
+        const target =
+          await peopleDmCallFindAccountByUsername(
+            targetUsername
+          );
+
+        if (!target) {
+          return ack({
+            ok: false,
+            error:
+              "Utilisateur introuvable."
+          });
+        }
+
+        if (
+          String(
+            target.id
+          ) ===
+          String(
+            callerAccountId
+          )
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Tu ne peux pas t'appeler toi-même."
+          });
+        }
+
+        const targetSockets =
+          peopleDmCallAccountSocketIds(
+            target.id
+          );
+
         if (
           !peopleAccountHasVoiceSlot(
             callerAccountId
@@ -12162,10 +11287,9 @@ io.on("connection", (socket) => {
         }
 
         if (
-          peopleAccountActiveVoiceCount(
+          !peopleAccountHasVoiceSlot(
             target.id
-          ) >=
-          PEOPLE_MAX_SIMULTANEOUS_VOICES
+          )
         ) {
           return ack({
             ok: false,
@@ -12182,7 +11306,7 @@ io.on("connection", (socket) => {
           id:
             callId,
           status:
-            "active",
+            "ringing",
           callerAccountId:
             String(
               callerAccountId
@@ -12195,11 +11319,6 @@ io.on("connection", (socket) => {
             cleanUsername(
               callerUsername
             ),
-          callerMedia: {
-            muted: false,
-            camera: false,
-            screen: false
-          },
           calleeAccountId:
             String(
               target.id
@@ -12210,19 +11329,8 @@ io.on("connection", (socket) => {
             cleanUsername(
               target.username
             ),
-          calleeMedia: {
-            muted: false,
-            camera: false,
-            screen: false
-          },
           createdAt:
-            Date.now(),
-          acceptedAt:
-            Date.now(),
-          soloSince:
-            Date.now(),
-          ringActive:
-            true
+            Date.now()
         };
 
         peopleDmCalls.set(
@@ -12235,22 +11343,21 @@ io.on("connection", (socket) => {
           "started"
         );
 
-        peopleVoiceRefreshAccount(
-          callerAccountId
-        );
-
-        peopleDmCallScheduleSoloTimeout(
-          call
-        );
-
-        peopleDmCallScheduleRingTimeout(
-          call
-        );
-
-        const targetSockets =
-          peopleDmCallAccountSocketIds(
-            target.id
+        const timer =
+          setTimeout(
+            () => {
+              peopleDmCallFinish(
+                callId,
+                "timeout"
+              );
+            },
+            PEOPLE_DM_CALL_RING_MS
           );
+
+        peopleDmCallTimers.set(
+          callId,
+          timer
+        );
 
         peopleDmCallEmitSocketIds(
           targetSockets,
@@ -12264,11 +11371,7 @@ io.on("connection", (socket) => {
                 ),
               username:
                 call.callerUsername
-            },
-            rejoin:
-              false,
-            silent:
-              false
+            }
           }
         );
 
@@ -12278,23 +11381,7 @@ io.on("connection", (socket) => {
           target:
             peoplePublicAccount(
               target
-            ),
-          created:
-            true,
-          rejoined:
-            false,
-          peerSocketId:
-            "",
-          peerUsername:
-            call.calleeUsername,
-          peerMuted:
-            false,
-          peerCamera:
-            false,
-          peerScreen:
-            false,
-          initiator:
-            false
+            )
         });
       } catch (err) {
         console.error(
@@ -12333,8 +11420,14 @@ io.on("connection", (socket) => {
       if (
         !call ||
         call.status !==
-          "active" ||
-        !accountId
+          "ringing" ||
+        !accountId ||
+        String(
+          call.calleeAccountId
+        ) !==
+          String(
+            accountId
+          )
       ) {
         return ack({
           ok: false,
@@ -12343,38 +11436,76 @@ io.on("connection", (socket) => {
         });
       }
 
-      const role =
-        peopleDmCallRoleForAccount(
-          call,
-          accountId
+      // === VOICE_LIMIT_ON_ANSWER ===
+      if (
+        peopleAccountActiveVoiceCount(
+          call.callerAccountId
+        ) >=
+          PEOPLE_MAX_SIMULTANEOUS_VOICES ||
+        peopleAccountActiveVoiceCount(
+          call.calleeAccountId
+        ) >=
+          PEOPLE_MAX_SIMULTANEOUS_VOICES
+      ) {
+        peopleDmCallFinish(
+          call.id,
+          "limit"
         );
 
-      if (!role) {
         return ack({
           ok: false,
           reason:
-            "unavailable"
+            "limit"
         });
       }
 
-      const joined =
-        peopleDmCallJoinParticipant(
-          call,
-          accountId,
+      const timer =
+        peopleDmCallTimers.get(
+          call.id
+        );
+
+      if (timer) {
+        clearTimeout(
+          timer
+        );
+      }
+
+      peopleDmCallTimers.delete(
+        call.id
+      );
+
+      call.status =
+        "active";
+
+      call.acceptedAt =
+        Date.now();
+
+      call.calleeSocketId =
+        String(
           socket.id
         );
 
-      if (!joined.ok) {
-        return ack({
-          ok: false,
-          reason:
-            joined.reason
-        });
-      }
+      peopleDmCalls.set(
+        call.id,
+        call
+      );
 
-      const otherAccountSockets =
+      /*
+        L'appel MP devient une vraie session vocale.
+        On rafraîchit les listes des vocaux serveur
+        et tous les appels concernés.
+      */
+      peopleVoiceRefreshAccount(
+        call.callerAccountId
+      );
+
+      peopleVoiceRefreshAccount(
+        call.calleeAccountId
+      );
+
+      const otherCalleeSockets =
         peopleDmCallAccountSocketIds(
-          accountId
+          call.calleeAccountId
         ).filter(
           (id) =>
             String(id) !==
@@ -12384,30 +11515,58 @@ io.on("connection", (socket) => {
         );
 
       peopleDmCallEmitSocketIds(
-        otherAccountSockets,
-        "dm-call-left",
+        otherCalleeSockets,
+        "dm-call-ended",
         {
           callId:
             call.id,
           reason:
-            "joined-elsewhere"
+            "answered-elsewhere"
+        }
+      );
+
+      io.to(
+        call.callerSocketId
+      ).emit(
+        "dm-call-accepted",
+        {
+          callId:
+            call.id,
+          peerSocketId:
+            call.calleeSocketId,
+          peerUsername:
+            call.calleeUsername,
+          initiator:
+            true,
+          peerCamera:
+            false,
+          peerScreen:
+            false
+        }
+      );
+
+      io.to(
+        call.calleeSocketId
+      ).emit(
+        "dm-call-accepted",
+        {
+          callId:
+            call.id,
+          peerSocketId:
+            call.callerSocketId,
+          peerUsername:
+            call.callerUsername,
+          initiator:
+            false,
+          peerCamera:
+            false,
+          peerScreen:
+            false
         }
       );
 
       ack({
-        ok: true,
-        peerSocketId:
-          joined.peerSocketId,
-        peerUsername:
-          joined.peerUsername,
-        peerMuted:
-          joined.peerMuted,
-        peerCamera:
-          joined.peerCamera,
-        peerScreen:
-          joined.peerScreen,
-        initiator:
-          joined.initiator
+        ok: true
       });
     }
   );
@@ -12431,74 +11590,22 @@ io.on("connection", (socket) => {
       if (
         !call ||
         call.status !==
-          "active" ||
-        !accountId
+          "ringing" ||
+        !accountId ||
+        String(
+          call.calleeAccountId
+        ) !==
+          String(
+            accountId
+          )
       ) {
         return;
       }
 
-      const role =
-        peopleDmCallRoleForAccount(
-          call,
-          accountId
-        );
-
-      if (!role) {
-        return;
-      }
-
-      if (
-        peopleDmCallSocketForRole(
-          call,
-          role
-        )
-      ) {
-        return;
-      }
-
-      if (
-        role === "callee"
-      ) {
-        peopleDmCallStopRinging(
-          call
-        );
-      }
-
-      peopleDmCallEmitSocketIds(
-        peopleDmCallAccountSocketIds(
-          accountId
-        ),
-        "dm-call-left",
-        {
-          callId:
-            call.id,
-          reason:
-            "declined"
-        }
+      peopleDmCallFinish(
+        call.id,
+        "declined"
       );
-
-      const otherRole =
-        peopleDmCallOtherRole(
-          role
-        );
-
-      const otherSocket =
-        peopleDmCallSocketForRole(
-          call,
-          otherRole
-        );
-
-      if (otherSocket) {
-        io.to(
-          otherSocket
-        ).emit(
-          "dm-call-peer-declined",
-          {
-            callId:
-              call.id
-          }
-        );
-      }
     }
   );
 
@@ -12513,14 +11620,23 @@ io.on("connection", (socket) => {
           )
         );
 
-      if (!call) {
+      if (
+        !call ||
+        call.status !==
+          "ringing" ||
+        String(
+          call.callerSocketId
+        ) !==
+          String(
+            socket.id
+          )
+      ) {
         return;
       }
 
-      peopleDmCallLeaveSocket(
-        call,
-        socket.id,
-        "left"
+      peopleDmCallFinish(
+        call.id,
+        "cancelled"
       );
     }
   );
@@ -12540,10 +11656,26 @@ io.on("connection", (socket) => {
         return;
       }
 
-      peopleDmCallLeaveSocket(
-        call,
-        socket.id,
-        "left"
+      const current =
+        String(
+          socket.id
+        );
+
+      if (
+        String(
+          call.callerSocketId
+        ) !== current &&
+        String(
+          call.calleeSocketId ||
+          ""
+        ) !== current
+      ) {
+        return;
+      }
+
+      peopleDmCallFinish(
+        call.id,
+        "hangup"
       );
     }
   );
@@ -12718,34 +11850,6 @@ io.on("connection", (socket) => {
       if (!call) {
         return;
       }
-
-      const current =
-        String(
-          socket.id
-        );
-
-      const role =
-        String(
-          call.callerSocketId ||
-          ""
-        ) === current
-          ? "caller"
-          : "callee";
-
-      peopleDmCallSetMediaForRole(
-        call,
-        role,
-        {
-          muted,
-          camera,
-          screen
-        }
-      );
-
-      peopleDmCalls.set(
-        call.id,
-        call
-      );
 
       const other =
         peopleDmCallOtherSocket(

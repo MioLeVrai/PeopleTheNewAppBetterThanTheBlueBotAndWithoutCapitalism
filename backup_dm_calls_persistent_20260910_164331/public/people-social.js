@@ -3358,10 +3358,6 @@ function dmTextLine(
         "Appel annulé",
       timeout:
         "Appel manqué — pas de réponse",
-      "alone-timeout":
-        "Appel terminé",
-      empty:
-        "Appel terminé",
       disconnected:
         "Appel interrompu",
       hangup:
@@ -3385,11 +3381,7 @@ function dmTextLine(
         event.reason ===
           "hangup" ||
         event.reason ===
-          "disconnected" ||
-        event.reason ===
-          "alone-timeout" ||
-        event.reason ===
-          "empty"
+          "disconnected"
       )
     ) {
       text +=

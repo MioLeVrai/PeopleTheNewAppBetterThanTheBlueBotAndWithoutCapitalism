@@ -2063,62 +2063,6 @@
     );
   }
 
-  function resetPeerConnectionOnly() {
-    if (connectionWatchTimer) {
-      clearTimeout(
-        connectionWatchTimer
-      );
-      connectionWatchTimer = null;
-    }
-
-    if (iceRestartTimer) {
-      clearTimeout(
-        iceRestartTimer
-      );
-      iceRestartTimer = null;
-    }
-
-    if (peer) {
-      try {
-        peer.ontrack = null;
-        peer.onicecandidate = null;
-        peer.onconnectionstatechange = null;
-        peer.close();
-      } catch {}
-    }
-
-    peer = null;
-    pendingIce = [];
-
-    if (remoteStream) {
-      for (
-        const track of
-        remoteStream.getTracks()
-      ) {
-        try {
-          track.stop();
-        } catch {}
-      }
-    }
-
-    remoteStream = null;
-
-    try {
-      remoteVideo.srcObject =
-        null;
-      remoteAudio.srcObject =
-        null;
-    } catch {}
-
-    remoteVideo.classList.add(
-      "hidden"
-    );
-
-    identity.classList.remove(
-      "with-video"
-    );
-  }
-
   function stopMedia() {
     if (connectionWatchTimer) {
       clearTimeout(
@@ -2220,20 +2164,12 @@
         "Pas de réponse",
       hangup:
         "Appel terminé",
-      left:
-        "Tu as quitté l'appel",
-      empty:
-        "Appel terminé",
-      "alone-timeout":
-        "Appel fermé après 3 min seul",
       disconnected:
-        "Connexion quittée",
+        "Appel interrompu",
       unavailable:
-        "Appel indisponible",
+        "Utilisateur hors ligne",
       limit:
-        "Tu es déjà dans un vocal ou un appel",
-      "joined-elsewhere":
-        "Appel rejoint ailleurs",
+        "Limite de 2 vocaux/appels atteinte",
       "answered-elsewhere":
         "Appel pris ailleurs"
     };
@@ -2305,7 +2241,7 @@
           ""
         ),
       role:
-        "joiner",
+        "callee",
       username:
         String(
           payload?.caller?.username ||
@@ -2316,11 +2252,7 @@
       remoteCamera:
         false,
       remoteScreen:
-        false,
-      rejoin:
-        Boolean(
-          payload?.rejoin
-        )
+        false
     };
 
     setCallPerson(
@@ -2328,9 +2260,7 @@
     );
 
     setStatus(
-      call.rejoin
-        ? "Appel en cours • tu peux rejoindre"
-        : "Appel entrant…"
+      "Appel entrant…"
     );
 
     showMode(
@@ -2338,16 +2268,12 @@
     );
 
     showOverlay();
-
-    if (!payload?.silent) {
-      startRinging(
-        "incoming"
-      );
-    }
+    startRinging(
+      "incoming"
+    );
 
     try {
       if (
-        !payload?.silent &&
         "Notification" in
           window &&
         Notification.permission ===
@@ -2381,47 +2307,12 @@
       return;
     }
 
-    const previousPeerSocketId =
-      String(
-        call.peerSocketId ||
-        ""
-      );
+    stopRinging();
 
-    const nextPeerSocketId =
+    call.peerSocketId =
       String(
         payload?.peerSocketId ||
         ""
-      );
-
-    if (
-      peer &&
-      previousPeerSocketId &&
-      nextPeerSocketId &&
-      previousPeerSocketId !==
-        nextPeerSocketId
-    ) {
-      resetPeerConnectionOnly();
-    }
-
-    call.peerSocketId =
-      nextPeerSocketId;
-
-    if (
-      payload?.peerUsername
-    ) {
-      call.username =
-        String(
-          payload.peerUsername
-        );
-
-      setCallPerson(
-        call.username
-      );
-    }
-
-    call.remoteMuted =
-      Boolean(
-        payload?.peerMuted
       );
 
     call.remoteCamera =
@@ -2439,63 +2330,19 @@
         payload?.initiator
       );
 
+    setStatus(
+      "Connexion…"
+    );
+
     showMode(
       "active"
     );
-
-    showOverlay();
 
     await ensureLocalAudio(
       4500
     );
 
-    socket.emit(
-      "dm-call-media-state",
-      {
-        callId:
-          call.id,
-        muted:
-          micMuted,
-        camera:
-          cameraEnabled,
-        screen:
-          screenEnabled
-      }
-    );
-
-    if (!call.peerSocketId) {
-      setStatus(
-        "En attente de " +
-        call.username +
-        "… • fermeture après 3 min seul"
-      );
-
-      return;
-    }
-
-    stopRinging();
-
-    setStatus(
-      "Connexion…"
-    );
-
     createPeer();
-
-    if (
-      screenEnabled &&
-      screenTrack
-    ) {
-      await peopleDmSetOutgoingVideo(
-        screenTrack
-      );
-    } else if (
-      cameraEnabled &&
-      cameraTrack
-    ) {
-      await peopleDmSetOutgoingVideo(
-        cameraTrack
-      );
-    }
 
     if (connectionWatchTimer) {
       clearTimeout(
@@ -2508,7 +2355,6 @@
         () => {
           if (
             call &&
-            call.peerSocketId &&
             peer &&
             peer.connectionState !==
               "connected"
@@ -2534,6 +2380,20 @@
         },
         12000
       );
+
+    socket.emit(
+      "dm-call-media-state",
+      {
+        callId:
+          call.id,
+        muted:
+          micMuted,
+        camera:
+          cameraEnabled,
+        screen:
+          screenEnabled
+      }
+    );
 
     if (
       payload?.initiator
@@ -2615,63 +2475,36 @@
               response.callId
             ),
           role:
-            "member",
+            "caller",
           username:
             String(
-              response.peerUsername ||
               response.target?.username ||
               targetUsername
             ),
           peerSocketId:
-            String(
-              response.peerSocketId ||
-              ""
-            ),
-          remoteMuted:
-            Boolean(
-              response.peerMuted
-            ),
+            null,
           remoteCamera:
-            Boolean(
-              response.peerCamera
-            ),
+            false,
           remoteScreen:
-            Boolean(
-              response.peerScreen
-            )
+            false
         };
 
         setCallPerson(
           call.username
         );
 
+        setStatus(
+          "Appel en cours…"
+        );
+
+        showMode(
+          "outgoing"
+        );
+
         showOverlay();
-
-        if (
-          response.created &&
-          !response.peerSocketId
-        ) {
-          startRinging(
-            "outgoing"
-          );
-        }
-
-        void beginActiveCall({
-          callId:
-            call.id,
-          peerSocketId:
-            response.peerSocketId,
-          peerUsername:
-            call.username,
-          peerMuted:
-            response.peerMuted,
-          peerCamera:
-            response.peerCamera,
-          peerScreen:
-            response.peerScreen,
-          initiator:
-            response.initiator
-        });
+        startRinging(
+          "outgoing"
+        );
       }
     );
   }
@@ -2687,7 +2520,7 @@
       if (
         !call ||
         call.role !==
-          "joiner"
+          "callee"
       ) {
         return;
       }
@@ -2725,31 +2558,6 @@
               response?.reason ||
               "unavailable"
             );
-
-            return;
-          }
-
-          if (call) {
-            call.role =
-              "member";
-
-            void beginActiveCall({
-              callId:
-                call.id,
-              peerSocketId:
-                response.peerSocketId,
-              peerUsername:
-                response.peerUsername ||
-                call.username,
-              peerMuted:
-                response.peerMuted,
-              peerCamera:
-                response.peerCamera,
-              peerScreen:
-                response.peerScreen,
-              initiator:
-                response.initiator
-            });
           }
         }
       );
@@ -2762,7 +2570,7 @@
       if (
         !call ||
         call.role !==
-          "joiner"
+          "callee"
       ) {
         return;
       }
@@ -2854,135 +2662,8 @@
   socket.on(
     "dm-call-accepted",
     (payload) => {
-      if (
-        call &&
-        String(
-          payload?.callId ||
-          ""
-        ) === call.id
-      ) {
-        call.role =
-          "member";
-      }
-
       void beginActiveCall(
         payload
-      );
-    }
-  );
-
-  socket.on(
-    "dm-call-ring-ended",
-    (payload) => {
-      if (
-        !call ||
-        String(
-          payload?.callId ||
-          ""
-        ) !== call.id
-      ) {
-        return;
-      }
-
-      stopRinging();
-
-      if (call.peerSocketId) {
-        return;
-      }
-
-      setStatus(
-        call.role === "joiner"
-          ? "Appel en cours • tu peux rejoindre"
-          : "En attente de " +
-            call.username +
-            "… • fermeture après 3 min seul"
-      );
-    }
-  );
-
-  socket.on(
-    "dm-call-peer-left",
-    (payload) => {
-      if (
-        !call ||
-        String(
-          payload?.callId ||
-          ""
-        ) !== call.id
-      ) {
-        return;
-      }
-
-      stopRinging();
-      resetPeerConnectionOnly();
-
-      call.peerSocketId =
-        "";
-      call.remoteMuted =
-        false;
-      call.remoteCamera =
-        false;
-      call.remoteScreen =
-        false;
-      call.initiator =
-        false;
-
-      syncRemoteMedia();
-      showMode(
-        "active"
-      );
-      showOverlay();
-
-      setStatus(
-        call.username +
-        " a quitté • fermeture dans 3 min s'il ne revient pas"
-      );
-    }
-  );
-
-  socket.on(
-    "dm-call-peer-declined",
-    (payload) => {
-      if (
-        !call ||
-        String(
-          payload?.callId ||
-          ""
-        ) !== call.id
-      ) {
-        return;
-      }
-
-      stopRinging();
-
-      if (!call.peerSocketId) {
-        setStatus(
-          call.username +
-          " a refusé • tu restes dans l'appel jusqu'à 3 min"
-        );
-      }
-    }
-  );
-
-  socket.on(
-    "dm-call-left",
-    (payload) => {
-      if (
-        !call ||
-        String(
-          payload?.callId ||
-          ""
-        ) !== call.id
-      ) {
-        return;
-      }
-
-      finishCall(
-        payload?.reason ||
-        "left",
-        {
-          immediate: true
-        }
       );
     }
   );

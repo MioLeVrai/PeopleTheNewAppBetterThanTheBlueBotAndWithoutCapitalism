@@ -1,0 +1,50 @@
+PEOPLE - APPELS MP PERSISTANTS
+==============================
+
+Ce patch a ete construit a partir de Discord 2(8).zip.
+Il ne remplace pas tout le projet.
+
+Fichiers modifies uniquement :
+- server.js
+- public/people-dm-calls.js
+- public/people-social.js
+
+INSTALLATION
+------------
+1. Extrais ce ZIP.
+2. Place AJOUTER_APPELS_MP_PERSISTANTS.bat et people-dm-persistent.patch
+   dans ton dossier People, a cote de server.js.
+3. Lance AJOUTER_APPELS_MP_PERSISTANTS.bat.
+
+Le BAT verifie d'abord si le patch est compatible.
+S'il ne l'est pas, il s'arrete AVANT de modifier les fichiers.
+Il cree aussi une sauvegarde des 3 fichiers touches.
+
+NOUVEAU COMPORTEMENT
+--------------------
+- Quand A lance un appel MP, A est immediatement dans la room.
+- B recoit l'appel et peut le rejoindre.
+- La sonnerie s'arrete apres environ 35 secondes, mais la room reste rejoignable.
+- Si A ou B quitte pendant que l'autre reste, la room continue.
+- La personne partie peut revenir dans le meme callId en cliquant de nouveau sur Appeler,
+  ou via la fenetre de rejoindre si elle reapparait apres reconnexion.
+- Si une seule personne reste, un delai de 3 minutes commence.
+- Si l'autre revient avant la fin, le delai est annule.
+- Si elle ne revient pas, la room se ferme apres 3 minutes.
+- Si les deux sont partis, la room se ferme immediatement.
+- Le WebRTC est reconstruit quand quelqu'un revient.
+- Le micro, la camera et le partage d'ecran du participant reste dans la room sont conserves.
+
+TESTS EFFECTUES
+---------------
+- node --check server.js : OK
+- node --check public/people-dm-calls.js : OK
+- node --check public/people-social.js : OK
+- Test Socket.IO reel avec deux comptes temporaires : OK
+  creation -> reponse -> depart -> rejointe meme callId -> depart inverse -> fermeture : OK
+- Test de la minuterie solo avec une duree temporairement raccourcie : OK
+  La version livree utilise bien 180000 ms = 3 minutes.
+
+CONSEIL
+-------
+Teste d'abord avec deux comptes/ordinateurs ou deux navigateurs avant ton push Render.
