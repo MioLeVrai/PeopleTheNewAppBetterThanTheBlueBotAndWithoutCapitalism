@@ -2611,9 +2611,13 @@ async function peopleCreateDm(
   return message;
 }
 
+// === PEOPLE_DM_PAGINATION_V1_START ===
+const PEOPLE_DM_HISTORY_PAGE_SIZE = 50;
+
 async function peopleDmHistory(
   accountId,
-  otherId
+  otherId,
+  options = null
 ) {
   const me =
     String(accountId);
@@ -2621,8 +2625,77 @@ async function peopleDmHistory(
   const other =
     String(otherId);
 
+  const beforeRaw =
+    String(
+      options?.before ||
+      ""
+    ).trim();
+
+  const afterRaw =
+    String(
+      options?.after ||
+      ""
+    ).trim();
+
+  function peopleDmHistoryCursor(value) {
+    if (!value) {
+      return null;
+    }
+
+    const date =
+      new Date(value);
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+      return null;
+    }
+
+    return date.toISOString();
+  }
+
+  const before =
+    peopleDmHistoryCursor(
+      beforeRaw
+    );
+
+  const after =
+    before
+      ? null
+      : peopleDmHistoryCursor(
+          afterRaw
+        );
+
+  const direction =
+    before
+      ? "older"
+      : after
+        ? "newer"
+        : "latest";
+
   if (peoplePool) {
     await peopleEnsureReplyColumns();
+
+    const params = [
+      me,
+      other
+    ];
+
+    let cursorSql = "";
+    let orderSql = "DESC";
+
+    if (before) {
+      params.push(before);
+      cursorSql =
+        " AND dm.created_at < $3 ";
+    } else if (after) {
+      params.push(after);
+      cursorSql =
+        " AND dm.created_at > $3 ";
+      orderSql = "ASC";
+    }
 
     const result =
       await peoplePool.query(
@@ -2639,35 +2712,59 @@ async function peopleDmHistory(
         "ON rdm.id = dm.reply_to_id " +
         "LEFT JOIN people_accounts ra " +
         "ON ra.id = rdm.sender_id " +
-        "WHERE (dm.sender_id = $1 AND dm.recipient_id = $2) " +
-        "OR (dm.sender_id = $2 AND dm.recipient_id = $1) " +
-        "ORDER BY dm.created_at DESC LIMIT 150",
-        [
-          me,
-          other
-        ]
+        "WHERE ((dm.sender_id = $1 AND dm.recipient_id = $2) " +
+        "OR (dm.sender_id = $2 AND dm.recipient_id = $1)) " +
+        cursorSql +
+        "ORDER BY dm.created_at " +
+        orderSql +
+        " LIMIT " +
+        String(
+          PEOPLE_DM_HISTORY_PAGE_SIZE +
+          1
+        ),
+        params
       );
 
-    return result.rows
-      .reverse()
-      .map(
-        (row) => ({
-          ...row,
-          body:
-            peopleDecryptMessageText(
-              row.body
-            ),
-          reply_body:
-            row.reply_body ===
-              null ||
-            row.reply_body ===
-              undefined
-              ? row.reply_body
-              : peopleDecryptMessageText(
-                  row.reply_body
-                )
-        })
+    const hasMore =
+      result.rows.length >
+      PEOPLE_DM_HISTORY_PAGE_SIZE;
+
+    let rows =
+      result.rows.slice(
+        0,
+        PEOPLE_DM_HISTORY_PAGE_SIZE
       );
+
+    if (
+      orderSql === "DESC"
+    ) {
+      rows =
+        rows.reverse();
+    }
+
+    return {
+      messages:
+        rows.map(
+          (row) => ({
+            ...row,
+            body:
+              peopleDecryptMessageText(
+                row.body
+              ),
+            reply_body:
+              row.reply_body ===
+                null ||
+              row.reply_body ===
+                undefined
+                ? row.reply_body
+                : peopleDecryptMessageText(
+                    row.reply_body
+                  )
+          })
+        ),
+      hasMore,
+      direction
+    };
   }
 
   const all =
@@ -2684,37 +2781,107 @@ async function peopleDmHistory(
       )
     );
 
-  const filtered =
+  const beforeTime =
+    before
+      ? new Date(before).getTime()
+      : null;
+
+  const afterTime =
+    after
+      ? new Date(after).getTime()
+      : null;
+
+  let filtered =
     all
       .filter(
-        (message) =>
-          (
-            String(
-              message.sender_id
-            ) === me &&
-            String(
-              message.recipient_id
-            ) === other
-          ) ||
-          (
-            String(
-              message.sender_id
-            ) === other &&
-            String(
-              message.recipient_id
-            ) === me
-          )
+        (message) => {
+          const inConversation =
+            (
+              String(
+                message.sender_id
+              ) === me &&
+              String(
+                message.recipient_id
+              ) === other
+            ) ||
+            (
+              String(
+                message.sender_id
+              ) === other &&
+              String(
+                message.recipient_id
+              ) === me
+            );
+
+          if (!inConversation) {
+            return false;
+          }
+
+          const time =
+            new Date(
+              message.created_at
+            ).getTime();
+
+          if (
+            beforeTime !== null &&
+            !(time < beforeTime)
+          ) {
+            return false;
+          }
+
+          if (
+            afterTime !== null &&
+            !(time > afterTime)
+          ) {
+            return false;
+          }
+
+          return true;
+        }
       )
       .sort(
-        (a, b) =>
-          new Date(
-            a.created_at
-          ).getTime() -
-          new Date(
-            b.created_at
-          ).getTime()
-      )
-      .slice(-150);
+        (a, b) => {
+          const left =
+            new Date(
+              a.created_at
+            ).getTime();
+
+          const right =
+            new Date(
+              b.created_at
+            ).getTime();
+
+          return after
+            ? left - right
+            : right - left;
+        }
+      );
+
+  const hasMore =
+    filtered.length >
+    PEOPLE_DM_HISTORY_PAGE_SIZE;
+
+  filtered =
+    filtered.slice(
+      0,
+      PEOPLE_DM_HISTORY_PAGE_SIZE
+    );
+
+  if (!after) {
+    filtered.reverse();
+  }
+
+  /*
+    On clone les lignes locales avant d'ajouter les infos de réponse.
+    Ça évite de modifier people-social.local.json juste parce qu'on a lu
+    une page d'historique.
+  */
+  filtered =
+    filtered.map(
+      (message) => ({
+        ...message
+      })
+    );
 
   for (const message of filtered) {
     const replyId =
@@ -2754,8 +2921,14 @@ async function peopleDmHistory(
     }
   }
 
-  return filtered;
+  return {
+    messages:
+      filtered,
+    hasMore,
+    direction
+  };
 }
+// === PEOPLE_DM_PAGINATION_V1_END ===
 
 async function peopleMarkDmRead(accountId, otherId) {
   const me = String(accountId);
@@ -6149,17 +6322,30 @@ app.get("/api/dm/:username", async (req, res) => {
     // === PEOPLE_NAVIGATION_PARALLEL_V1_DM ===
     // L'historique et la relation d'amitié sont indépendants : les attendre
     // en parallèle réduit la latence réelle du premier affichage d'un MP.
-    const [messages, isFriend] =
+    const [history, isFriend] =
       await Promise.all([
         peopleDmHistory(
           session.id,
-          target.id
+          target.id,
+          {
+            before:
+              req.query?.before,
+            after:
+              req.query?.after
+          }
         ),
         peopleHasFriend(
           session.id,
           target.id
         )
       ]);
+
+    const messages =
+      Array.isArray(
+        history?.messages
+      )
+        ? history.messages
+        : [];
 
     res.json({
       ok: true,
@@ -6173,6 +6359,17 @@ app.get("/api/dm/:username", async (req, res) => {
           ),
         isFriend
       },
+      pageSize:
+        PEOPLE_DM_HISTORY_PAGE_SIZE,
+      hasMore:
+        Boolean(
+          history?.hasMore
+        ),
+      direction:
+        String(
+          history?.direction ||
+          "latest"
+        ),
       messages:
         messages.map(
           (message) => ({

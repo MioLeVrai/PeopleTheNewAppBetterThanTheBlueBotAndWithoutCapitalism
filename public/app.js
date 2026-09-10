@@ -3085,12 +3085,20 @@ async function enableCamera() {
 
     const cameraStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: {
-        facingMode: "user",
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 24, max: 30 }
-      }
+      video:
+        window.PeopleAudioDevices
+          ?.getCameraConstraints?.({
+            facingMode: "user",
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 24, max: 30 }
+          }) ||
+        {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 24, max: 30 }
+        }
     });
 
     const track = cameraStream.getVideoTracks()[0];
@@ -3109,8 +3117,12 @@ async function enableCamera() {
 
     localStream.addTrack(outgoingTrack);
 
+    const activeCameraTrack = cameraTrack;
+
     cameraTrack.addEventListener("ended", () => {
-      if (cameraEnabled) disableCamera({ trackAlreadyEnded: true });
+      if (cameraEnabled && cameraTrack === activeCameraTrack) {
+        disableCamera({ trackAlreadyEnded: true });
+      }
     }, { once: true });
 
     attachLocalPreview();
@@ -3133,6 +3145,94 @@ async function enableCamera() {
     }
   }
 }
+
+// === PEOPLE_VOICE_CAMERA_DEVICE_SWITCH_V1_START ===
+async function peopleSwitchVoiceCameraDevice() {
+  if (!voiceJoined || !cameraEnabled || !cameraTrack) {
+    return;
+  }
+
+  const oldTrack = cameraTrack;
+
+  try {
+    const replacementStream =
+      await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video:
+          window.PeopleAudioDevices
+            ?.getCameraConstraints?.({
+              facingMode: "user",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 24, max: 30 }
+            }) ||
+          {
+            facingMode: "user",
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 24, max: 30 }
+          }
+      });
+
+    const newTrack =
+      replacementStream.getVideoTracks()[0];
+
+    if (!newTrack) {
+      throw new Error("Aucune caméra disponible");
+    }
+
+    cameraTrack = newTrack;
+
+    let outgoingTrack = newTrack;
+
+    try {
+      outgoingTrack =
+        await window.PeopleCameraEffects?.attachSource?.(newTrack) ||
+        newTrack;
+    } catch (err) {
+      console.warn(
+        "[People effets caméra/changement vocal]",
+        err
+      );
+    }
+
+    await peopleInstallCameraOutputTrack(outgoingTrack);
+
+    newTrack.addEventListener(
+      "ended",
+      () => {
+        if (cameraEnabled && cameraTrack === newTrack) {
+          void disableCamera({ trackAlreadyEnded: true });
+        }
+      },
+      { once: true }
+    );
+
+    try {
+      oldTrack.stop();
+    } catch {}
+
+    updateCameraUi();
+    voiceStatus.textContent =
+      "Caméra changée ✓";
+  } catch (err) {
+    console.warn(
+      "[People changement caméra vocal]",
+      err
+    );
+
+    voiceStatus.textContent =
+      "Impossible d'utiliser cette caméra";
+  }
+}
+
+window.addEventListener(
+  "people-camera-input-device-changed",
+  () => {
+    void peopleSwitchVoiceCameraDevice();
+  }
+);
+// === PEOPLE_VOICE_CAMERA_DEVICE_SWITCH_V1_END ===
 
 async function disableCamera({ trackAlreadyEnded = false } = {}) {
   if (!cameraEnabled && !cameraTrack) return;

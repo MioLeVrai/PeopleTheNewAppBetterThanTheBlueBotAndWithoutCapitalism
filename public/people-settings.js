@@ -200,7 +200,9 @@
     input:
       "people-audio-input-device-v1",
     output:
-      "people-audio-output-device-v1"
+      "people-audio-output-device-v1",
+    camera:
+      "people-video-input-device-v1"
   };
 
   const PEOPLE_BASE_AUDIO_CONSTRAINTS = {
@@ -265,6 +267,30 @@
           : {}
       )
     };
+  }
+
+  function cameraConstraints(
+    base = {}
+  ) {
+    const deviceId =
+      audioDeviceValue(
+        "camera"
+      );
+
+    const constraints = {
+      ...(base || {})
+    };
+
+    if (deviceId) {
+      delete constraints.facingMode;
+
+      constraints.deviceId = {
+        exact:
+          deviceId
+      };
+    }
+
+    return constraints;
   }
 
   async function applyOutput(
@@ -365,8 +391,17 @@
       );
     },
 
+    getCameraId() {
+      return audioDeviceValue(
+        "camera"
+      );
+    },
+
     getInputConstraints:
       inputConstraints,
+
+    getCameraConstraints:
+      cameraConstraints,
 
     setInputId(
       value
@@ -393,6 +428,41 @@
       window.dispatchEvent(
         new CustomEvent(
           "people-audio-input-device-changed",
+          {
+            detail: {
+              deviceId:
+                next
+            }
+          }
+        )
+      );
+    },
+
+    setCameraId(
+      value
+    ) {
+      const next =
+        String(
+          value || ""
+        );
+
+      if (
+        audioDeviceValue(
+          "camera"
+        ) ===
+        next
+      ) {
+        return;
+      }
+
+      saveAudioDeviceValue(
+        "camera",
+        next
+      );
+
+      window.dispatchEvent(
+        new CustomEvent(
+          "people-camera-input-device-changed",
           {
             detail: {
               deviceId:
@@ -1674,9 +1744,9 @@
               class="people-settings-section-title"
             >
               <div>
-                <strong>Entrée / sortie audio</strong>
+                <strong>Périphériques audio / vidéo</strong>
                 <span>
-                  Choisis le micro et le casque ou haut-parleur utilisés par les vocaux et appels.
+                  Choisis le micro, la caméra et le casque ou haut-parleur utilisés par les vocaux et appels.
                 </span>
               </div>
             </div>
@@ -1694,6 +1764,20 @@
                 >
                   <option value="">
                     Microphone par défaut
+                  </option>
+                </select>
+              </label>
+
+              <label
+                class="people-settings-device-field"
+              >
+                <span>Vidéo — Caméra</span>
+
+                <select
+                  id="peopleSettingsVideoInput"
+                >
+                  <option value="">
+                    Caméra par défaut
                   </option>
                 </select>
               </label>
@@ -1882,6 +1966,11 @@
   const audioOutputSelect =
     document.getElementById(
       "peopleSettingsAudioOutput"
+    );
+
+  const videoInputSelect =
+    document.getElementById(
+      "peopleSettingsVideoInput"
     );
 
   const audioRefreshButton =
@@ -3180,9 +3269,14 @@
         ? window.PeopleAudioDevices
             ?.getInputId?.() ||
           ""
-        : window.PeopleAudioDevices
-            ?.getOutputId?.() ||
-          "";
+        : kind ===
+            "camera"
+          ? window.PeopleAudioDevices
+              ?.getCameraId?.() ||
+            ""
+          : window.PeopleAudioDevices
+              ?.getOutputId?.() ||
+            "";
 
     const fragment =
       document.createDocumentFragment();
@@ -3199,7 +3293,10 @@
       kind ===
         "input"
         ? "Microphone par défaut"
-        : "Sortie par défaut";
+        : kind ===
+            "camera"
+          ? "Caméra par défaut"
+          : "Sortie par défaut";
 
     fragment.appendChild(
       fallback
@@ -3244,7 +3341,10 @@
           kind ===
             "input"
             ? "Microphone"
-            : "Sortie audio",
+            : kind ===
+                "camera"
+              ? "Caméra"
+              : "Sortie audio",
           visibleIndex
         );
 
@@ -3269,6 +3369,14 @@
       ) {
         window.PeopleAudioDevices
           ?.setInputId?.(
+            ""
+          );
+      } else if (
+        kind ===
+        "camera"
+      ) {
+        window.PeopleAudioDevices
+          ?.setCameraId?.(
             ""
           );
       } else {
@@ -3300,7 +3408,7 @@
         audioDeviceStatus
       ) {
         audioDeviceStatus.textContent =
-          "Ce navigateur ne permet pas de choisir les périphériques audio.";
+          "Ce navigateur ne permet pas de choisir les périphériques audio / vidéo.";
       }
 
       return;
@@ -3326,21 +3434,34 @@
         navigator.mediaDevices
           ?.getUserMedia
       ) {
-        try {
-          const temporary =
-            await navigator.mediaDevices
-              .getUserMedia({
-                audio: true,
-                video: false
-              });
+        for (
+          const constraints of
+          [
+            {
+              audio: true,
+              video: false
+            },
+            {
+              audio: false,
+              video: true
+            }
+          ]
+        ) {
+          try {
+            const temporary =
+              await navigator.mediaDevices
+                .getUserMedia(
+                  constraints
+                );
 
-          for (
-            const track of
-            temporary.getTracks()
-          ) {
-            track.stop();
-          }
-        } catch {}
+            for (
+              const track of
+              temporary.getTracks()
+            ) {
+              track.stop();
+            }
+          } catch {}
+        }
       }
 
       const devices =
@@ -3361,10 +3482,23 @@
             "audiooutput"
         );
 
+      const cameras =
+        devices.filter(
+          (device) =>
+            device.kind ===
+            "videoinput"
+        );
+
       fillDeviceSelect(
         audioInputSelect,
         inputs,
         "input"
+      );
+
+      fillDeviceSelect(
+        videoInputSelect,
+        cameras,
+        "camera"
       );
 
       fillDeviceSelect(
@@ -3375,6 +3509,17 @@
 
       const hasNamedInput =
         inputs.some(
+          (device) =>
+            Boolean(
+              String(
+                device.label ||
+                ""
+              ).trim()
+            )
+        );
+
+      const hasNamedCamera =
+        cameras.some(
           (device) =>
             Boolean(
               String(
@@ -3402,12 +3547,13 @@
           !outputSupported
         ) {
           audioDeviceStatus.textContent =
-            "Micro sélectionnable. Le choix de sortie n'est pas supporté par ce navigateur.";
+            "Micro et caméra sélectionnables. Le choix de sortie n'est pas supporté par ce navigateur.";
         } else if (
-          !hasNamedInput
+          !hasNamedInput ||
+          !hasNamedCamera
         ) {
           audioDeviceStatus.textContent =
-            "Clique sur Détecter / actualiser pour autoriser People à afficher les noms.";
+            "Clique sur Détecter / actualiser pour afficher les noms des micros et caméras.";
         } else {
           audioDeviceStatus.textContent =
             "Les changements sont appliqués automatiquement.";
@@ -3474,6 +3620,24 @@
         ) {
           audioDeviceStatus.textContent =
             "Micro changé ✓";
+        }
+      }
+    );
+
+  videoInputSelect
+    ?.addEventListener(
+      "change",
+      () => {
+        window.PeopleAudioDevices
+          ?.setCameraId?.(
+            videoInputSelect.value
+          );
+
+        if (
+          audioDeviceStatus
+        ) {
+          audioDeviceStatus.textContent =
+            "Caméra changée ✓";
         }
       }
     );

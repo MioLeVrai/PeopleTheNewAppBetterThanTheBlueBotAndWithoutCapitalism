@@ -1862,14 +1862,32 @@
           .mediaDevices
           .getUserMedia({
             audio: false,
-            video: {
-              width: {
-                ideal: 1280
-              },
-              height: {
-                ideal: 720
+            video:
+              window.PeopleAudioDevices
+                ?.getCameraConstraints?.({
+                  width: {
+                    ideal: 1280
+                  },
+                  height: {
+                    ideal: 720
+                  },
+                  frameRate: {
+                    ideal: 24,
+                    max: 30
+                  }
+                }) ||
+              {
+                width: {
+                  ideal: 1280
+                },
+                height: {
+                  ideal: 720
+                },
+                frameRate: {
+                  ideal: 24,
+                  max: 30
+                }
               }
-            }
           });
 
       const track =
@@ -1910,11 +1928,16 @@
         );
       }
 
+      const activeCameraTrack =
+        cameraTrack;
+
       cameraTrack.addEventListener(
         "ended",
         () => {
           if (
-            cameraEnabled
+            cameraEnabled &&
+            cameraTrack ===
+              activeCameraTrack
           ) {
             void disableCamera(
               true
@@ -1955,6 +1978,147 @@
       );
     }
   }
+
+  // === PEOPLE_DM_CAMERA_DEVICE_SWITCH_V1_START ===
+  async function peopleDmSwitchCameraDevice() {
+    if (
+      !call ||
+      !cameraEnabled ||
+      !cameraTrack
+    ) {
+      return;
+    }
+
+    const oldTrack =
+      cameraTrack;
+
+    try {
+      const replacement =
+        await navigator.mediaDevices
+          .getUserMedia({
+            audio: false,
+            video:
+              window.PeopleAudioDevices
+                ?.getCameraConstraints?.({
+                  width: {
+                    ideal: 1280
+                  },
+                  height: {
+                    ideal: 720
+                  },
+                  frameRate: {
+                    ideal: 24,
+                    max: 30
+                  }
+                }) ||
+              {
+                width: {
+                  ideal: 1280
+                },
+                height: {
+                  ideal: 720
+                },
+                frameRate: {
+                  ideal: 24,
+                  max: 30
+                }
+              }
+          });
+
+      const newTrack =
+        replacement
+          .getVideoTracks()[0];
+
+      if (!newTrack) {
+        throw new Error(
+          "Aucune caméra disponible."
+        );
+      }
+
+      cameraTrack =
+        newTrack;
+
+      let outgoingTrack =
+        newTrack;
+
+      try {
+        outgoingTrack =
+          await window.PeopleCameraEffects?.attachSource?.(newTrack) ||
+          newTrack;
+      } catch (err) {
+        console.warn(
+          "[People effets caméra/changement MP]",
+          err
+        );
+      }
+
+      await peopleDmInstallCameraOutputTrack(
+        outgoingTrack
+      );
+
+      newTrack.addEventListener(
+        "ended",
+        () => {
+          if (
+            cameraEnabled &&
+            cameraTrack ===
+              newTrack
+          ) {
+            void disableCamera(
+              true
+            );
+          }
+        },
+        {
+          once: true
+        }
+      );
+
+      try {
+        oldTrack.stop();
+      } catch {}
+
+      syncLocalPreview();
+      updateMediaButtons();
+      setStatus(
+        "Caméra changée ✓"
+      );
+
+      setTimeout(
+        () => {
+          if (
+            call &&
+            call.phase ===
+              "active"
+          ) {
+            setStatus(
+              screenEnabled
+                ? "Appel en cours • partage d'écran"
+                : "Appel en cours"
+            );
+          }
+        },
+        900
+      );
+    } catch (err) {
+      console.warn(
+        "[People changement caméra MP]",
+        err
+      );
+
+      setStatus(
+        "Impossible d'utiliser cette caméra"
+      );
+    }
+  }
+
+  window.addEventListener(
+    "people-camera-input-device-changed",
+    () => {
+      void peopleDmSwitchCameraDevice();
+    }
+  );
+  // === PEOPLE_DM_CAMERA_DEVICE_SWITCH_V1_END ===
 
   async function disableCamera(
     alreadyEnded = false
@@ -4292,7 +4456,7 @@
   );
 
   miniButton.innerHTML =
-    "<span>↘️</span><small>Mini</small>";
+    "<span>↘️</span><small>Réduire</small>";
 
   miniButton.disabled =
     true;
@@ -4669,35 +4833,6 @@
     pip
   );
 
-  const pipReopen =
-    document.createElement(
-      "button"
-    );
-
-  pipReopen.id =
-    "peopleDmCallVideoPipReopen";
-
-  pipReopen.type =
-    "button";
-
-  pipReopen.className =
-    "people-dm-call-video-pip-reopen hidden";
-
-  pipReopen.title =
-    "Rouvrir la mini caméra";
-
-  pipReopen.setAttribute(
-    "aria-label",
-    "Rouvrir la mini caméra"
-  );
-
-  pipReopen.textContent =
-    "📹";
-
-  document.body.appendChild(
-    pipReopen
-  );
-
   let pipDismissed =
     false;
 
@@ -4750,8 +4885,8 @@
     if (label) {
       label.textContent =
         pipForced
-          ? "Grand"
-          : "Mini";
+          ? "Agrandir"
+          : "Réduire";
     }
 
     miniButton.title =
@@ -4907,19 +5042,9 @@
       ) &&
       !pipDismissed;
 
-    const shouldOfferReopen =
-      remoteCamera &&
-      !callHere &&
-      pipDismissed;
-
     pip.classList.toggle(
       "hidden",
       !shouldShow
-    );
-
-    pipReopen.classList.toggle(
-      "hidden",
-      !shouldOfferReopen
     );
 
     pipRestore.classList.toggle(
@@ -4981,25 +5106,15 @@
     }
   );
 
-  pipReopen.addEventListener(
-    "click",
-    () => {
-      pipDismissed =
-        false;
-
-      syncPip();
-    }
-  );
-
   pipClose.addEventListener(
     "click",
     (event) => {
       event.stopPropagation();
 
       /*
-        Fermer une mini-fenêtre forcée annule d'abord
-        le mode mini manuel. Si on est ailleurs dans People,
-        un petit bouton caméra reste disponible pour la rouvrir.
+        Fermer la fenêtre réduite annule le mode manuel.
+        Hors du MP, elle reste simplement masquée jusqu'à ce que
+        l'utilisateur revienne dans l'appel et choisisse Réduire.
       */
       if (pipForced) {
         setManualMini(

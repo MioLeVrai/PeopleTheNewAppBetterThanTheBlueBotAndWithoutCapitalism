@@ -8,6 +8,16 @@
   const WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;
   const MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
 
+  // Dessins du filtre Chat fournis pour People. Chaque élément reste séparé
+  // afin de suivre correctement la rotation et la taille du visage.
+  const CAT_ASSET_URLS = Object.freeze({
+    leftEar: "assets/people-facefx/cat/ear-left.png",
+    rightEar: "assets/people-facefx/cat/ear-right.png",
+    leftWhiskers: "assets/people-facefx/cat/whiskers-left.png",
+    rightWhiskers: "assets/people-facefx/cat/whiskers-right.png",
+    nose: "assets/people-facefx/cat/nose.png"
+  });
+
   const EFFECTS = Object.freeze([
     { id: "none", label: "Aucun", icon: "✕", cover: "none" },
     { id: "glasses", label: "Lunettes", icon: "😎", cover: "light" },
@@ -52,6 +62,9 @@
   let activeAnchor = null;
   let scratchCanvas = null;
   let scratchContext = null;
+  const catAssets = Object.create(null);
+  let catAssetsState = "idle";
+  let catAssetsPromise = null;
 
   function effectInfo(id = selectedEffect) {
     return EFFECTS.find((effect) => effect.id === id) || EFFECTS[0];
@@ -346,7 +359,42 @@
     });
   }
 
-  function drawCat(face) {
+  function loadCatAsset(key, url) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.decoding = "async";
+      image.onload = () => {
+        catAssets[key] = image;
+        resolve(true);
+      };
+      image.onerror = () => {
+        console.warn(`[People effets caméra] asset Chat introuvable: ${url}`);
+        resolve(false);
+      };
+      image.src = url;
+    });
+  }
+
+  function ensureCatAssets() {
+    if (catAssetsState === "ready") return Promise.resolve(true);
+    if (catAssetsState === "error") return Promise.resolve(false);
+    if (catAssetsPromise) return catAssetsPromise;
+
+    catAssetsState = "loading";
+    catAssetsPromise = Promise.all(
+      Object.entries(CAT_ASSET_URLS).map(([key, url]) => loadCatAsset(key, url))
+    ).then((results) => {
+      const ok = results.every(Boolean);
+      catAssetsState = ok ? "ready" : "error";
+      return ok;
+    }).finally(() => {
+      catAssetsPromise = null;
+    });
+
+    return catAssetsPromise;
+  }
+
+  function drawCatFallback(face) {
     withFaceTransform(face, () => {
       const w = face.width;
       const h = face.height;
@@ -383,6 +431,37 @@
         context.lineTo(w * 0.48, h * (0.12 + dy));
         context.stroke();
       }
+    });
+  }
+
+  function drawCat(face) {
+    if (catAssetsState !== "ready") {
+      if (catAssetsState === "idle") void ensureCatAssets();
+      drawCatFallback(face);
+      return;
+    }
+
+    withFaceTransform(face, () => {
+      const w = face.width;
+      const h = face.height;
+
+      // Les proportions sont volontairement liées à la boîte du visage :
+      // le dessin grandit/rétrécit avec la personne et suit l'inclinaison de la tête.
+      const earW = w * 0.43;
+      const earH = w * 0.39;
+      const earY = -h * 0.70;
+      context.drawImage(catAssets.leftEar, -w * 0.49, earY, earW, earH);
+      context.drawImage(catAssets.rightEar, w * 0.49 - earW, earY, earW, earH);
+
+      const whiskersW = w * 0.46;
+      const whiskersH = h * 0.26;
+      const whiskersY = h * 0.02;
+      context.drawImage(catAssets.leftWhiskers, -w * 0.50, whiskersY, whiskersW, whiskersH);
+      context.drawImage(catAssets.rightWhiskers, w * 0.04, whiskersY, whiskersW, whiskersH);
+
+      const noseW = w * 0.12;
+      const noseH = h * 0.105;
+      context.drawImage(catAssets.nose, -noseW / 2, h * 0.085, noseW, noseH);
     });
   }
 

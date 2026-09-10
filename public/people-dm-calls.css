@@ -994,59 +994,6 @@ body.people-dm-call-resizing {
     default;
 }
 
-.people-dm-call-video-pip-reopen {
-  position:
-    fixed;
-  z-index:
-    2851;
-  right:
-    16px;
-  bottom:
-    16px;
-  width:
-    46px;
-  height:
-    46px;
-  padding:
-    0;
-  border:
-    1px solid
-    rgba(
-      138,
-      121,
-      202,
-      .35
-    );
-  border-radius:
-    14px;
-  display:
-    grid;
-  place-items:
-    center;
-  background:
-    #181521;
-  color:
-    white;
-  font-size:
-    20px;
-  box-shadow:
-    0 12px 34px
-    rgba(
-      0,
-      0,
-      0,
-      .45
-    );
-  cursor:
-    pointer;
-}
-
-.people-dm-call-video-pip-reopen:hover {
-  background:
-    #312a3d;
-}
-
-.people-dm-call-video-pip-reopen.hidden,
 .people-dm-call-video-pip-restore.hidden {
   display:
     none;
@@ -1192,18 +1139,6 @@ body.people-dm-call-resizing {
         560px
       )
       !important;
-  }
-
-  .people-dm-call-video-pip-reopen {
-    right:
-      8px;
-    bottom:
-      calc(
-        8px +
-        env(
-          safe-area-inset-bottom
-        )
-      );
   }
 
   .people-dm-call-video-pip {

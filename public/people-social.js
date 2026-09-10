@@ -173,6 +173,11 @@
   const PEOPLE_DM_DECRYPT_CACHE_MAX = 1400;
   const PEOPLE_DM_PREFETCH_MAX_AGE_MS = 30000;
 
+  // Historique MP charge par pages, avec une fenetre bornee en memoire/DOM.
+  const PEOPLE_DM_HISTORY_PAGE_SIZE = 50;
+  const PEOPLE_DM_HISTORY_WINDOW_MAX = 200;
+  const PEOPLE_DM_HISTORY_EDGE_PX = 140;
+
   const peopleDmViewCache = new Map();
   const peopleDmDecryptCache = new Map();
   const peopleDmPrefetchPromises = new Map();
@@ -193,16 +198,36 @@
     }
   }
 
-  function peopleDmRememberView(username, user, messages) {
+  function peopleDmRememberView(
+    username,
+    user,
+    messages,
+    meta = null
+  ) {
     const key = peopleDmUsernameKey(username);
     if (!key) return;
+
+    const previous =
+      peopleDmViewCache.get(key) ||
+      null;
 
     const value = {
       user: {
         ...(user || {}),
         username: String(user?.username || username || "")
       },
-      messages: Array.isArray(messages) ? messages : [],
+      messages:
+        Array.isArray(messages)
+          ? messages
+          : [],
+      hasOlder:
+        meta?.hasOlder === undefined
+          ? Boolean(previous?.hasOlder)
+          : Boolean(meta.hasOlder),
+      hasNewer:
+        meta?.hasNewer === undefined
+          ? Boolean(previous?.hasNewer)
+          : Boolean(meta.hasNewer),
       updatedAt: Date.now()
     };
 
@@ -3546,7 +3571,8 @@ function dmTextLine(
   function peopleDmRenderConversation(
     username,
     user,
-    decryptedMessages
+    decryptedMessages,
+    renderOptions = null
   ) {
     if (!dmMessages) return false;
 
@@ -3557,6 +3583,15 @@ function dmTextLine(
     ) {
       return false;
     }
+
+    const cachedMeta =
+      peopleDmViewCache.get(wanted) ||
+      null;
+
+    const hasOlder =
+      renderOptions?.hasOlder === undefined
+        ? Boolean(cachedMeta?.hasOlder)
+        : Boolean(renderOptions.hasOlder);
 
     activeDmUser = {
       ...(activeDmUser || {}),
@@ -3607,19 +3642,27 @@ function dmTextLine(
     }
 
     const fragment = document.createDocumentFragment();
-    const welcome = document.createElement("div");
-    welcome.className = "dm-welcome";
 
-    const title = document.createElement("h2");
-    title.textContent =
-      "Début de ta conversation avec " + activeDmUser.username;
+    /*
+      La carte "Début de conversation" n'est affichée que lorsqu'on a
+      réellement atteint le tout premier message. Avec la pagination,
+      afficher cette carte sur la dernière page serait trompeur.
+    */
+    if (!hasOlder) {
+      const welcome = document.createElement("div");
+      welcome.className = "dm-welcome";
 
-    const subtitle = document.createElement("p");
-    subtitle.textContent =
-      "Les nouveaux MP texte sont chiffrés de bout en bout.";
+      const title = document.createElement("h2");
+      title.textContent =
+        "Début de ta conversation avec " + activeDmUser.username;
 
-    welcome.append(title, subtitle);
-    fragment.appendChild(welcome);
+      const subtitle = document.createElement("p");
+      subtitle.textContent =
+        "Les nouveaux MP texte sont chiffrés de bout en bout.";
+
+      welcome.append(title, subtitle);
+      fragment.appendChild(welcome);
+    }
 
     renderDmMessageGroups(
       Array.isArray(decryptedMessages) ? decryptedMessages : [],
@@ -3628,28 +3671,102 @@ function dmTextLine(
 
     peopleDmAppendPending(activeDmUser.username, fragment);
     dmMessages.replaceChildren(fragment);
-    peopleDmScrollToBottom();
+
+    if (
+      renderOptions?.scrollToBottom !== false
+    ) {
+      peopleDmScrollToBottom();
+    }
+
     return true;
   }
 
-  async function peopleDmFetchAndDecrypt(username) {
+  async function peopleDmFetchAndDecrypt(
+    username,
+    options = null
+  ) {
+    const before =
+      String(
+        options?.before ||
+        ""
+      ).trim();
+
+    const after =
+      before
+        ? ""
+        : String(
+            options?.after ||
+            ""
+          ).trim();
+
+    const query =
+      new URLSearchParams();
+
+    if (before) {
+      query.set(
+        "before",
+        before
+      );
+    } else if (after) {
+      query.set(
+        "after",
+        after
+      );
+    }
+
+    const suffix =
+      query.toString()
+        ? "?" + query.toString()
+        : "";
+
     const data = await api(
-      "/api/dm/" + encodeURIComponent(username)
+      "/api/dm/" +
+        encodeURIComponent(username) +
+        suffix
     );
 
     const decryptedMessages =
       await peopleDmE2eeDecryptMessagesCached(data.messages || []);
 
-    peopleDmRememberView(
-      username,
-      data.user,
-      decryptedMessages
-    );
-
-    return {
-      user: data.user,
-      messages: decryptedMessages
+    const result = {
+      user:
+        data.user,
+      messages:
+        decryptedMessages,
+      hasMore:
+        Boolean(data.hasMore),
+      direction:
+        String(
+          data.direction ||
+          (
+            before
+              ? "older"
+              : after
+                ? "newer"
+                : "latest"
+          )
+        )
     };
+
+    if (
+      !before &&
+      !after &&
+      options?.remember !== false
+    ) {
+      peopleDmRememberView(
+        username,
+        data.user,
+        decryptedMessages,
+        {
+          hasOlder:
+            result.hasMore,
+          hasNewer:
+            false
+        }
+      );
+    }
+
+    return result;
   }
 
   async function peopleDmPrefetch(username) {
@@ -3694,7 +3811,13 @@ function dmTextLine(
       peopleDmRenderConversation(
         username,
         cached.user,
-        cached.messages
+        cached.messages,
+        {
+          hasOlder:
+            cached.hasOlder,
+          hasNewer:
+            cached.hasNewer
+        }
       );
     }
 
@@ -3718,9 +3841,6 @@ function dmTextLine(
           PEOPLE_DM_NO_FLICKER_V1
           Si un envoi optimiste vient d'être confirmé par le POST,
           on garde sa bulle affichée pendant TOUT le refresh réseau.
-          On retire l'entrée pending seulement une fois l'historique frais
-          disponible, juste avant le remplacement atomique du DOM.
-          => plus de séquence : apparition -> disparition -> réapparition.
         */
         if (options?.settlePendingId) {
           peopleDmRemovePending(
@@ -3728,10 +3848,28 @@ function dmTextLine(
           );
         }
 
+        peopleDmRememberView(
+          username,
+          fresh.user,
+          fresh.messages,
+          {
+            hasOlder:
+              fresh.hasMore,
+            hasNewer:
+              false
+          }
+        );
+
         peopleDmRenderConversation(
           username,
           fresh.user,
-          fresh.messages
+          fresh.messages,
+          {
+            hasOlder:
+              fresh.hasMore,
+            hasNewer:
+              false
+          }
         );
       }
 
@@ -3755,6 +3893,459 @@ function dmTextLine(
       }
     }
   }
+
+  // === PEOPLE_DM_PAGINATION_V1_START ===
+  function peopleDmMergeHistory(...lists) {
+    const byId =
+      new Map();
+
+    for (const list of lists) {
+      for (
+        const message of
+        Array.isArray(list)
+          ? list
+          : []
+      ) {
+        const id =
+          String(
+            message?.id ||
+            ""
+          );
+
+        const fallback =
+          [
+            String(message?.createdAt || ""),
+            String(message?.senderId || ""),
+            String(message?.body || ""),
+            String(message?.imageId || "")
+          ].join("\u001f");
+
+        byId.set(
+          id || fallback,
+          message
+        );
+      }
+    }
+
+    return [
+      ...byId.values()
+    ].sort(
+      (left, right) => {
+        const time =
+          dmMessageTimestamp(left) -
+          dmMessageTimestamp(right);
+
+        if (time !== 0) {
+          return time;
+        }
+
+        return String(left?.id || "")
+          .localeCompare(
+            String(right?.id || "")
+          );
+      }
+    );
+  }
+
+  function peopleDmHistoryCursor(
+    messages,
+    side
+  ) {
+    const list =
+      Array.isArray(messages)
+        ? messages
+        : [];
+
+    if (!list.length) {
+      return "";
+    }
+
+    const message =
+      side === "newer"
+        ? list[list.length - 1]
+        : list[0];
+
+    return String(
+      message?.createdAt ||
+      ""
+    );
+  }
+
+  function peopleDmCaptureScrollAnchor() {
+    if (!dmMessages) {
+      return null;
+    }
+
+    const containerRect =
+      dmMessages.getBoundingClientRect();
+
+    const nodes =
+      dmMessages.querySelectorAll(
+        "[data-message-id]"
+      );
+
+    for (const node of nodes) {
+      const rect =
+        node.getBoundingClientRect();
+
+      if (
+        rect.bottom >=
+        containerRect.top + 2
+      ) {
+        return {
+          id:
+            String(
+              node.dataset.messageId ||
+              ""
+            ),
+          offset:
+            rect.top -
+            containerRect.top
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function peopleDmRestoreScrollAnchor(anchor) {
+    if (
+      !dmMessages ||
+      !anchor?.id
+    ) {
+      return;
+    }
+
+    requestAnimationFrame(
+      () => {
+        const containerRect =
+          dmMessages.getBoundingClientRect();
+
+        const node =
+          [
+            ...dmMessages.querySelectorAll(
+              "[data-message-id]"
+            )
+          ].find(
+            (candidate) =>
+              String(
+                candidate.dataset.messageId ||
+                ""
+              ) === anchor.id
+          );
+
+        if (!node) {
+          return;
+        }
+
+        const rect =
+          node.getBoundingClientRect();
+
+        dmMessages.scrollTop +=
+          rect.top -
+          containerRect.top -
+          anchor.offset;
+      }
+    );
+  }
+
+  function peopleDmIsNearBottom() {
+    if (!dmMessages) {
+      return true;
+    }
+
+    return (
+      dmMessages.scrollHeight -
+      dmMessages.scrollTop -
+      dmMessages.clientHeight
+    ) < 180;
+  }
+
+  let peopleDmLoadingOlder = false;
+  let peopleDmLoadingNewer = false;
+
+  async function peopleDmLoadOlder() {
+    if (
+      peopleDmLoadingOlder ||
+      !activeDmUser ||
+      !dmMessages
+    ) {
+      return;
+    }
+
+    const username =
+      String(
+        activeDmUser.username ||
+        ""
+      ).trim();
+
+    const wanted =
+      peopleDmUsernameKey(username);
+
+    const cached =
+      peopleDmCachedView(username);
+
+    if (
+      !cached?.hasOlder ||
+      !cached.messages?.length
+    ) {
+      return;
+    }
+
+    const cursor =
+      peopleDmHistoryCursor(
+        cached.messages,
+        "older"
+      );
+
+    if (!cursor) {
+      return;
+    }
+
+    peopleDmLoadingOlder = true;
+    const anchor =
+      peopleDmCaptureScrollAnchor();
+
+    try {
+      const page =
+        await peopleDmFetchAndDecrypt(
+          username,
+          {
+            before:
+              cursor,
+            remember:
+              false
+          }
+        );
+
+      if (
+        peopleDmUsernameKey(activeDmUser?.username) !== wanted
+      ) {
+        return;
+      }
+
+      let merged =
+        peopleDmMergeHistory(
+          page.messages,
+          cached.messages
+        );
+
+      let hasNewer =
+        Boolean(
+          cached.hasNewer
+        );
+
+      if (
+        merged.length >
+        PEOPLE_DM_HISTORY_WINDOW_MAX
+      ) {
+        /*
+          On est en train de remonter : on garde le côté ancien et on
+          libère les messages les plus récents. Ils pourront être
+          rechargés avec `after` en redescendant.
+        */
+        merged =
+          merged.slice(
+            0,
+            PEOPLE_DM_HISTORY_WINDOW_MAX
+          );
+
+        hasNewer = true;
+      }
+
+      peopleDmRememberView(
+        username,
+        page.user || cached.user,
+        merged,
+        {
+          hasOlder:
+            page.hasMore,
+          hasNewer
+        }
+      );
+
+      peopleDmRenderConversation(
+        username,
+        page.user || cached.user,
+        merged,
+        {
+          hasOlder:
+            page.hasMore,
+          hasNewer,
+          scrollToBottom:
+            false
+        }
+      );
+
+      peopleDmRestoreScrollAnchor(
+        anchor
+      );
+    } catch (err) {
+      console.warn(
+        "[People DM pagination/older]",
+        err
+      );
+    } finally {
+      peopleDmLoadingOlder = false;
+    }
+  }
+
+  async function peopleDmLoadNewer() {
+    if (
+      peopleDmLoadingNewer ||
+      !activeDmUser ||
+      !dmMessages
+    ) {
+      return;
+    }
+
+    const username =
+      String(
+        activeDmUser.username ||
+        ""
+      ).trim();
+
+    const wanted =
+      peopleDmUsernameKey(username);
+
+    const cached =
+      peopleDmCachedView(username);
+
+    if (
+      !cached?.hasNewer ||
+      !cached.messages?.length
+    ) {
+      return;
+    }
+
+    const cursor =
+      peopleDmHistoryCursor(
+        cached.messages,
+        "newer"
+      );
+
+    if (!cursor) {
+      return;
+    }
+
+    peopleDmLoadingNewer = true;
+    const anchor =
+      peopleDmCaptureScrollAnchor();
+
+    try {
+      const page =
+        await peopleDmFetchAndDecrypt(
+          username,
+          {
+            after:
+              cursor,
+            remember:
+              false
+          }
+        );
+
+      if (
+        peopleDmUsernameKey(activeDmUser?.username) !== wanted
+      ) {
+        return;
+      }
+
+      let merged =
+        peopleDmMergeHistory(
+          cached.messages,
+          page.messages
+        );
+
+      let hasOlder =
+        Boolean(
+          cached.hasOlder
+        );
+
+      if (
+        merged.length >
+        PEOPLE_DM_HISTORY_WINDOW_MAX
+      ) {
+        /*
+          On redescend : on libère cette fois les messages les plus anciens.
+          Ils restent disponibles et seront rechargés si on remonte.
+        */
+        merged =
+          merged.slice(
+            -PEOPLE_DM_HISTORY_WINDOW_MAX
+          );
+
+        hasOlder = true;
+      }
+
+      peopleDmRememberView(
+        username,
+        page.user || cached.user,
+        merged,
+        {
+          hasOlder,
+          hasNewer:
+            page.hasMore
+        }
+      );
+
+      peopleDmRenderConversation(
+        username,
+        page.user || cached.user,
+        merged,
+        {
+          hasOlder,
+          hasNewer:
+            page.hasMore,
+          scrollToBottom:
+            false
+        }
+      );
+
+      peopleDmRestoreScrollAnchor(
+        anchor
+      );
+    } catch (err) {
+      console.warn(
+        "[People DM pagination/newer]",
+        err
+      );
+    } finally {
+      peopleDmLoadingNewer = false;
+    }
+  }
+
+  dmMessages?.addEventListener(
+    "scroll",
+    () => {
+      if (
+        !activeDmUser ||
+        dmView?.classList.contains(
+          "hidden"
+        )
+      ) {
+        return;
+      }
+
+      if (
+        dmMessages.scrollTop <=
+        PEOPLE_DM_HISTORY_EDGE_PX
+      ) {
+        void peopleDmLoadOlder();
+        return;
+      }
+
+      if (
+        dmMessages.scrollHeight -
+        dmMessages.scrollTop -
+        dmMessages.clientHeight <=
+        PEOPLE_DM_HISTORY_EDGE_PX
+      ) {
+        void peopleDmLoadNewer();
+      }
+    },
+    { passive: true }
+  );
+  // === PEOPLE_DM_PAGINATION_V1_END ===
 
   async function openDm(
     username,
