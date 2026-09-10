@@ -240,6 +240,17 @@
         </button>
 
         <button
+          id="peopleDmCallEffects"
+          class="people-dm-call-control people-dm-effects-control"
+          type="button"
+          title="Effets de visage"
+          disabled
+        >
+          <span>✨</span>
+          <small>Effets</small>
+        </button>
+
+        <button
           id="peopleDmCallScreen"
           class="people-dm-call-control"
           type="button"
@@ -265,6 +276,9 @@
   document.body.appendChild(
     overlay
   );
+
+  // Face Effects V1.1: garde-fou UI si les contrôles sont reconstruits.
+  window.PeopleCameraEffects?.ensureControls?.();
 
   const remoteVideo =
     document.getElementById(
@@ -339,6 +353,11 @@
   const cameraButton =
     document.getElementById(
       "peopleDmCallCamera"
+    );
+
+  const effectsButton =
+    document.getElementById(
+      "peopleDmCallEffects"
     );
 
   const screenButton =
@@ -766,6 +785,58 @@
     }
   }
 
+  // === PEOPLE_DM_CAMERA_FACE_EFFECTS_V1_START ===
+  function peopleDmCameraOutputTrack() {
+    if (!cameraTrack) return null;
+    try {
+      return window.PeopleCameraEffects?.getOutputTrack?.(cameraTrack) || cameraTrack;
+    } catch {
+      return cameraTrack;
+    }
+  }
+
+  function peopleDmUpdateEffectsButton() {
+    if (!effectsButton) return;
+    const selected = window.PeopleCameraEffects?.getSelectedEffect?.() || "none";
+    const info = window.PeopleCameraEffects?.getSelectedEffectInfo?.();
+    effectsButton.disabled = !cameraEnabled;
+    effectsButton.classList.toggle("people-face-effects-active", selected !== "none");
+    effectsButton.title = cameraEnabled
+      ? `Effets de visage${selected !== "none" ? ` • ${info?.label || selected}` : ""}`
+      : "Active la caméra pour utiliser les effets";
+  }
+
+  async function peopleDmInstallCameraOutputTrack(track) {
+    if (!cameraEnabled || !localStream) return;
+
+    for (const current of [...localStream.getVideoTracks()]) {
+      if (current === track) continue;
+      try { localStream.removeTrack(current); } catch {}
+    }
+
+    if (track && !localStream.getVideoTracks().includes(track)) {
+      try { localStream.addTrack(track); } catch {}
+    }
+
+    syncLocalPreview();
+
+    if (peer && !screenEnabled) {
+      try {
+        await peopleDmSetOutgoingVideo(track || null);
+      } catch (err) {
+        console.warn("[People effets caméra/MP]", err);
+      }
+    }
+  }
+
+  window.addEventListener("people-camera-effect-changed", peopleDmUpdateEffectsButton);
+  window.addEventListener("people-camera-effect-track-changed", (event) => {
+    if (!call || !cameraEnabled) return;
+    const track = event?.detail?.track || peopleDmCameraOutputTrack();
+    void peopleDmInstallCameraOutputTrack(track);
+  });
+  // === PEOPLE_DM_CAMERA_FACE_EFFECTS_V1_END ===
+
   function updateMediaButtons() {
     muteButton.classList.toggle(
       "active",
@@ -839,6 +910,7 @@
         ? "Arrêter le partage d'écran"
         : "Partager l'écran";
 
+    peopleDmUpdateEffectsButton();
     peopleDmCallPublishState();
   }
 
@@ -849,7 +921,7 @@
         : (
             cameraEnabled &&
             cameraTrack
-              ? cameraTrack
+              ? peopleDmCameraOutputTrack()
               : null
           );
 
@@ -1816,8 +1888,17 @@
       cameraEnabled =
         true;
 
+      let outgoingTrack = cameraTrack;
+      try {
+        outgoingTrack =
+          await window.PeopleCameraEffects?.attachSource?.(cameraTrack) || cameraTrack;
+      } catch (err) {
+        console.warn("[People effets caméra/activation MP]", err);
+        outgoingTrack = cameraTrack;
+      }
+
       localStream.addTrack(
-        cameraTrack
+        outgoingTrack
       );
 
       if (
@@ -1825,7 +1906,7 @@
         !screenEnabled
       ) {
         await peopleDmSetOutgoingVideo(
-          cameraTrack
+          outgoingTrack
         );
       }
 
@@ -1887,12 +1968,11 @@
 
     const oldTrack =
       cameraTrack;
+    const oldOutput =
+      peopleDmCameraOutputTrack();
 
     cameraEnabled =
       false;
-
-    cameraTrack =
-      null;
 
     if (
       peer &&
@@ -1904,16 +1984,14 @@
       );
     }
 
-    if (
-      localStream &&
-      oldTrack
-    ) {
-      try {
-        localStream.removeTrack(
-          oldTrack
-        );
-      } catch {}
+    if (localStream) {
+      for (const current of [...localStream.getVideoTracks()]) {
+        try { localStream.removeTrack(current); } catch {}
+      }
     }
+
+    try { window.PeopleCameraEffects?.detachSource?.(oldTrack); } catch {}
+    cameraTrack = null;
 
     if (
       oldTrack &&
@@ -1922,6 +2000,10 @@
       try {
         oldTrack.stop();
       } catch {}
+    }
+
+    if (oldOutput && oldOutput !== oldTrack) {
+      try { oldOutput.stop(); } catch {}
     }
 
     syncLocalPreview();
@@ -2068,7 +2150,7 @@
     if (peer) {
       await peopleDmSetOutgoingVideo(
         cameraEnabled && cameraTrack
-          ? cameraTrack
+          ? peopleDmCameraOutputTrack()
           : null
       );
       await sendOffer();
@@ -2218,6 +2300,12 @@
     }
 
     peer = null;
+
+    if (cameraTrack) {
+      const rawCameraTrack = cameraTrack;
+      try { window.PeopleCameraEffects?.detachSource?.(rawCameraTrack); } catch {}
+      try { rawCameraTrack.stop(); } catch {}
+    }
 
     if (localStream) {
       for (
@@ -2645,7 +2733,7 @@
       cameraTrack
     ) {
       await peopleDmSetOutgoingVideo(
-        cameraTrack
+        peopleDmCameraOutputTrack()
       );
     }
 
@@ -2992,6 +3080,14 @@
       } else {
         void enableCamera();
       }
+    }
+  );
+
+  effectsButton?.addEventListener(
+    "click",
+    () => {
+      if (!cameraEnabled) return;
+      window.PeopleCameraEffects?.togglePicker?.(effectsButton);
     }
   );
 
@@ -3363,6 +3459,14 @@
         await enableCamera();
       }
 
+      return true;
+    },
+
+    openEffects(anchor = effectsButton) {
+      if (!call || !cameraEnabled) {
+        return false;
+      }
+      window.PeopleCameraEffects?.togglePicker?.(anchor || effectsButton);
       return true;
     },
 

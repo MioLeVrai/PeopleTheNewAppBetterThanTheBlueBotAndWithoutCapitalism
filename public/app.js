@@ -199,6 +199,58 @@ function peoplePlayCallEventSound(
 }
 // === PEOPLE_CALL_EVENT_SOUNDS_V5_END ===
 
+
+// === PEOPLE_CAMERA_FACE_EFFECTS_V1_START ===
+function peopleCameraOutputTrack() {
+  if (!cameraTrack) return null;
+  try {
+    return window.PeopleCameraEffects?.getOutputTrack?.(cameraTrack) || cameraTrack;
+  } catch {
+    return cameraTrack;
+  }
+}
+
+async function peopleInstallCameraOutputTrack(track) {
+  if (!cameraEnabled || !localStream) return;
+
+  for (const current of [...localStream.getVideoTracks()]) {
+    if (current === track) continue;
+    try { localStream.removeTrack(current); } catch {}
+  }
+
+  if (track && !localStream.getVideoTracks().includes(track)) {
+    try { localStream.addTrack(track); } catch {}
+  }
+
+  attachLocalPreview();
+
+  if (!screenEnabled) {
+    for (const pc of peers.values()) {
+      try { await peopleSyncOutgoingVideo(pc); } catch (err) {
+        console.warn("[People effets caméra/vocal]", err);
+      }
+    }
+  }
+}
+
+function peopleUpdateServerEffectsButton() {
+  const button = document.getElementById("peopleServerVideoEffects");
+  if (!button) return;
+  const selected = window.PeopleCameraEffects?.getSelectedEffect?.() || "none";
+  const info = window.PeopleCameraEffects?.getSelectedEffectInfo?.();
+  button.classList.toggle("people-face-effects-active", selected !== "none");
+  button.classList.toggle("hidden", !cameraEnabled || screenEnabled);
+  button.title = `Effets de visage${selected !== "none" ? ` • ${info?.label || selected}` : ""}`;
+}
+
+window.addEventListener("people-camera-effect-changed", peopleUpdateServerEffectsButton);
+window.addEventListener("people-camera-effect-track-changed", (event) => {
+  if (!voiceJoined || !cameraEnabled) return;
+  const track = event?.detail?.track || peopleCameraOutputTrack();
+  void peopleInstallCameraOutputTrack(track);
+});
+// === PEOPLE_CAMERA_FACE_EFFECTS_V1_END ===
+
 const peers = new Map();
 const pendingCandidates = new Map();
 const reconnectTimers = new Map();
@@ -1449,7 +1501,24 @@ function ensureVideoTile(peerId, displayName, isLocal = false) {
     label.className = "video-label";
 
     tile.append(placeholder, video, label);
+
+    if (isLocal) {
+      const effectsButton = document.createElement("button");
+      effectsButton.id = "peopleServerVideoEffects";
+      effectsButton.className = "people-video-effects-button";
+      effectsButton.type = "button";
+      effectsButton.textContent = "✨";
+      effectsButton.title = "Effets de visage";
+      effectsButton.setAttribute("aria-label", "Effets de visage");
+      effectsButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        window.PeopleCameraEffects?.togglePicker?.(effectsButton);
+      });
+      tile.appendChild(effectsButton);
+    }
+
     videoGrid.appendChild(tile);
+    window.PeopleCameraEffects?.ensureControls?.();
   }
 
   const label = tile.querySelector(".video-label");
@@ -1584,7 +1653,7 @@ function attachLocalPreview() {
   const previewTrack =
     screenEnabled && screenTrack
       ? screenTrack
-      : (cameraEnabled ? cameraTrack : null);
+      : (cameraEnabled ? peopleCameraOutputTrack() : null);
 
   if (!previewTrack) {
     removeVideoTile(socket.id || "local", true);
@@ -1622,6 +1691,7 @@ function attachLocalPreview() {
       : `${username || "Moi"} (toi)`;
   }
 
+  peopleUpdateServerEffectsButton();
   syncVideoStageVisibility();
 }
 
@@ -2856,6 +2926,7 @@ function peopleVoiceRejectJoin(
   closeAllPeers();
 
   if (cameraTrack) {
+    try { window.PeopleCameraEffects?.detachSource?.(cameraTrack); } catch {}
     try {
       cameraTrack.stop();
     } catch {}
@@ -3027,7 +3098,16 @@ async function enableCamera() {
 
     cameraTrack = track;
     cameraEnabled = true;
-    localStream.addTrack(cameraTrack);
+
+    let outgoingTrack = cameraTrack;
+    try {
+      outgoingTrack = await window.PeopleCameraEffects?.attachSource?.(cameraTrack) || cameraTrack;
+    } catch (err) {
+      console.warn("[People effets caméra/activation vocal]", err);
+      outgoingTrack = cameraTrack;
+    }
+
+    localStream.addTrack(outgoingTrack);
 
     cameraTrack.addEventListener("ended", () => {
       if (cameraEnabled) disableCamera({ trackAlreadyEnded: true });
@@ -3058,15 +3138,24 @@ async function disableCamera({ trackAlreadyEnded = false } = {}) {
   if (!cameraEnabled && !cameraTrack) return;
 
   const oldTrack = cameraTrack;
+  const oldOutput = peopleCameraOutputTrack();
   cameraEnabled = false;
-  cameraTrack = null;
 
-  if (localStream && oldTrack) {
-    try { localStream.removeTrack(oldTrack); } catch {}
+  if (localStream) {
+    for (const current of [...localStream.getVideoTracks()]) {
+      try { localStream.removeTrack(current); } catch {}
+    }
   }
+
+  try { window.PeopleCameraEffects?.detachSource?.(oldTrack); } catch {}
+  cameraTrack = null;
 
   if (oldTrack && !trackAlreadyEnded) {
     try { oldTrack.stop(); } catch {}
+  }
+
+  if (oldOutput && oldOutput !== oldTrack) {
+    try { oldOutput.stop(); } catch {}
   }
 
   removeVideoTile(socket.id || "local", true);
@@ -3223,6 +3312,7 @@ function leaveVoice() {
   closeAllPeers();
 
   if (cameraTrack) {
+    try { window.PeopleCameraEffects?.detachSource?.(cameraTrack); } catch {}
     try { cameraTrack.stop(); } catch {}
     cameraTrack = null;
   }
@@ -3483,7 +3573,7 @@ async function peopleSyncOutgoingVideo(pc) {
   if (!pc) return;
   const wantedTrack = screenEnabled && screenTrack
     ? screenTrack
-    : (cameraEnabled && cameraTrack ? cameraTrack : null);
+    : (cameraEnabled && cameraTrack ? peopleCameraOutputTrack() : null);
   let transceiver = peopleFindVideoTransceiver(pc);
   if (!transceiver) {
     transceiver = pc.addTransceiver("video", { direction: wantedTrack ? "sendrecv" : "recvonly" });

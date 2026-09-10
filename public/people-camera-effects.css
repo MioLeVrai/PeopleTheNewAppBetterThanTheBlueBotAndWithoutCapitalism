@@ -1,0 +1,242 @@
+/* ===== People Camera Face Effects V1.1 ===== */
+.people-camera-effects-picker {
+  position: fixed;
+  z-index: 6800;
+  width: min(386px, calc(100vw - 24px));
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--people-accent, #67589d) 35%, #2b2934);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--panel, #181524) 96%, #000);
+  color: var(--text, #f2eff8);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .52);
+  backdrop-filter: blur(18px);
+}
+
+.people-camera-effects-picker.hidden { display: none !important; }
+
+.people-camera-effects-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.people-camera-effects-head strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.people-camera-effects-head span {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted, #aea7bc);
+  font-size: 11px;
+}
+
+.people-camera-effects-close {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--people-surface, #211d30);
+  color: var(--text, #f2eff8);
+  cursor: pointer;
+}
+
+.people-camera-effects-close:hover { background: var(--people-hover, #2b253f); }
+
+.people-camera-effects-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.people-camera-effect-card {
+  min-width: 0;
+  min-height: 78px;
+  padding: 8px 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  background: var(--people-surface, #211d30);
+  color: var(--text, #f2eff8);
+  cursor: pointer;
+  transition: transform .12s ease, border-color .12s ease, background .12s ease;
+}
+
+.people-camera-effect-card:hover {
+  transform: translateY(-1px);
+  background: var(--people-hover, #2b253f);
+}
+
+.people-camera-effect-card.active {
+  border-color: var(--people-accent-light, #8a79ca);
+  background: color-mix(in srgb, var(--people-accent, #67589d) 30%, var(--people-surface, #211d30));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--people-accent, #67589d) 16%, transparent);
+}
+
+.people-camera-effect-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .18);
+  font-size: 23px;
+  line-height: 1;
+}
+
+.people-camera-effect-card small {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 750;
+  color: var(--muted, #aea7bc);
+}
+
+.people-camera-effect-card.active small { color: var(--text, #f2eff8); }
+
+.people-camera-effects-foot {
+  min-height: 28px;
+  margin-top: 10px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(0, 0, 0, .16);
+  color: var(--muted, #aea7bc);
+  font-size: 10px;
+}
+
+.people-camera-effects-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #74707b;
+}
+
+.people-camera-effects-status[data-state="ready"] + * {}
+.people-camera-effects-foot:has(.people-camera-effects-status[data-state="ready"]) .people-camera-effects-dot { background: #23a55a; }
+.people-camera-effects-foot:has(.people-camera-effects-status[data-state="loading"]) .people-camera-effects-dot { background: #f0b232; }
+.people-camera-effects-foot:has(.people-camera-effects-status[data-state="error"]) .people-camera-effects-dot { background: #da373c; }
+
+.icon-btn.people-face-effects-active,
+.people-dm-call-control.people-face-effects-active {
+  background: color-mix(in srgb, var(--people-accent, #67589d) 64%, #17141f) !important;
+  color: #fff !important;
+}
+
+.people-dm-call-control.people-dm-effects-control span {
+  font-size: 19px;
+}
+
+@media (max-width: 720px) {
+  .people-camera-effects-picker.mobile {
+    left: 10px !important;
+    right: 10px !important;
+    top: auto !important;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    width: auto !important;
+    max-height: min(72vh, 520px);
+    overflow: auto;
+    border-radius: 20px;
+  }
+
+  .people-camera-effects-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .people-camera-effect-card {
+    min-height: 74px;
+  }
+}
+
+@media (max-width: 390px) {
+  .people-camera-effects-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .people-camera-effect-card { transition: none; }
+}
+
+.people-video-effects-button {
+  position: absolute;
+  z-index: 4;
+  top: 9px;
+  right: 9px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 14, .72);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0,0,0,.28);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+
+.people-video-effects-button:hover {
+  background: rgba(35, 31, 48, .94);
+}
+
+.people-video-effects-button.hidden {
+  display: none !important;
+}
+
+.people-video-effects-button.people-face-effects-active {
+  border-color: var(--people-accent-light, #8a79ca);
+  background: color-mix(in srgb, var(--people-accent, #67589d) 76%, #15121d);
+}
+
+.people-dm-call-active-actions:has(#peopleDmCallEffects) {
+  gap: 12px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.people-dm-call-active-actions:has(#peopleDmCallEffects) .people-dm-call-control {
+  min-width: 68px;
+}
+
+.people-dm-call-floating .people-dm-call-active-actions:has(#peopleDmCallEffects) .people-dm-call-control {
+  min-width: 52px !important;
+  padding-left: 5px !important;
+  padding-right: 5px !important;
+}
+
+@media (max-width: 520px) {
+  .people-dm-call-active-actions:has(#peopleDmCallEffects) {
+    gap: 7px;
+  }
+
+  .people-dm-call-active-actions:has(#peopleDmCallEffects) .people-dm-call-control {
+    min-width: 62px;
+  }
+}
+
+
+/* === PEOPLE_CAMERA_FACE_EFFECTS_V1_1_UI_GUARD_START === */
+#peopleDmCallEffects.people-dm-call-control {
+  display: grid;
+}
+
+#peopleDmCallEffects.people-dm-call-control:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+#peopleDmCallEffects.people-dm-call-control:not(:disabled) {
+  opacity: 1;
+}
+/* === PEOPLE_CAMERA_FACE_EFFECTS_V1_1_UI_GUARD_END === */
