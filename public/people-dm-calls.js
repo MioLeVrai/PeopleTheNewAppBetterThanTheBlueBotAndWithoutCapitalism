@@ -4259,6 +4259,53 @@
     );
   }
 
+  // === PEOPLE_DM_CALL_MINI_V1_START ===
+  /*
+    Bouton manuel pour reprendre la mini-caméra existante.
+    On ne touche pas au moteur WebRTC : seule la présentation change.
+  */
+  const inlineDock =
+    document.getElementById(
+      "peopleDmCallInlineDock"
+    );
+
+  const miniButton =
+    document.createElement(
+      "button"
+    );
+
+  miniButton.id =
+    "peopleDmCallMini";
+
+  miniButton.type =
+    "button";
+
+  miniButton.className =
+    "people-dm-call-control people-dm-call-mini-control";
+
+  miniButton.title =
+    "Réduire l'appel";
+
+  miniButton.setAttribute(
+    "aria-label",
+    "Réduire l'appel"
+  );
+
+  miniButton.innerHTML =
+    "<span>↘️</span><small>Mini</small>";
+
+  miniButton.disabled =
+    true;
+
+  activeActions.insertBefore(
+    miniButton,
+    activeActions.querySelector(
+      ".people-dm-call-volume-wrap"
+    ) ||
+    activeActions.lastElementChild
+  );
+  // === PEOPLE_DM_CALL_MINI_V1_END ===
+
   // ==========================================================
   // 1. HAUTEUR RÉGLABLE DU PANNEAU DANS LE MP
   // ==========================================================
@@ -4546,6 +4593,28 @@
   pipTitle.textContent =
     "Caméra";
 
+  const pipRestore =
+    document.createElement(
+      "button"
+    );
+
+  pipRestore.type =
+    "button";
+
+  pipRestore.className =
+    "people-dm-call-video-pip-restore hidden";
+
+  pipRestore.title =
+    "Agrandir l'appel";
+
+  pipRestore.setAttribute(
+    "aria-label",
+    "Agrandir l'appel"
+  );
+
+  pipRestore.textContent =
+    "↗";
+
   const pipClose =
     document.createElement(
       "button"
@@ -4570,6 +4639,7 @@
 
   pipHeader.append(
     pipTitle,
+    pipRestore,
     pipClose
   );
 
@@ -4599,13 +4669,96 @@
     pip
   );
 
+  const pipReopen =
+    document.createElement(
+      "button"
+    );
+
+  pipReopen.id =
+    "peopleDmCallVideoPipReopen";
+
+  pipReopen.type =
+    "button";
+
+  pipReopen.className =
+    "people-dm-call-video-pip-reopen hidden";
+
+  pipReopen.title =
+    "Rouvrir la mini caméra";
+
+  pipReopen.setAttribute(
+    "aria-label",
+    "Rouvrir la mini caméra"
+  );
+
+  pipReopen.textContent =
+    "📹";
+
+  document.body.appendChild(
+    pipReopen
+  );
+
   let pipDismissed =
+    false;
+
+  let pipForced =
     false;
 
   let previousRemoteCamera =
     false;
 
   let dragState = null;
+
+  function setManualMini(
+    enabled
+  ) {
+    pipForced =
+      Boolean(enabled);
+
+    inlineDock?.classList.toggle(
+      "people-dm-call-manual-mini-active",
+      pipForced
+    );
+
+    dmView.classList.toggle(
+      "people-dm-call-manual-mini-active",
+      pipForced
+    );
+
+    miniButton.classList.toggle(
+      "active",
+      pipForced
+    );
+
+    const icon =
+      miniButton.querySelector(
+        "span"
+      );
+
+    const label =
+      miniButton.querySelector(
+        "small"
+      );
+
+    if (icon) {
+      icon.textContent =
+        pipForced
+          ? "↗️"
+          : "↘️";
+    }
+
+    if (label) {
+      label.textContent =
+        pipForced
+          ? "Grand"
+          : "Mini";
+    }
+
+    miniButton.title =
+      pipForced
+        ? "Agrandir l'appel"
+        : "Réduire l'appel";
+  }
 
   function syncPipVideoSource() {
     const source =
@@ -4710,6 +4863,9 @@
     const remoteCamera =
       remoteCameraIsActive();
 
+    const callHere =
+      currentDmMatchesCall();
+
     if (
       remoteCamera &&
       !previousRemoteCamera
@@ -4725,19 +4881,53 @@
       resetPipPosition();
     }
 
+    if (!remoteCamera) {
+      pipDismissed =
+        false;
+
+      setManualMini(
+        false
+      );
+    }
+
     previousRemoteCamera =
       remoteCamera;
 
     syncPipVideoSource();
 
+    miniButton.disabled =
+      !remoteCamera ||
+      !callHere;
+
     const shouldShow =
       remoteCamera &&
-      !currentDmMatchesCall() &&
+      (
+        !callHere ||
+        pipForced
+      ) &&
       !pipDismissed;
+
+    const shouldOfferReopen =
+      remoteCamera &&
+      !callHere &&
+      pipDismissed;
 
     pip.classList.toggle(
       "hidden",
       !shouldShow
+    );
+
+    pipReopen.classList.toggle(
+      "hidden",
+      !shouldOfferReopen
+    );
+
+    pipRestore.classList.toggle(
+      "hidden",
+      !(
+        pipForced &&
+        callHere
+      )
     );
 
     pipTitle.textContent =
@@ -4755,13 +4945,70 @@
     }
   }
 
-  pipClose.addEventListener(
+  miniButton.addEventListener(
+    "click",
+    () => {
+      if (
+        !remoteCameraIsActive()
+      ) {
+        return;
+      }
+
+      pipDismissed =
+        false;
+
+      setManualMini(
+        !pipForced
+      );
+
+      syncPip();
+    }
+  );
+
+  pipRestore.addEventListener(
     "click",
     (event) => {
       event.stopPropagation();
 
       pipDismissed =
-        true;
+        false;
+
+      setManualMini(
+        false
+      );
+
+      syncPip();
+    }
+  );
+
+  pipReopen.addEventListener(
+    "click",
+    () => {
+      pipDismissed =
+        false;
+
+      syncPip();
+    }
+  );
+
+  pipClose.addEventListener(
+    "click",
+    (event) => {
+      event.stopPropagation();
+
+      /*
+        Fermer une mini-fenêtre forcée annule d'abord
+        le mode mini manuel. Si on est ailleurs dans People,
+        un petit bouton caméra reste disponible pour la rouvrir.
+      */
+      if (pipForced) {
+        setManualMini(
+          false
+        );
+      }
+
+      pipDismissed =
+        !currentDmMatchesCall();
 
       syncPip();
     }
@@ -4772,7 +5019,9 @@
     (event) => {
       if (
         event.target ===
-        pipClose
+          pipClose ||
+        event.target ===
+          pipRestore
       ) {
         return;
       }
