@@ -729,9 +729,7 @@ async function peopleCreateAccount(username, passwordHash) {
     username: name,
     username_key: key,
     password_hash: passwordHash,
-    created_at: new Date().toISOString(),
-    appearance_theme: "dark",
-    appearance_accent: "#67589D"
+    created_at: new Date().toISOString()
   };
 
   accounts.push(account);
@@ -1768,115 +1766,6 @@ async function peopleUpdateDescription(accountId, description) {
   peopleWriteLocalAccounts(accounts);
   return account;
 }
-
-
-// === PEOPLE_APPEARANCE_V1_START ===
-const PEOPLE_APPEARANCE_THEMES = new Set([
-  "dark",
-  "midnight",
-  "light",
-  "system"
-]);
-
-const PEOPLE_DEFAULT_APPEARANCE = {
-  theme: "dark",
-  accent: "#67589D"
-};
-
-function peopleNormalizeAppearanceTheme(value) {
-  const theme = String(value || "")
-    .trim()
-    .toLowerCase();
-
-  return PEOPLE_APPEARANCE_THEMES.has(theme)
-    ? theme
-    : PEOPLE_DEFAULT_APPEARANCE.theme;
-}
-
-function peopleNormalizeAppearanceAccent(value) {
-  const accent = String(value || "")
-    .trim()
-    .toUpperCase();
-
-  return /^#[0-9A-F]{6}$/.test(accent)
-    ? accent
-    : PEOPLE_DEFAULT_APPEARANCE.accent;
-}
-
-function peopleAppearanceFromAccount(account) {
-  return {
-    theme: peopleNormalizeAppearanceTheme(
-      account?.appearance_theme ||
-      account?.appearanceTheme
-    ),
-    accent: peopleNormalizeAppearanceAccent(
-      account?.appearance_accent ||
-      account?.appearanceAccent
-    )
-  };
-}
-
-async function peopleGetAppearance(accountId) {
-  const wanted = String(accountId || "");
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT appearance_theme, appearance_accent " +
-      "FROM people_accounts WHERE id = $1 LIMIT 1",
-      [wanted]
-    );
-
-    return result.rows[0]
-      ? peopleAppearanceFromAccount(result.rows[0])
-      : null;
-  }
-
-  const account = peopleReadLocalAccounts().find(
-    (item) => String(item.id) === wanted
-  );
-
-  return account
-    ? peopleAppearanceFromAccount(account)
-    : null;
-}
-
-async function peopleUpdateAppearance(
-  accountId,
-  theme,
-  accent
-) {
-  const wanted = String(accountId || "");
-  const cleanTheme = peopleNormalizeAppearanceTheme(theme);
-  const cleanAccent = peopleNormalizeAppearanceAccent(accent);
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "UPDATE people_accounts " +
-      "SET appearance_theme = $1, appearance_accent = $2 " +
-      "WHERE id = $3 " +
-      "RETURNING appearance_theme, appearance_accent",
-      [cleanTheme, cleanAccent, wanted]
-    );
-
-    return result.rows[0]
-      ? peopleAppearanceFromAccount(result.rows[0])
-      : null;
-  }
-
-  const accounts = peopleReadLocalAccounts();
-  const account = accounts.find(
-    (item) => String(item.id) === wanted
-  );
-
-  if (!account) return null;
-
-  account.appearance_theme = cleanTheme;
-  account.appearance_accent = cleanAccent;
-  peopleWriteLocalAccounts(accounts);
-
-  return peopleAppearanceFromAccount(account);
-}
-// === PEOPLE_APPEARANCE_V1_END ===
 
 async function peopleFriendIds(accountId) {
   const owner = String(accountId);
@@ -3975,27 +3864,6 @@ async function peopleInitSocial() {
         account.description = "";
         changed = true;
       }
-
-      const appearance =
-        peopleAppearanceFromAccount(account);
-
-      if (
-        account.appearance_theme !==
-        appearance.theme
-      ) {
-        account.appearance_theme =
-          appearance.theme;
-        changed = true;
-      }
-
-      if (
-        account.appearance_accent !==
-        appearance.accent
-      ) {
-        account.appearance_accent =
-          appearance.accent;
-        changed = true;
-      }
     }
 
     if (changed) peopleWriteLocalAccounts(accounts);
@@ -4007,16 +3875,6 @@ async function peopleInitSocial() {
   await peoplePool.query(
     "ALTER TABLE people_accounts " +
     "ADD COLUMN IF NOT EXISTS description VARCHAR(280) NOT NULL DEFAULT ''"
-  );
-
-  await peoplePool.query(
-    "ALTER TABLE people_accounts " +
-    "ADD COLUMN IF NOT EXISTS appearance_theme VARCHAR(16) NOT NULL DEFAULT 'dark'"
-  );
-
-  await peoplePool.query(
-    "ALTER TABLE people_accounts " +
-    "ADD COLUMN IF NOT EXISTS appearance_accent VARCHAR(7) NOT NULL DEFAULT '#67589D'"
   );
 
   await peoplePool.query(
@@ -5068,94 +4926,6 @@ app.get(
   }
 );
 // === PEOPLE_AVATAR_JSON_DISPLAY_V1_END ===
-
-// === PEOPLE_APPEARANCE_ROUTES_V1_START ===
-app.get(
-  "/api/settings/appearance",
-  async (req, res) => {
-    try {
-      const session = peopleSessionForRequest(req, res);
-      if (!session) return;
-
-      const appearance = await peopleGetAppearance(session.id);
-
-      if (!appearance) {
-        return res.status(404).json({
-          ok: false,
-          error: "Compte introuvable."
-        });
-      }
-
-      return res.json({
-        ok: true,
-        appearance
-      });
-    } catch (err) {
-      console.error("[People appearance/get]", err);
-      return res.status(500).json({
-        ok: false,
-        error: "Impossible de charger l'apparence."
-      });
-    }
-  }
-);
-
-app.put(
-  "/api/settings/appearance",
-  async (req, res) => {
-    try {
-      const session = peopleSessionForRequest(req, res);
-      if (!session) return;
-
-      const rawTheme = String(req.body?.theme || "")
-        .trim()
-        .toLowerCase();
-
-      const rawAccent = String(req.body?.accent || "")
-        .trim()
-        .toUpperCase();
-
-      if (!PEOPLE_APPEARANCE_THEMES.has(rawTheme)) {
-        return res.status(400).json({
-          ok: false,
-          error: "Thème d'apparence invalide."
-        });
-      }
-
-      if (!/^#[0-9A-F]{6}$/.test(rawAccent)) {
-        return res.status(400).json({
-          ok: false,
-          error: "Couleur d'accent invalide."
-        });
-      }
-
-      const appearance = await peopleUpdateAppearance(
-        session.id,
-        rawTheme,
-        rawAccent
-      );
-
-      if (!appearance) {
-        return res.status(404).json({
-          ok: false,
-          error: "Compte introuvable."
-        });
-      }
-
-      return res.json({
-        ok: true,
-        appearance
-      });
-    } catch (err) {
-      console.error("[People appearance/put]", err);
-      return res.status(500).json({
-        ok: false,
-        error: "Impossible d'enregistrer l'apparence."
-      });
-    }
-  }
-);
-// === PEOPLE_APPEARANCE_ROUTES_V1_END ===
 
 app.get("/api/profile/:username", async (req, res) => {
   try {

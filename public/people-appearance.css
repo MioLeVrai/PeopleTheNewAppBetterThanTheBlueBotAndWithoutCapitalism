@@ -1,0 +1,351 @@
+/* === PEOPLE_APPEARANCE_THEME_V1_START === */
+:root {
+  --people-accent: #67589D;
+  --people-accent-strong: #574B85;
+  --people-accent-light: #8B7DB5;
+  --people-accent-soft: rgba(103, 88, 157, .26);
+  --people-accent-faint: rgba(103, 88, 157, .10);
+  --people-accent-border: rgba(103, 88, 157, .40);
+}
+
+:root[data-people-theme="dark"] {
+  --people-ink: #090811;
+  --people-night: #100e1a;
+  --people-deep: #181524;
+  --people-surface: #211d30;
+  --people-hover: #2b253f;
+  --people-input: #12101b;
+  --people-text: #f2eff8;
+  --people-muted: #aea7bc;
+  --people-subtle: #827a90;
+  --people-border: #322b43;
+  --people-overlay: rgba(4, 3, 8, .84);
+  --people-danger: #da4b55;
+  color-scheme: dark;
+}
+
+:root[data-people-theme="midnight"] {
+  --people-ink: #020306;
+  --people-night: #07090d;
+  --people-deep: #0d1016;
+  --people-surface: #151922;
+  --people-hover: #1d2330;
+  --people-input: #0a0d12;
+  --people-text: #f4f6f8;
+  --people-muted: #a7afbb;
+  --people-subtle: #737d8a;
+  --people-border: #222936;
+  --people-overlay: rgba(0, 0, 0, .88);
+  --people-danger: #df4e58;
+  color-scheme: dark;
+}
+
+:root[data-people-theme="light"] {
+  --people-ink: #e3e5e8;
+  --people-night: #f2f3f5;
+  --people-deep: #ffffff;
+  --people-surface: #eceef1;
+  --people-hover: #e3e5e8;
+  --people-input: #e9ebee;
+  --people-text: #202225;
+  --people-muted: #5d6570;
+  --people-subtle: #727a86;
+  --people-border: #d6d9de;
+  --people-overlay: rgba(35, 39, 44, .40);
+  --people-danger: #c73942;
+  color-scheme: light;
+}
+
+:root[data-people-theme] {
+  --bg: var(--people-night) !important;
+  --panel: var(--people-deep) !important;
+  --panel-dark: var(--people-ink) !important;
+  --input: var(--people-input) !important;
+  --text: var(--people-text) !important;
+  --muted: var(--people-muted) !important;
+  --brand: var(--people-accent) !important;
+  --hover: var(--people-hover) !important;
+}
+
+:root[data-people-theme] body,
+:root[data-people-theme] .app,
+:root[data-people-theme] .main,
+:root[data-people-theme] .home-main,
+:root[data-people-theme] .messages,
+:root[data-people-theme] .dm-view,
+:root[data-people-theme] .dm-messages,
+:root[data-people-theme] .friends-view {
+  background: var(--people-night) !important;
+  color: var(--people-text) !important;
+}
+
+:root[data-people-theme] .sidebar,
+:root[data-people-theme] .online-panel,
+:root[data-people-theme] .server-title,
+:root[data-people-theme] .topbar,
+:root[data-people-theme] .home-topbar,
+:root[data-people-theme] .dm-header,
+:root[data-people-theme] .profile,
+:root[data-people-theme] .friends-search-card,
+:root[data-people-theme] .profile-card-section,
+:root[data-people-theme] .profile-card-modal,
+:root[data-people-theme] .join-card,
+:root[data-people-theme] .people-server-modal-card,
+:root[data-people-theme] .people-invite-card,
+:root[data-people-theme] .people-card {
+  background: var(--people-deep) !important;
+  border-color: var(--people-border) !important;
+  color: var(--people-text) !important;
+}
+
+:root[data-people-theme] .server-rail,
+:root[data-people-theme] .people-message-context-menu,
+:root[data-people-theme] .people-server-context-menu,
+:root[data-people-theme] .people-dm-context-menu {
+  background: var(--people-ink) !important;
+  border-color: var(--people-border) !important;
+}
+
+:root[data-people-theme] .channel:hover,
+:root[data-people-theme] .channel.active,
+:root[data-people-theme] .dm-conversation-row:hover,
+:root[data-people-theme] .dm-conversation-row.active,
+:root[data-people-theme] .dm-back-button:hover,
+:root[data-people-theme] .icon-btn:hover,
+:root[data-people-theme] .voice-user:hover,
+:root[data-people-theme] .online-user-row:hover,
+:root[data-people-theme] .people-card:hover,
+:root[data-people-theme] .friend-request-row:hover,
+:root[data-people-theme] .people-message-menu-item:hover,
+:root[data-people-theme] .people-server-context-item:hover,
+:root[data-people-theme] .people-dm-context-item:hover {
+  background: var(--people-hover) !important;
+  color: var(--people-text) !important;
+}
+
+:root[data-people-theme] .rail-button.active,
+:root[data-people-theme] .dynamic-server-button.active,
+:root[data-people-theme] .people-settings-tab.active,
+:root[data-people-theme] .people-settings-theme-card.selected {
+  background: var(--people-accent-soft) !important;
+  border-color: var(--people-accent-border) !important;
+  color: var(--people-text) !important;
+}
+
+:root[data-people-theme] .server-icon,
+:root[data-people-theme] .logo,
+:root[data-people-theme] .avatar,
+:root[data-people-theme] .dm-sidebar-avatar,
+:root[data-people-theme] .dm-header-avatar,
+:root[data-people-theme] .people-card-avatar,
+:root[data-people-theme] .profile-large-avatar,
+:root[data-people-theme] .people-invite-icon,
+:root[data-people-theme] .friend-request-avatar,
+:root[data-people-theme] .people-settings-avatar,
+:root[data-people-theme] .people-dm-call-avatar {
+  background: var(--people-accent) !important;
+  color: #fff !important;
+}
+
+:root[data-people-theme] .composer button,
+:root[data-people-theme] .join-card button,
+:root[data-people-theme] .people-card-action,
+:root[data-people-theme] .profile-edit-wrap button,
+:root[data-people-theme] .profile-modal-actions button,
+:root[data-people-theme] .people-server-primary,
+:root[data-people-theme] .friend-request-accept,
+:root[data-people-theme] .people-settings-primary {
+  background: var(--people-accent) !important;
+  color: #fff !important;
+}
+
+:root[data-people-theme] .composer button:hover,
+:root[data-people-theme] .join-card button:hover,
+:root[data-people-theme] .people-card-action:hover,
+:root[data-people-theme] .profile-edit-wrap button:hover,
+:root[data-people-theme] .profile-modal-actions button:hover,
+:root[data-people-theme] .people-server-primary:hover,
+:root[data-people-theme] .friend-request-accept:hover,
+:root[data-people-theme] .people-settings-primary:hover {
+  background: var(--people-accent-strong) !important;
+}
+
+:root[data-people-theme] .composer input,
+:root[data-people-theme] .join-card input,
+:root[data-people-theme] .friends-search-card input,
+:root[data-people-theme] .profile-edit-wrap textarea,
+:root[data-people-theme] .people-server-form input,
+:root[data-people-theme] .people-settings-section textarea,
+:root[data-people-theme] .people-settings-device-field select,
+:root[data-people-theme] .people-settings-custom-color input[type="text"] {
+  background: var(--people-input) !important;
+  color: var(--people-text) !important;
+  border-color: var(--people-border) !important;
+}
+
+:root[data-people-theme] .composer input:focus,
+:root[data-people-theme] .join-card input:focus,
+:root[data-people-theme] .friends-search-card input:focus,
+:root[data-people-theme] .profile-edit-wrap textarea:focus,
+:root[data-people-theme] .people-server-form input:focus,
+:root[data-people-theme] .people-settings-section textarea:focus,
+:root[data-people-theme] .people-settings-device-field select:focus {
+  border-color: var(--people-accent-light) !important;
+  box-shadow: 0 0 0 2px var(--people-accent-faint) !important;
+}
+
+:root[data-people-theme] .group-label,
+:root[data-people-theme] .channel,
+:root[data-people-theme] .voice-status,
+:root[data-people-theme] .voice-user,
+:root[data-people-theme] .server-title span,
+:root[data-people-theme] .profile span,
+:root[data-people-theme] .topbar span,
+:root[data-people-theme] .people-settings-page-head p,
+:root[data-people-theme] .people-settings-section-title span,
+:root[data-people-theme] .people-settings-profile-copy small,
+:root[data-people-theme] .people-settings-sound-copy small,
+:root[data-people-theme] .people-dm-call-identity span {
+  color: var(--people-muted) !important;
+}
+
+:root[data-people-theme] .message-text,
+:root[data-people-theme] .dm-message,
+:root[data-people-theme] .people-settings-page-head h2,
+:root[data-people-theme] .people-settings-nav-head strong,
+:root[data-people-theme] .people-settings-profile-copy label,
+:root[data-people-theme] .people-settings-section-title strong,
+:root[data-people-theme] .people-dm-call-identity strong {
+  color: var(--people-text) !important;
+}
+
+:root[data-people-theme] .people-message-link,
+:root[data-people-theme] a.people-message-link {
+  color: var(--people-accent-light) !important;
+}
+
+:root[data-people-theme] .people-message-link:hover,
+:root[data-people-theme] a.people-message-link:hover {
+  color: var(--people-accent) !important;
+}
+
+:root[data-people-theme] .people-settings-backdrop {
+  background: var(--people-overlay) !important;
+}
+
+:root[data-people-theme] .people-settings-shell {
+  background: var(--people-night) !important;
+  border-color: var(--people-border) !important;
+}
+
+:root[data-people-theme] .people-settings-nav {
+  background: var(--people-ink) !important;
+  border-color: var(--people-border) !important;
+}
+
+:root[data-people-theme] .people-settings-content,
+:root[data-people-theme] .people-settings-section,
+:root[data-people-theme] .people-settings-profile-card,
+:root[data-people-theme] .people-settings-sound-card,
+:root[data-people-theme] .people-settings-theme-card,
+:root[data-people-theme] .people-settings-custom-color {
+  background: var(--people-deep) !important;
+  border-color: var(--people-border) !important;
+  color: var(--people-text) !important;
+}
+
+:root[data-people-theme] .people-settings-tab,
+:root[data-people-theme] .people-settings-close,
+:root[data-people-theme] .people-settings-secondary {
+  color: var(--people-muted) !important;
+}
+
+:root[data-people-theme] .people-settings-tab:hover,
+:root[data-people-theme] .people-settings-close:hover,
+:root[data-people-theme] .people-settings-secondary:hover {
+  background: var(--people-hover) !important;
+  color: var(--people-text) !important;
+}
+
+:root[data-people-theme] .people-dm-call-overlay {
+  background: var(--people-overlay) !important;
+}
+
+:root[data-people-theme] .people-dm-call-card {
+  border-color: var(--people-accent-border) !important;
+  background: linear-gradient(
+    145deg,
+    var(--people-deep),
+    var(--people-ink)
+  ) !important;
+}
+
+:root[data-people-theme] .people-dm-call-stage {
+  background: radial-gradient(
+    circle at 50% 35%,
+    var(--people-accent-soft),
+    transparent 48%
+  ) !important;
+}
+
+:root[data-people-theme] .people-dm-call-glow {
+  background: var(--people-accent-soft) !important;
+}
+
+:root[data-people-theme] .people-dm-call-incoming-actions,
+:root[data-people-theme] .people-dm-call-outgoing-actions,
+:root[data-people-theme] .people-dm-call-active-actions {
+  background: color-mix(
+    in srgb,
+    var(--people-ink) 88%,
+    transparent
+  ) !important;
+  border-color: var(--people-border) !important;
+}
+
+:root[data-people-theme] .people-dm-call-control {
+  background: var(--people-surface) !important;
+  color: var(--people-text) !important;
+}
+
+:root[data-people-theme] .people-dm-call-control:hover,
+:root[data-people-theme] .people-dm-call-control.active {
+  background: var(--people-accent-soft) !important;
+}
+
+:root[data-people-theme] .people-dm-call-control.danger,
+:root[data-people-theme] .people-message-menu-item.delete:hover,
+:root[data-people-theme] .people-server-context-item.danger:hover {
+  background: var(--people-danger) !important;
+  color: #fff !important;
+}
+
+:root[data-people-theme="light"] .video-stage,
+:root[data-people-theme="light"] .video-tile,
+:root[data-people-theme="light"] .people-dm-call-remote-video,
+:root[data-people-theme="light"] .people-dm-call-local-video {
+  background: #dfe2e7 !important;
+}
+
+:root[data-people-theme="light"] .people-dm-call-identity.with-video {
+  background: rgba(255,255,255,.78) !important;
+}
+
+:root[data-people-theme="light"] .people-dm-call-identity.with-video strong,
+:root[data-people-theme="light"] .people-dm-call-identity.with-video span {
+  color: #202225 !important;
+}
+
+:root[data-people-theme] * {
+  scrollbar-color: var(--people-surface) transparent !important;
+}
+
+:root[data-people-theme] *::-webkit-scrollbar-thumb {
+  background: var(--people-surface) !important;
+  background-clip: padding-box !important;
+}
+
+:root[data-people-theme] *::-webkit-scrollbar-thumb:hover {
+  background: var(--people-hover) !important;
+}
+/* === PEOPLE_APPEARANCE_THEME_V1_END === */
