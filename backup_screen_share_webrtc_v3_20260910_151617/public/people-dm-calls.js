@@ -855,7 +855,11 @@
         );
 
     if (
-      videoTracks.length
+      videoTracks.length &&
+      (
+        call?.remoteCamera ||
+        call?.remoteScreen
+      )
     ) {
       remoteVideo.srcObject =
         new MediaStream(
@@ -1138,14 +1142,6 @@
           localStream
         );
       }
-    }
-
-    let videoTransceiver = peer.getTransceivers().find(transceiver =>
-      transceiver.sender?.track?.kind === "video" ||
-      transceiver.receiver?.track?.kind === "video"
-    );
-    if (!videoTransceiver) {
-      videoTransceiver = peer.addTransceiver("video", { direction: "recvonly" });
     }
 
     remoteStream =
@@ -1671,42 +1667,6 @@
     );
   }
 
-  // === PEOPLE_STREAM_INTEROP_V4_DM_START ===
-  function peopleDmVideoTransceiver(pc = peer) {
-    if (!pc) return null;
-    return pc.getTransceivers().find(transceiver =>
-      transceiver.sender?.track?.kind === "video" ||
-      transceiver.receiver?.track?.kind === "video"
-    ) || null;
-  }
-
-  function peopleDmPreferCompatibleVideoCodec(transceiver) {
-    try {
-      if (!transceiver?.setCodecPreferences || typeof RTCRtpSender?.getCapabilities !== "function") return;
-      const codecs = RTCRtpSender.getCapabilities("video")?.codecs || [];
-      const preferred = [
-        ...codecs.filter(codec => String(codec.mimeType || "").toLowerCase() === "video/vp8"),
-        ...codecs.filter(codec => String(codec.mimeType || "").toLowerCase() !== "video/vp8")
-      ];
-      if (preferred.length) transceiver.setCodecPreferences(preferred);
-    } catch (err) {
-      console.warn("[People appel MP/codec]", err);
-    }
-  }
-
-  async function peopleDmSetOutgoingVideo(track) {
-    const pc = createPeer();
-    let transceiver = peopleDmVideoTransceiver(pc);
-    if (!transceiver) {
-      transceiver = pc.addTransceiver("video", { direction: track ? "sendrecv" : "recvonly" });
-    }
-    peopleDmPreferCompatibleVideoCodec(transceiver);
-    if (transceiver.sender.track !== track) {
-      await transceiver.sender.replaceTrack(track || null);
-    }
-    transceiver.direction = track ? "sendrecv" : "recvonly";
-  }
-
   async function enableCamera() {
     if (
       cameraEnabled
@@ -1756,9 +1716,21 @@
         peer &&
         !screenEnabled
       ) {
-        await peopleDmSetOutgoingVideo(
-          cameraTrack
-        );
+        const sender =
+          findVideoSender(
+            peer
+          );
+
+        if (sender) {
+          await sender.replaceTrack(
+            cameraTrack
+          );
+        } else {
+          peer.addTrack(
+            cameraTrack,
+            localStream
+          );
+        }
       }
 
       cameraTrack.addEventListener(
@@ -1831,9 +1803,25 @@
       oldTrack &&
       !screenEnabled
     ) {
-      await peopleDmSetOutgoingVideo(
-        null
-      );
+      const sender =
+        peer
+          .getSenders()
+          .find(
+            (item) =>
+              item.track ===
+              oldTrack
+          ) ||
+        findVideoSender(
+          peer
+        );
+
+      if (sender) {
+        try {
+          peer.removeTrack(
+            sender
+          );
+        } catch {}
+      }
     }
 
     if (
@@ -1928,11 +1916,26 @@
         { once: true }
       );
 
-      await peopleDmSetOutgoingVideo(
-        screenTrack
-      );
+      const pc = createPeer();
+      const sender =
+        findVideoSender(
+          pc
+        );
 
-      await sendOffer();
+      if (sender) {
+        await sender.replaceTrack(
+          screenTrack
+        );
+      } else {
+        pc.addTrack(
+          screenTrack,
+          new MediaStream(
+            [screenTrack]
+          )
+        );
+
+        await sendOffer();
+      }
 
       syncLocalPreview();
       updateMediaButtons();
@@ -1997,13 +2000,27 @@
       } catch {}
     }
 
-    if (peer) {
-      await peopleDmSetOutgoingVideo(
-        cameraEnabled && cameraTrack
-          ? cameraTrack
-          : null
-      );
-      await sendOffer();
+    if (
+      peer &&
+      oldTrack
+    ) {
+      const sender =
+        peer
+          .getSenders()
+          .find(
+            (item) =>
+              item.track ===
+              oldTrack
+          );
+
+      if (sender) {
+        await sender.replaceTrack(
+          cameraEnabled &&
+          cameraTrack
+            ? cameraTrack
+            : null
+        );
+      }
     }
 
     syncLocalPreview();
@@ -2027,8 +2044,6 @@
       "Appel en cours"
     );
   }
-
-  // === PEOPLE_STREAM_INTEROP_V4_DM_END ===
 
   async function toggleMute() {
     await ensureLocalAudio();

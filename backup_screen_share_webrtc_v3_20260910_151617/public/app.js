@@ -1460,11 +1460,7 @@ function syncVideoTilesWithRoster() {
 
   for (const tile of [...videoGrid.querySelectorAll(".video-tile:not(.local)")]) {
     const peerId = tile.dataset.peerId;
-    const video = tile.querySelector("video");
-    const hasLiveVideo =
-      video?.srcObject instanceof MediaStream &&
-      video.srcObject.getVideoTracks().some(track => track.readyState === "live");
-    if (!videoUsers.has(peerId) && !hasLiveVideo) tile.remove();
+    if (!videoUsers.has(peerId)) tile.remove();
   }
 
   syncVideoStageVisibility();
@@ -1575,12 +1571,8 @@ function attachRemoteMedia(peerId, stream) {
 
     for (const track of videoTracks) {
       track.addEventListener("ended", () => {
-        const video = document.getElementById(`video-${peerId}`)?.querySelector("video");
-        const currentStream = video?.srcObject;
-        const stillCurrent = currentStream instanceof MediaStream && currentStream.getTracks().includes(track);
-        if (!stillCurrent) return;
         const latest = getVoiceUser(peerId);
-        if (!latest?.camera && !latest?.screen) removeVideoTile(peerId, false);
+        if (!latest?.camera) removeVideoTile(peerId, false);
         syncVideoStageVisibility();
       }, { once: true });
     }
@@ -3290,9 +3282,7 @@ function closePeer(peerId) {
   }
 
   const user = getVoiceUser(peerId);
-  if (!user?.camera && !user?.screen) {
-    removeVideoTile(peerId, false);
-  }
+  if (!user?.camera) removeVideoTile(peerId, false);
 }
 
 function closeAllPeers() {
@@ -3331,44 +3321,6 @@ function recoverPeer(peerId) {
   }
 }
 
-// === PEOPLE_STREAM_INTEROP_V4_APP_START ===
-function peoplePreferCompatibleVideoCodec(pc, transceiver) {
-  try {
-    if (!transceiver?.setCodecPreferences || typeof RTCRtpSender?.getCapabilities !== "function") return;
-    const codecs = RTCRtpSender.getCapabilities("video")?.codecs || [];
-    const preferred = [
-      ...codecs.filter(codec => String(codec.mimeType || "").toLowerCase() === "video/vp8"),
-      ...codecs.filter(codec => String(codec.mimeType || "").toLowerCase() !== "video/vp8")
-    ];
-    if (preferred.length) transceiver.setCodecPreferences(preferred);
-  } catch (err) {
-    console.warn("[People stream/codec]", err);
-  }
-}
-
-function peopleFindVideoTransceiver(pc) {
-  if (!pc) return null;
-  return pc.getTransceivers().find(transceiver =>
-    transceiver.sender?.track?.kind === "video" ||
-    transceiver.receiver?.track?.kind === "video"
-  ) || null;
-}
-
-async function peopleSyncOutgoingVideo(pc) {
-  if (!pc) return;
-  const wantedTrack = screenEnabled && screenTrack
-    ? screenTrack
-    : (cameraEnabled && cameraTrack ? cameraTrack : null);
-  let transceiver = peopleFindVideoTransceiver(pc);
-  if (!transceiver) {
-    transceiver = pc.addTransceiver("video", { direction: wantedTrack ? "sendrecv" : "recvonly" });
-  }
-  peoplePreferCompatibleVideoCodec(pc, transceiver);
-  const sender = transceiver.sender;
-  if (sender.track !== wantedTrack) await sender.replaceTrack(wantedTrack || null);
-  transceiver.direction = wantedTrack ? "sendrecv" : "recvonly";
-}
-
 function createPeer(peerId) {
   if (peers.has(peerId)) return peers.get(peerId);
 
@@ -3395,12 +3347,6 @@ function createPeer(peerId) {
     );
   }
 
-  let videoTransceiver = peopleFindVideoTransceiver(pc);
-  if (!videoTransceiver) {
-    videoTransceiver = pc.addTransceiver("video", { direction: "recvonly" });
-  }
-  peoplePreferCompatibleVideoCodec(pc, videoTransceiver);
-
   pc.onicecandidate = (event) => {
     if (!event.candidate) return;
 
@@ -3411,7 +3357,7 @@ function createPeer(peerId) {
   };
 
   pc.ontrack = (event) => {
-    const stream = event.streams?.[0] || (event.track ? new MediaStream([event.track]) : null);
+    const stream = event.streams && event.streams[0];
     if (stream) attachRemoteMedia(peerId, stream);
   };
 
@@ -3459,9 +3405,8 @@ function createPeer(peerId) {
 async function makeOffer(peerId) {
   if (!voiceJoined || !localStream || !peerIsStillInVoice(peerId)) return;
 
+  closePeer(peerId);
   const pc = createPeer(peerId);
-  await peopleSyncOutgoingVideo(pc);
-  if (pc.signalingState !== "stable") return;
 
   const offer = await pc.createOffer({
     offerToReceiveAudio: true,
@@ -3483,14 +3428,8 @@ async function rebuildPeersForMediaChange() {
     .map(user => user.id)
     .filter(peerId => peerId && peerId !== socket.id);
 
-  await Promise.allSettled(peerIds.map(async peerId => {
-    const pc = createPeer(peerId);
-    await peopleSyncOutgoingVideo(pc);
-    await makeOffer(peerId);
-  }));
+  await Promise.allSettled(peerIds.map(peerId => makeOffer(peerId)));
 }
-
-// === PEOPLE_STREAM_INTEROP_V4_APP_END ===
 
 socket.on("voice-peers", async (existingPeers) => {
   /*
@@ -3521,13 +3460,15 @@ socket.on("webrtc-offer", async ({ from, sdp }) => {
   if (!voiceJoined || !from || !sdp) return;
 
   try {
-    const pc = createPeer(from);
-    if (pc.signalingState === "have-local-offer") {
-      try { await pc.setLocalDescription({ type: "rollback" }); } catch {}
+    const queuedBeforeOffer = pendingCandidates.get(from) || [];
+    closePeer(from);
+    if (queuedBeforeOffer.length) {
+      pendingCandidates.set(from, queuedBeforeOffer);
     }
 
+    const pc = createPeer(from);
+
     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-    await peopleSyncOutgoingVideo(pc);
     await flushCandidates(from, pc);
 
     const answer = await pc.createAnswer();
