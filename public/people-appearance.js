@@ -1,9 +1,12 @@
 (() => {
   "use strict";
 
-  // === PEOPLE_APPEARANCE_CLIENT_V2_START ===
-  const STORAGE_KEY = "people-appearance-v2";
-  const LEGACY_STORAGE_KEY = "people-appearance-v1";
+  // === PEOPLE_APPEARANCE_CLIENT_V3_START ===
+  const STORAGE_KEY = "people-appearance-v3";
+  const LEGACY_STORAGE_KEYS = [
+    "people-appearance-v2",
+    "people-appearance-v1"
+  ];
 
   const PRESET_PALETTES = Object.freeze({
     dark: Object.freeze({
@@ -56,6 +59,16 @@
     "accent"
   ]);
 
+  function clone(value) {
+    return {
+      theme: value.theme,
+      palette: {
+        ...value.palette
+      },
+      accent: value.palette.accent
+    };
+  }
+
   function normalizeTheme(value) {
     const theme = String(value || "")
       .trim()
@@ -78,33 +91,18 @@
 
   function normalizePalette(value, legacyAccent) {
     const source =
-      value && typeof value === "object"
+      value && typeof value === "object" && !Array.isArray(value)
         ? value
         : {};
 
     const base = DEFAULT_CUSTOM_PALETTE;
 
     return {
-      background: normalizeHex(
-        source.background,
-        base.background
-      ),
-      panel: normalizeHex(
-        source.panel,
-        base.panel
-      ),
-      secondary: normalizeHex(
-        source.secondary,
-        base.secondary
-      ),
-      text: normalizeHex(
-        source.text,
-        base.text
-      ),
-      accent: normalizeHex(
-        source.accent || legacyAccent,
-        base.accent
-      )
+      background: normalizeHex(source.background, base.background),
+      panel: normalizeHex(source.panel, base.panel),
+      secondary: normalizeHex(source.secondary, base.secondary),
+      text: normalizeHex(source.text, base.text),
+      accent: normalizeHex(source.accent || legacyAccent, base.accent)
     };
   }
 
@@ -123,6 +121,18 @@
     };
   }
 
+  function equal(a, b) {
+    const left = normalize(a);
+    const right = normalize(b);
+
+    return (
+      left.theme === right.theme &&
+      PALETTE_KEYS.every(
+        (key) => left.palette[key] === right.palette[key]
+      )
+    );
+  }
+
   function readStorage(key) {
     try {
       const raw = localStorage.getItem(key);
@@ -132,27 +142,6 @@
     }
   }
 
-  function readLocal() {
-    const modern = readStorage(STORAGE_KEY);
-    if (modern) return normalize(modern);
-
-    const legacy = readStorage(LEGACY_STORAGE_KEY);
-    if (legacy) {
-      const migrated = normalize({
-        theme: legacy.theme,
-        palette: {
-          ...DEFAULT_CUSTOM_PALETTE,
-          accent: legacy.accent
-        }
-      });
-
-      writeLocal(migrated);
-      return migrated;
-    }
-
-    return normalize(DEFAULT_APPEARANCE);
-  }
-
   function writeLocal(value) {
     try {
       localStorage.setItem(
@@ -160,6 +149,30 @@
         JSON.stringify(normalize(value))
       );
     } catch {}
+  }
+
+  function migrateLocal() {
+    const modern = readStorage(STORAGE_KEY);
+    if (modern) return normalize(modern);
+
+    for (const key of LEGACY_STORAGE_KEYS) {
+      const legacy = readStorage(key);
+      if (!legacy) continue;
+
+      const migrated = normalize({
+        theme: legacy.theme,
+        palette: legacy.palette || {
+          ...DEFAULT_CUSTOM_PALETTE,
+          accent: legacy.accent
+        },
+        accent: legacy.accent
+      });
+
+      writeLocal(migrated);
+      return migrated;
+    }
+
+    return normalize(DEFAULT_APPEARANCE);
   }
 
   function hexToRgb(hex) {
@@ -243,22 +256,45 @@
     };
   }
 
-  let current = readLocal();
+  let committed = migrateLocal();
+  let active = normalize(committed);
+  let activeRevision = 0;
+  let syncSerial = 0;
+  let saveSerial = 0;
+  let saveQueue = Promise.resolve();
 
-  function apply(appearance, options = {}) {
-    current = normalize(appearance);
+  function dispatchChange(source) {
+    const palette = paletteFor(active);
 
-    const resolved = resolvedTheme(current.theme);
-    const palette = paletteFor(current);
+    window.dispatchEvent(
+      new CustomEvent("people-appearance-changed", {
+        detail: {
+          ...clone(active),
+          activePalette: palette,
+          resolvedTheme: resolvedTheme(active.theme),
+          dirty: !equal(active, committed),
+          source
+        }
+      })
+    );
+  }
+
+  function render(value, options = {}) {
+    active = normalize(value);
+
+    const resolved = resolvedTheme(active.theme);
+    const palette = paletteFor(active);
     const root = document.documentElement;
     const lightSurface = luminance(palette.background) > 0.48;
 
     root.dataset.peopleTheme =
-      current.theme === "custom"
+      active.theme === "custom"
         ? "custom"
         : resolved;
 
-    root.dataset.peopleThemeChoice = current.theme;
+    root.dataset.peopleThemeChoice = active.theme;
+    root.dataset.peopleAppearanceDirty =
+      equal(active, committed) ? "false" : "true";
     root.style.colorScheme = lightSurface ? "light" : "dark";
 
     const surfaceMixTarget = lightSurface ? "#000000" : "#FFFFFF";
@@ -296,7 +332,10 @@
       "--people-overlay",
       rgba(palette.secondary, lightSurface ? 0.42 : 0.84)
     );
-    root.style.setProperty("--people-danger", lightSurface ? "#C73942" : "#DA4B55");
+    root.style.setProperty(
+      "--people-danger",
+      lightSurface ? "#C73942" : "#DA4B55"
+    );
 
     root.style.setProperty("--people-accent", palette.accent);
     root.style.setProperty(
@@ -320,34 +359,60 @@
       rgba(palette.accent, lightSurface ? 0.34 : 0.40)
     );
 
-    if (options.local !== false) {
-      writeLocal(current);
+    if (options.bumpRevision !== false) {
+      activeRevision += 1;
     }
 
-    window.dispatchEvent(
-      new CustomEvent("people-appearance-changed", {
-        detail: {
-          ...current,
-          accent: palette.accent,
-          activePalette: palette,
-          resolvedTheme: resolved
-        }
-      })
-    );
+    if (options.persist === true) {
+      committed = normalize(active);
+      writeLocal(committed);
+      root.dataset.peopleAppearanceDirty = "false";
+    }
 
-    return {
-      ...current,
-      accent: current.palette.accent
-    };
+    if (options.dispatch !== false) {
+      dispatchChange(options.source || "apply");
+    }
+
+    return clone(active);
+  }
+
+  function preview(value) {
+    return render(value, {
+      persist: false,
+      source: "preview"
+    });
+  }
+
+  // Backward-compatible helper. It now behaves as a preview by default so
+  // unsaved values are never silently persisted. Pass { persist: true } only
+  // for trusted, already-confirmed data.
+  function apply(value, options = {}) {
+    return render(value, {
+      persist: options.persist === true || options.local === true,
+      bumpRevision: options.bumpRevision,
+      dispatch: options.dispatch,
+      source: options.source || "apply"
+    });
+  }
+
+  function discard() {
+    return render(committed, {
+      persist: false,
+      source: "discard"
+    });
   }
 
   async function syncFromServer() {
+    const serial = ++syncSerial;
+    const revisionAtStart = activeRevision;
+
     const response = await fetch("/api/settings/appearance", {
-      credentials: "same-origin"
+      credentials: "same-origin",
+      cache: "no-store"
     });
 
     if (response.status === 401) {
-      return { ...current };
+      return clone(active);
     }
 
     const data = await response.json().catch(() => ({}));
@@ -358,56 +423,114 @@
       );
     }
 
-    return apply(data.appearance);
-  }
-
-  async function save(appearance) {
-    const clean = apply(appearance);
-
-    const response = await fetch("/api/settings/appearance", {
-      method: "PUT",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        theme: clean.theme,
-        palette: clean.palette,
-        accent: clean.palette.accent
-      })
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok || data?.ok === false) {
-      throw new Error(
-        data?.error || "Impossible d'enregistrer l'apparence."
-      );
+    if (serial !== syncSerial) {
+      return clone(active);
     }
 
-    return apply(data.appearance || clean);
+    const confirmed = normalize(data.appearance);
+    committed = confirmed;
+    writeLocal(committed);
+
+    // Never overwrite a preview the user started while the GET was pending.
+    if (revisionAtStart === activeRevision) {
+      return render(committed, {
+        persist: false,
+        bumpRevision: false,
+        source: "sync"
+      });
+    }
+
+    document.documentElement.dataset.peopleAppearanceDirty =
+      equal(active, committed) ? "false" : "true";
+    dispatchChange("sync-background");
+    return clone(active);
+  }
+
+  function save(value) {
+    const wanted = normalize(value);
+    const serial = ++saveSerial;
+
+    // Serialize writes. Even if another caller invokes save twice quickly,
+    // the server always receives them in the same order as the UI.
+    const operation = saveQueue.then(async () => {
+      const response = await fetch("/api/settings/appearance", {
+        method: "PUT",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          theme: wanted.theme,
+          palette: wanted.palette,
+          accent: wanted.palette.accent
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data?.ok === false) {
+        throw new Error(
+          data?.error || "Impossible d'enregistrer l'apparence."
+        );
+      }
+
+      const confirmed = normalize(data.appearance || wanted);
+
+      // A newer queued save owns the final visual state. We still update the
+      // confirmed snapshot here; the newer operation will replace it after.
+      committed = confirmed;
+      writeLocal(committed);
+
+      if (serial === saveSerial) {
+        return render(committed, {
+          persist: false,
+          source: "save"
+        });
+      }
+
+      return clone(active);
+    });
+
+    saveQueue = operation.catch(() => {});
+
+    return operation.catch((err) => {
+      if (serial === saveSerial) {
+        render(committed, {
+          persist: false,
+          source: "save-error"
+        });
+      }
+      throw err;
+    });
   }
 
   function get() {
-    return {
-      ...current,
-      palette: {
-        ...current.palette
-      },
-      accent: current.palette.accent
-    };
+    return clone(active);
+  }
+
+  function getSaved() {
+    return clone(committed);
+  }
+
+  function isDirty() {
+    return !equal(active, committed);
   }
 
   function getActivePalette() {
     return {
-      ...paletteFor(current)
+      ...paletteFor(active)
     };
   }
 
   window.PeopleAppearance = {
     get,
+    getSaved,
     getActivePalette,
+    isDirty,
+    preview,
     apply,
+    discard,
     save,
     syncFromServer,
     presets: PRESET_PALETTES,
@@ -426,7 +549,12 @@
     }
   };
 
-  apply(current, { local: false });
+  render(active, {
+    persist: false,
+    bumpRevision: false,
+    dispatch: false,
+    source: "boot"
+  });
 
   window.addEventListener("people-authenticated", () => {
     void syncFromServer().catch((err) => {
@@ -439,9 +567,13 @@
   );
 
   systemScheme?.addEventListener?.("change", () => {
-    if (current.theme === "system") {
-      apply(current, { local: false });
+    if (active.theme === "system") {
+      render(active, {
+        persist: false,
+        bumpRevision: false,
+        source: "system-theme"
+      });
     }
   });
-  // === PEOPLE_APPEARANCE_CLIENT_V2_END ===
+  // === PEOPLE_APPEARANCE_CLIENT_V3_END ===
 })();

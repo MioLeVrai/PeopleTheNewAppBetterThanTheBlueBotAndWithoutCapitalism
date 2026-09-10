@@ -1214,3 +1214,20 @@
   }
 }
 /* === PEOPLE_SETTINGS_APPEARANCE_V2_END === */
+
+/* === PEOPLE_SETTINGS_APPEARANCE_V3_START === */
+@media (max-width: 690px) {
+  .people-settings-page[data-settings-page="appearance"] .people-settings-actions {
+    flex-wrap: wrap;
+  }
+
+  .people-settings-page[data-settings-page="appearance"] .people-settings-status {
+    flex: 1 0 100%;
+    margin-right: 0;
+  }
+
+  .people-settings-page[data-settings-page="appearance"] .people-settings-actions button {
+    flex: 1 1 0;
+  }
+}
+/* === PEOPLE_SETTINGS_APPEARANCE_V3_END === */

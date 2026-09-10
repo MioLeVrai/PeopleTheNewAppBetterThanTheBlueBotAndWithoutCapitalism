@@ -1170,7 +1170,7 @@
             <span>PERSONNALISATION</span>
             <h2>Apparence</h2>
             <p>
-              Utilise un préréglage ou crée ta propre palette avec 5 couleurs exactes. Ces réglages suivent ton compte.
+              Prévisualise ton thème en direct, puis enregistre seulement quand le résultat te plaît. Tes réglages suivent ton compte.
             </p>
           </div>
 
@@ -1183,7 +1183,7 @@
               <div>
                 <strong>Préréglages</strong>
                 <span>
-                  Choisis une base prête à l'emploi. Ta palette personnalisée reste enregistrée à côté.
+                  Choisis une base. Rien n'est envoyé au serveur tant que tu n'appuies pas sur Enregistrer.
                 </span>
               </div>
             </div>
@@ -1264,7 +1264,7 @@
               <div>
                 <strong>Palette personnalisée</strong>
                 <span>
-                  Modifie une couleur pour passer automatiquement en mode personnalisé.
+                  Modifie une couleur pour passer en mode personnalisé. Tu peux annuler tous les changements avant de sauvegarder.
                 </span>
               </div>
 
@@ -1369,11 +1369,29 @@
               ></span>
 
               <button
+                id="peopleSettingsAppearanceCancel"
+                class="people-settings-secondary"
+                type="button"
+                disabled
+              >
+                Annuler
+              </button>
+
+              <button
                 id="peopleSettingsAppearanceReset"
                 class="people-settings-secondary"
                 type="button"
               >
-                Réinitialiser tout
+                Valeurs par défaut
+              </button>
+
+              <button
+                id="peopleSettingsAppearanceSave"
+                class="people-settings-primary"
+                type="button"
+                disabled
+              >
+                Enregistrer
               </button>
             </div>
           </div>
@@ -1580,6 +1598,16 @@
       "peopleSettingsAppearanceReset"
     );
 
+  const appearanceCancel =
+    document.getElementById(
+      "peopleSettingsAppearanceCancel"
+    );
+
+  const appearanceSave =
+    document.getElementById(
+      "peopleSettingsAppearanceSave"
+    );
+
   const ringtones =
     document.getElementById(
       "peopleSettingsRingtones"
@@ -1691,7 +1719,7 @@
   );
 
   // ==========================================================
-  // APPARENCE
+  // APPARENCE — V3 : brouillon local + sauvegarde explicite
   // ==========================================================
 
   const PEOPLE_SETTINGS_PALETTE_KEYS = [
@@ -1701,6 +1729,22 @@
     "text",
     "accent"
   ];
+
+  let appearanceDraft = null;
+  let appearanceSaving = false;
+
+  function cloneAppearance(value) {
+    const fallback = appearanceDefaults();
+    const source = value?.palette ? value : fallback;
+
+    return {
+      theme: String(source.theme || fallback.theme),
+      palette: {
+        ...fallback.palette,
+        ...(source.palette || {})
+      }
+    };
+  }
 
   function setAppearanceStatus(
     text,
@@ -1758,37 +1802,49 @@
     };
   }
 
-  function appearanceValue() {
-    const current =
+  function savedAppearanceValue() {
+    const saved =
+      window.PeopleAppearance
+        ?.getSaved?.() ||
       window.PeopleAppearance
         ?.get?.();
 
-    if (current?.palette) {
-      return {
-        ...current,
-        palette: {
-          ...current.palette
-        }
-      };
-    }
-
-    return appearanceDefaults();
+    return cloneAppearance(saved);
   }
 
-  function appearanceActivePalette() {
-    const active =
-      window.PeopleAppearance
-        ?.getActivePalette?.();
-
-    if (active) {
-      return {
-        ...active
-      };
+  function appearanceValue() {
+    if (appearanceDraft) {
+      return cloneAppearance(
+        appearanceDraft
+      );
     }
 
-    return {
-      ...appearanceValue().palette
-    };
+    return cloneAppearance(
+      window.PeopleAppearance
+        ?.get?.() ||
+      appearanceDefaults()
+    );
+  }
+
+  function appearanceEqual(left, right) {
+    const a = cloneAppearance(left);
+    const b = cloneAppearance(right);
+
+    return (
+      a.theme === b.theme &&
+      PEOPLE_SETTINGS_PALETTE_KEYS.every(
+        (key) =>
+          a.palette[key] ===
+          b.palette[key]
+      )
+    );
+  }
+
+  function appearanceIsDirty() {
+    return !appearanceEqual(
+      appearanceValue(),
+      savedAppearanceValue()
+    );
   }
 
   function appearanceHexToRgb(hex) {
@@ -1854,29 +1910,38 @@
       return;
     }
 
-    appearancePalettePreview.style.setProperty(
-      "--palette-background",
-      palette.background
-    );
-    appearancePalettePreview.style.setProperty(
-      "--palette-panel",
-      palette.panel
-    );
-    appearancePalettePreview.style.setProperty(
-      "--palette-secondary",
-      palette.secondary
-    );
-    appearancePalettePreview.style.setProperty(
-      "--palette-text",
-      palette.text
-    );
-    appearancePalettePreview.style.setProperty(
-      "--palette-accent",
-      palette.accent
-    );
+    for (const key of PEOPLE_SETTINGS_PALETTE_KEYS) {
+      appearancePalettePreview.style.setProperty(
+        `--palette-${key}`,
+        palette[key]
+      );
+    }
   }
 
-  function updateAppearanceControls() {
+  function setAppearanceButtons() {
+    const dirty = appearanceIsDirty();
+
+    if (appearanceSave) {
+      appearanceSave.disabled =
+        appearanceSaving || !dirty;
+      appearanceSave.textContent =
+        appearanceSaving
+          ? "Enregistrement…"
+          : "Enregistrer";
+    }
+
+    if (appearanceCancel) {
+      appearanceCancel.disabled =
+        appearanceSaving || !dirty;
+    }
+
+    if (appearanceReset) {
+      appearanceReset.disabled =
+        appearanceSaving;
+    }
+  }
+
+  function updateAppearanceControls(options = {}) {
     const appearance =
       appearanceValue();
 
@@ -1887,11 +1952,18 @@
           "[data-appearance-theme]"
         ) || []
     ) {
-      card.classList.toggle(
-        "selected",
+      const selected =
         card.dataset
           .appearanceTheme ===
-          appearance.theme
+        appearance.theme;
+
+      card.classList.toggle(
+        "selected",
+        selected
+      );
+      card.setAttribute(
+        "aria-pressed",
+        selected ? "true" : "false"
       );
     }
 
@@ -1906,7 +1978,7 @@
       appearanceCustomBadge.textContent =
         appearance.theme === "custom"
           ? "Personnalisé actif"
-          : "Personnalisé";
+          : "Palette mémorisée";
     }
 
     const palette = {
@@ -1922,82 +1994,121 @@
         );
 
     if (customPreview) {
-      customPreview.style.setProperty(
-        "--custom-background",
-        palette.background
-      );
-      customPreview.style.setProperty(
-        "--custom-panel",
-        palette.panel
-      );
-      customPreview.style.setProperty(
-        "--custom-secondary",
-        palette.secondary
-      );
-      customPreview.style.setProperty(
-        "--custom-text",
-        palette.text
-      );
-      customPreview.style.setProperty(
-        "--custom-accent",
-        palette.accent
-      );
+      for (const key of PEOPLE_SETTINGS_PALETTE_KEYS) {
+        customPreview.style.setProperty(
+          `--custom-${key}`,
+          palette[key]
+        );
+      }
     }
 
-    for (const key of PEOPLE_SETTINGS_PALETTE_KEYS) {
-      const row =
-        appearancePaletteEditor
-          ?.querySelector(
-            `[data-palette-key="${key}"]`
+    if (options.skipInputs !== true) {
+      for (const key of PEOPLE_SETTINGS_PALETTE_KEYS) {
+        const row =
+          appearancePaletteEditor
+            ?.querySelector(
+              `[data-palette-key="${key}"]`
+            );
+
+        if (!row) continue;
+
+        const color =
+          String(palette[key] || "#000000")
+            .toUpperCase();
+        const rgb = appearanceHexToRgb(color);
+
+        const picker =
+          row.querySelector(
+            `[data-palette-picker="${key}"]`
+          );
+        const hexInput =
+          row.querySelector(
+            `[data-palette-hex="${key}"]`
+          );
+        const rgbWrap =
+          row.querySelector(
+            `[data-palette-rgb="${key}"]`
           );
 
-      if (!row) continue;
+        if (picker) picker.value = color;
+        if (hexInput) hexInput.value = color;
 
-      const color =
-        String(palette[key] || "#000000")
-          .toUpperCase();
-      const rgb = appearanceHexToRgb(color);
-
-      const picker =
-        row.querySelector(
-          `[data-palette-picker="${key}"]`
-        );
-      const hexInput =
-        row.querySelector(
-          `[data-palette-hex="${key}"]`
-        );
-      const rgbWrap =
-        row.querySelector(
-          `[data-palette-rgb="${key}"]`
-        );
-
-      if (picker) picker.value = color;
-      if (hexInput) hexInput.value = color;
-
-      if (rgbWrap) {
-        for (
-          const input of
-          rgbWrap.querySelectorAll(
-            "[data-rgb-channel]"
-          )
-        ) {
-          const channel =
-            input.dataset.rgbChannel;
-          input.value =
-            String(rgb[channel] ?? 0);
+        if (rgbWrap) {
+          for (
+            const input of
+            rgbWrap.querySelectorAll(
+              "[data-rgb-channel]"
+            )
+          ) {
+            const channel =
+              input.dataset.rgbChannel;
+            input.value =
+              String(rgb[channel] ?? 0);
+          }
         }
       }
     }
+
+    setAppearanceButtons();
   }
 
-  async function saveAppearance(
-    next,
-    successText = "Apparence enregistrée ✓"
-  ) {
+  function previewAppearance(next, options = {}) {
+    appearanceDraft =
+      cloneAppearance(next);
+
+    window.PeopleAppearance
+      ?.preview?.(
+        appearanceDraft
+      );
+
+    updateAppearanceControls({
+      skipInputs:
+        options.skipInputs === true
+    });
+
+    if (options.status !== false) {
+      setAppearanceStatus(
+        "Aperçu local — pense à enregistrer."
+      );
+    }
+
+    return cloneAppearance(
+      appearanceDraft
+    );
+  }
+
+  function discardAppearanceDraft(options = {}) {
+    const hadDraft =
+      appearanceDraft != null &&
+      appearanceIsDirty();
+
+    appearanceDraft =
+      savedAppearanceValue();
+
+    window.PeopleAppearance
+      ?.discard?.();
+
+    updateAppearanceControls();
+
     if (
-      !window.PeopleAppearance
-        ?.save
+      hadDraft &&
+      options.status !== false
     ) {
+      setAppearanceStatus(
+        "Modifications annulées."
+      );
+    }
+  }
+
+  async function saveAppearanceDraft() {
+    if (
+      appearanceSaving ||
+      !appearanceIsDirty()
+    ) {
+      return;
+    }
+
+    if (!window.PeopleAppearance?.save) {
       setAppearanceStatus(
         "Module d'apparence indisponible.",
         "error"
@@ -2005,88 +2116,67 @@
       return;
     }
 
+    appearanceSaving = true;
+    setAppearanceButtons();
     setAppearanceStatus(
       "Enregistrement…"
     );
 
+    const wanted =
+      cloneAppearance(
+        appearanceDraft ||
+        appearanceValue()
+      );
+
     try {
-      await window.PeopleAppearance
-        .save(next);
+      const saved =
+        await window.PeopleAppearance
+          .save(wanted);
+
+      appearanceDraft =
+        cloneAppearance(saved);
 
       updateAppearanceControls();
-
       setAppearanceStatus(
-        successText,
+        "Apparence enregistrée ✓",
         "success"
       );
     } catch (err) {
-      updateAppearanceControls();
+      appearanceDraft =
+        savedAppearanceValue();
 
+      updateAppearanceControls();
       setAppearanceStatus(
         err?.message ||
-        "Impossible d'enregistrer l'apparence.",
+        "Impossible d'enregistrer l'apparence. Les changements ont été annulés.",
         "error"
       );
+    } finally {
+      appearanceSaving = false;
+      setAppearanceButtons();
     }
   }
 
   async function loadAppearance() {
-    updateAppearanceControls();
     setAppearanceStatus("");
 
     try {
       await window.PeopleAppearance
         ?.syncFromServer?.();
 
+      appearanceDraft =
+        savedAppearanceValue();
       updateAppearanceControls();
     } catch (err) {
+      appearanceDraft =
+        savedAppearanceValue();
+      updateAppearanceControls();
       setAppearanceStatus(
         err?.message ||
         "La synchronisation du thème a échoué.",
         "error"
       );
     }
-  }
-
-  function paletteBaseForEdit() {
-    return {
-      ...appearanceValue().palette
-    };
-  }
-
-  function applyPaletteColor(
-    key,
-    color,
-    options = {}
-  ) {
-    if (
-      !PEOPLE_SETTINGS_PALETTE_KEYS
-        .includes(key) ||
-      !appearanceValidHex(color)
-    ) {
-      return null;
-    }
-
-    const next = {
-      theme: "custom",
-      palette: {
-        ...paletteBaseForEdit(),
-        [key]: String(color)
-          .trim()
-          .toUpperCase()
-      }
-    };
-
-    window.PeopleAppearance
-      ?.apply?.(next);
-
-    if (options.status !== false) {
-      setAppearanceStatus(
-        "Aperçu personnalisé — relâche pour enregistrer"
-      );
-    }
-
-    return next;
   }
 
   function paletteColorFromTarget(target) {
@@ -2162,10 +2252,34 @@
     return null;
   }
 
+  function previewPaletteColor(key, color, options = {}) {
+    if (
+      !PEOPLE_SETTINGS_PALETTE_KEYS.includes(key) ||
+      !appearanceValidHex(color)
+    ) {
+      return null;
+    }
+
+    const base = appearanceValue();
+    const next = {
+      theme: "custom",
+      palette: {
+        ...base.palette,
+        [key]: String(color)
+          .trim()
+          .toUpperCase()
+      }
+    };
+
+    return previewAppearance(next, options);
+  }
+
   appearanceThemes
     ?.addEventListener(
       "click",
       (event) => {
+        if (appearanceSaving) return;
+
         const target =
           event.target instanceof Element
             ? event.target.closest(
@@ -2177,7 +2291,6 @@
 
         const current =
           appearanceValue();
-
         const next = {
           ...current,
           theme:
@@ -2188,15 +2301,7 @@
           }
         };
 
-        window.PeopleAppearance
-          ?.apply?.(next);
-
-        updateAppearanceControls();
-
-        void saveAppearance(
-          next,
-          "Préréglage enregistré ✓"
-        );
+        previewAppearance(next);
       }
     );
 
@@ -2204,6 +2309,8 @@
     ?.addEventListener(
       "input",
       (event) => {
+        if (appearanceSaving) return;
+
         const target =
           event.target instanceof HTMLInputElement
             ? event.target
@@ -2216,7 +2323,7 @@
 
           if (!appearanceValidHex(target.value)) {
             setAppearanceStatus(
-              "Entre une couleur HEX complète, par exemple #12ABEF."
+              "Couleur HEX incomplète — exemple : #12ABEF."
             );
             return;
           }
@@ -2227,10 +2334,29 @@
 
         if (!value) return;
 
-        applyPaletteColor(
+        previewPaletteColor(
           value.key,
-          value.color
+          value.color,
+          { skipInputs: true }
         );
+
+        // Synchronise uniquement les autres représentations de la même
+        // couleur sans casser la saisie en cours.
+        const row = target.closest("[data-palette-key]");
+        if (row) {
+          const color = value.color.toUpperCase();
+          const rgb = appearanceHexToRgb(color);
+          const picker = row.querySelector("[data-palette-picker]");
+          const hex = row.querySelector("[data-palette-hex]");
+
+          if (picker && picker !== target) picker.value = color;
+          if (hex && hex !== target) hex.value = color;
+
+          for (const input of row.querySelectorAll("[data-rgb-channel]")) {
+            if (input === target) continue;
+            input.value = String(rgb[input.dataset.rgbChannel] ?? 0);
+          }
+        }
       }
     );
 
@@ -2238,6 +2364,8 @@
     ?.addEventListener(
       "change",
       (event) => {
+        if (appearanceSaving) return;
+
         const target =
           event.target instanceof HTMLInputElement
             ? event.target
@@ -2257,19 +2385,13 @@
           return;
         }
 
-        const next = applyPaletteColor(
+        previewPaletteColor(
           value.key,
           value.color,
-          {
-            status: false
-          }
+          { status: false }
         );
-
-        if (!next) return;
-
-        void saveAppearance(
-          next,
-          "Palette personnalisée enregistrée ✓"
+        setAppearanceStatus(
+          "Aperçu local — pense à enregistrer."
         );
       }
     );
@@ -2278,25 +2400,53 @@
     ?.addEventListener(
       "click",
       () => {
-        const next =
-          appearanceDefaults();
+        if (appearanceSaving) return;
 
-        window.PeopleAppearance
-          ?.apply?.(next);
-
-        updateAppearanceControls();
-
-        void saveAppearance(
-          next,
-          "Apparence réinitialisée ✓"
+        previewAppearance(
+          appearanceDefaults()
         );
+        setAppearanceStatus(
+          "Valeurs par défaut prévisualisées — clique sur Enregistrer pour confirmer."
+        );
+      }
+    );
+
+  appearanceCancel
+    ?.addEventListener(
+      "click",
+      () => {
+        if (appearanceSaving) return;
+        discardAppearanceDraft();
+      }
+    );
+
+  appearanceSave
+    ?.addEventListener(
+      "click",
+      () => {
+        void saveAppearanceDraft();
       }
     );
 
   window.addEventListener(
     "people-appearance-changed",
-    updateAppearanceControls
-  );  function activateTab(
+    (event) => {
+      const source = event?.detail?.source;
+
+      // Les previews sont déjà pilotées par ce panneau. Les autres sources
+      // (sync, save, système) peuvent rafraîchir les contrôles.
+      if (source === "preview") return;
+
+      if (!appearanceIsDirty()) {
+        appearanceDraft =
+          savedAppearanceValue();
+      }
+
+      updateAppearanceControls();
+    }
+  );
+
+  function activateTab(
     name
   ) {
     for (
@@ -2366,6 +2516,16 @@
   );
 
   function closeSettings() {
+    if (
+      appearanceDraft != null &&
+      appearanceIsDirty() &&
+      !appearanceSaving
+    ) {
+      discardAppearanceDraft({
+        status: false
+      });
+    }
+
     modal.classList.add(
       "hidden"
     );

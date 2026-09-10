@@ -177,7 +177,9 @@
 :root[data-people-theme] .people-server-form input,
 :root[data-people-theme] .people-settings-section textarea,
 :root[data-people-theme] .people-settings-device-field select,
-:root[data-people-theme] .people-settings-custom-color input[type="text"] {
+:root[data-people-theme] .people-settings-hex-input,
+:root[data-people-theme] .people-settings-rgb-input,
+:root[data-people-theme] .people-settings-palette-row input[type="color"] {
   background: var(--people-input) !important;
   color: var(--people-text) !important;
   border-color: var(--people-border) !important;
@@ -189,7 +191,10 @@
 :root[data-people-theme] .profile-edit-wrap textarea:focus,
 :root[data-people-theme] .people-server-form input:focus,
 :root[data-people-theme] .people-settings-section textarea:focus,
-:root[data-people-theme] .people-settings-device-field select:focus {
+:root[data-people-theme] .people-settings-device-field select:focus,
+:root[data-people-theme] .people-settings-hex-input:focus,
+:root[data-people-theme] .people-settings-rgb-input:focus,
+:root[data-people-theme] .people-settings-palette-row input[type="color"]:focus-visible {
   border-color: var(--people-accent-light) !important;
   box-shadow: 0 0 0 2px var(--people-accent-faint) !important;
 }
@@ -248,7 +253,8 @@
 :root[data-people-theme] .people-settings-profile-card,
 :root[data-people-theme] .people-settings-sound-card,
 :root[data-people-theme] .people-settings-theme-card,
-:root[data-people-theme] .people-settings-custom-color {
+:root[data-people-theme] .people-settings-palette-editor,
+:root[data-people-theme] .people-settings-palette-row {
   background: var(--people-deep) !important;
   border-color: var(--people-border) !important;
   color: var(--people-text) !important;

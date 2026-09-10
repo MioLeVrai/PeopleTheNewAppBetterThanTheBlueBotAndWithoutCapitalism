@@ -2965,24 +2965,6 @@ async function disableCamera({ trackAlreadyEnded = false } = {}) {
   }
 }
 
-async function peopleCapScreenTrack720p30(track) {
-  if (!track || typeof track.applyConstraints !== "function") {
-    return;
-  }
-
-  try {
-    await track.applyConstraints({
-      width: { ideal: 1280, max: 1280 },
-      height: { ideal: 720, max: 720 },
-      frameRate: { ideal: 30, max: 30 }
-    });
-  } catch (err) {
-    console.warn(
-      "[People partage ecran 720p30] Impossible d'appliquer toutes les contraintes :",
-      err
-    );
-  }
-}
 async function enableScreenShare() {
   if (screenEnabled) return;
 
@@ -3009,7 +2991,7 @@ async function enableScreenShare() {
         video: {
           frameRate: {
             ideal: 30,
-            max: 30
+            max: 60
           }
         },
         audio: false
@@ -3023,8 +3005,6 @@ async function enableScreenShare() {
         "Aucun écran sélectionné."
       );
     }
-
-    await peopleCapScreenTrack720p30(track);
 
     screenTrack = track;
     screenEnabled = true;
