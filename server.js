@@ -1770,17 +1770,37 @@ async function peopleUpdateDescription(accountId, description) {
 }
 
 
-// === PEOPLE_APPEARANCE_V1_START ===
+// === PEOPLE_APPEARANCE_V2_START ===
 const PEOPLE_APPEARANCE_THEMES = new Set([
   "dark",
   "midnight",
   "light",
-  "system"
+  "system",
+  "custom"
+]);
+
+const PEOPLE_DEFAULT_APPEARANCE_PALETTE = Object.freeze({
+  background: "#100E1A",
+  panel: "#181524",
+  secondary: "#090811",
+  text: "#F2EFF8",
+  accent: "#67589D"
+});
+
+const PEOPLE_APPEARANCE_PALETTE_KEYS = Object.freeze([
+  "background",
+  "panel",
+  "secondary",
+  "text",
+  "accent"
 ]);
 
 const PEOPLE_DEFAULT_APPEARANCE = {
   theme: "dark",
-  accent: "#67589D"
+  accent: PEOPLE_DEFAULT_APPEARANCE_PALETTE.accent,
+  palette: {
+    ...PEOPLE_DEFAULT_APPEARANCE_PALETTE
+  }
 };
 
 function peopleNormalizeAppearanceTheme(value) {
@@ -1793,26 +1813,82 @@ function peopleNormalizeAppearanceTheme(value) {
     : PEOPLE_DEFAULT_APPEARANCE.theme;
 }
 
-function peopleNormalizeAppearanceAccent(value) {
-  const accent = String(value || "")
+function peopleNormalizeAppearanceHex(value, fallback) {
+  const color = String(value || "")
     .trim()
     .toUpperCase();
 
-  return /^#[0-9A-F]{6}$/.test(accent)
-    ? accent
-    : PEOPLE_DEFAULT_APPEARANCE.accent;
+  return /^#[0-9A-F]{6}$/.test(color)
+    ? color
+    : fallback;
+}
+
+function peopleReadAppearancePalette(value) {
+  if (!value) return null;
+
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function peopleNormalizeAppearancePalette(value, legacyAccent) {
+  const source = peopleReadAppearancePalette(value) || {};
+  const base = PEOPLE_DEFAULT_APPEARANCE_PALETTE;
+
+  return {
+    background: peopleNormalizeAppearanceHex(
+      source.background,
+      base.background
+    ),
+    panel: peopleNormalizeAppearanceHex(
+      source.panel,
+      base.panel
+    ),
+    secondary: peopleNormalizeAppearanceHex(
+      source.secondary,
+      base.secondary
+    ),
+    text: peopleNormalizeAppearanceHex(
+      source.text,
+      base.text
+    ),
+    accent: peopleNormalizeAppearanceHex(
+      source.accent || legacyAccent,
+      base.accent
+    )
+  };
 }
 
 function peopleAppearanceFromAccount(account) {
+  const legacyAccent = peopleNormalizeAppearanceHex(
+    account?.appearance_accent || account?.appearanceAccent,
+    PEOPLE_DEFAULT_APPEARANCE_PALETTE.accent
+  );
+
+  const palette = peopleNormalizeAppearancePalette(
+    account?.appearance_palette || account?.appearancePalette,
+    legacyAccent
+  );
+
   return {
     theme: peopleNormalizeAppearanceTheme(
-      account?.appearance_theme ||
-      account?.appearanceTheme
+      account?.appearance_theme || account?.appearanceTheme
     ),
-    accent: peopleNormalizeAppearanceAccent(
-      account?.appearance_accent ||
-      account?.appearanceAccent
-    )
+    accent: palette.accent,
+    palette
   };
 }
 
@@ -1821,7 +1897,7 @@ async function peopleGetAppearance(accountId) {
 
   if (peoplePool) {
     const result = await peoplePool.query(
-      "SELECT appearance_theme, appearance_accent " +
+      "SELECT appearance_theme, appearance_accent, appearance_palette " +
       "FROM people_accounts WHERE id = $1 LIMIT 1",
       [wanted]
     );
@@ -1843,19 +1919,23 @@ async function peopleGetAppearance(accountId) {
 async function peopleUpdateAppearance(
   accountId,
   theme,
-  accent
+  appearanceValue = {}
 ) {
   const wanted = String(accountId || "");
   const cleanTheme = peopleNormalizeAppearanceTheme(theme);
-  const cleanAccent = peopleNormalizeAppearanceAccent(accent);
+  const cleanPalette = peopleNormalizeAppearancePalette(
+    appearanceValue?.palette,
+    appearanceValue?.accent
+  );
+  const paletteJson = JSON.stringify(cleanPalette);
 
   if (peoplePool) {
     const result = await peoplePool.query(
       "UPDATE people_accounts " +
-      "SET appearance_theme = $1, appearance_accent = $2 " +
-      "WHERE id = $3 " +
-      "RETURNING appearance_theme, appearance_accent",
-      [cleanTheme, cleanAccent, wanted]
+      "SET appearance_theme = $1, appearance_accent = $2, appearance_palette = $3 " +
+      "WHERE id = $4 " +
+      "RETURNING appearance_theme, appearance_accent, appearance_palette",
+      [cleanTheme, cleanPalette.accent, paletteJson, wanted]
     );
 
     return result.rows[0]
@@ -1871,12 +1951,13 @@ async function peopleUpdateAppearance(
   if (!account) return null;
 
   account.appearance_theme = cleanTheme;
-  account.appearance_accent = cleanAccent;
+  account.appearance_accent = cleanPalette.accent;
+  account.appearance_palette = cleanPalette;
   peopleWriteLocalAccounts(accounts);
 
   return peopleAppearanceFromAccount(account);
 }
-// === PEOPLE_APPEARANCE_V1_END ===
+// === PEOPLE_APPEARANCE_V2_END ===
 
 async function peopleFriendIds(accountId) {
   const owner = String(accountId);
@@ -4020,6 +4101,11 @@ async function peopleInitSocial() {
   );
 
   await peoplePool.query(
+    "ALTER TABLE people_accounts " +
+    "ADD COLUMN IF NOT EXISTS appearance_palette TEXT NOT NULL DEFAULT ''"
+  );
+
+  await peoplePool.query(
     "CREATE TABLE IF NOT EXISTS people_friends (" +
     "user_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
     "friend_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
@@ -5069,7 +5155,7 @@ app.get(
 );
 // === PEOPLE_AVATAR_JSON_DISPLAY_V1_END ===
 
-// === PEOPLE_APPEARANCE_ROUTES_V1_START ===
+// === PEOPLE_APPEARANCE_ROUTES_V2_START ===
 app.get(
   "/api/settings/appearance",
   async (req, res) => {
@@ -5111,10 +5197,6 @@ app.put(
         .trim()
         .toLowerCase();
 
-      const rawAccent = String(req.body?.accent || "")
-        .trim()
-        .toUpperCase();
-
       if (!PEOPLE_APPEARANCE_THEMES.has(rawTheme)) {
         return res.status(400).json({
           ok: false,
@@ -5122,17 +5204,58 @@ app.put(
         });
       }
 
-      if (!/^#[0-9A-F]{6}$/.test(rawAccent)) {
+      const currentAppearance = await peopleGetAppearance(session.id);
+
+      if (!currentAppearance) {
+        return res.status(404).json({
+          ok: false,
+          error: "Compte introuvable."
+        });
+      }
+
+      let rawPalette = req.body?.palette;
+
+      if (rawPalette == null) {
+        rawPalette = {
+          ...currentAppearance.palette,
+          accent:
+            req.body?.accent == null
+              ? currentAppearance.palette.accent
+              : req.body.accent
+        };
+      }
+
+      if (
+        !rawPalette ||
+        typeof rawPalette !== "object" ||
+        Array.isArray(rawPalette)
+      ) {
         return res.status(400).json({
           ok: false,
-          error: "Couleur d'accent invalide."
+          error: "Palette d'apparence invalide."
         });
+      }
+
+      for (const key of PEOPLE_APPEARANCE_PALETTE_KEYS) {
+        const value = String(rawPalette[key] || "")
+          .trim()
+          .toUpperCase();
+
+        if (!/^#[0-9A-F]{6}$/.test(value)) {
+          return res.status(400).json({
+            ok: false,
+            error: "Couleur invalide pour " + key + "."
+          });
+        }
       }
 
       const appearance = await peopleUpdateAppearance(
         session.id,
         rawTheme,
-        rawAccent
+        {
+          palette: rawPalette,
+          accent: rawPalette.accent
+        }
       );
 
       if (!appearance) {
@@ -5155,7 +5278,7 @@ app.put(
     }
   }
 );
-// === PEOPLE_APPEARANCE_ROUTES_V1_END ===
+// === PEOPLE_APPEARANCE_ROUTES_V2_END ===
 
 app.get("/api/profile/:username", async (req, res) => {
   try {

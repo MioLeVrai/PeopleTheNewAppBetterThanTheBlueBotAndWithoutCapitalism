@@ -1170,7 +1170,7 @@
             <span>PERSONNALISATION</span>
             <h2>Apparence</h2>
             <p>
-              Choisis le thème et la couleur d'accent de People. Ces réglages suivent ton compte.
+              Utilise un préréglage ou crée ta propre palette avec 5 couleurs exactes. Ces réglages suivent ton compte.
             </p>
           </div>
 
@@ -1181,9 +1181,9 @@
               class="people-settings-section-title"
             >
               <div>
-                <strong>Thème</strong>
+                <strong>Préréglages</strong>
                 <span>
-                  Modifie les surfaces principales du client.
+                  Choisis une base prête à l'emploi. Ta palette personnalisée reste enregistrée à côté.
                 </span>
               </div>
             </div>
@@ -1239,47 +1239,125 @@
                 <strong>Système</strong>
                 <small>Suit le thème de l'appareil.</small>
               </button>
+
+              <button
+                class="people-settings-theme-card"
+                type="button"
+                data-appearance-theme="custom"
+              >
+                <span class="people-settings-theme-preview people-theme-preview-custom">
+                  <i></i><b></b><em></em>
+                </span>
+                <strong>Personnalisé</strong>
+                <small>Tes 5 couleurs exactes.</small>
+              </button>
             </div>
           </div>
 
           <div
-            class="people-settings-section"
+            id="peopleSettingsPaletteEditor"
+            class="people-settings-section people-settings-palette-editor"
           >
             <div
-              class="people-settings-section-title"
+              class="people-settings-section-title people-settings-palette-title"
             >
               <div>
-                <strong>Couleur d'accent</strong>
+                <strong>Palette personnalisée</strong>
                 <span>
-                  Utilisée pour les boutons, sélections et éléments actifs.
+                  Modifie une couleur pour passer automatiquement en mode personnalisé.
                 </span>
               </div>
+
+              <span
+                id="peopleSettingsCustomBadge"
+                class="people-settings-custom-badge"
+              >Personnalisé</span>
             </div>
 
             <div
-              id="peopleSettingsAccentPresets"
-              class="people-settings-accent-grid"
+              id="peopleSettingsPalettePreview"
+              class="people-settings-palette-preview"
+              aria-label="Aperçu de la palette"
             >
-              <button type="button" class="people-settings-accent-swatch" data-accent="#67589D" style="--swatch:#67589D" aria-label="People violet"></button>
-              <button type="button" class="people-settings-accent-swatch" data-accent="#5865F2" style="--swatch:#5865F2" aria-label="Bleu"></button>
-              <button type="button" class="people-settings-accent-swatch" data-accent="#2F9CFF" style="--swatch:#2F9CFF" aria-label="Azur"></button>
-              <button type="button" class="people-settings-accent-swatch" data-accent="#19A974" style="--swatch:#19A974" aria-label="Vert"></button>
-              <button type="button" class="people-settings-accent-swatch" data-accent="#F28C28" style="--swatch:#F28C28" aria-label="Orange"></button>
-              <button type="button" class="people-settings-accent-swatch" data-accent="#E5484D" style="--swatch:#E5484D" aria-label="Rouge"></button>
-              <button type="button" class="people-settings-accent-swatch" data-accent="#D946EF" style="--swatch:#D946EF" aria-label="Rose"></button>
-              <button type="button" class="people-settings-accent-swatch" data-accent="#D4A72C" style="--swatch:#D4A72C" aria-label="Or"></button>
+              <span class="people-settings-palette-preview-rail"></span>
+              <span class="people-settings-palette-preview-panel"></span>
+              <span class="people-settings-palette-preview-main">
+                <i></i>
+                <b></b>
+                <em></em>
+              </span>
             </div>
 
-            <div
-              class="people-settings-custom-color"
-            >
-              <label for="peopleSettingsAccentColor">Couleur personnalisée</label>
-              <input
-                id="peopleSettingsAccentColor"
-                type="color"
-                value="#67589D"
-              />
-              <code id="peopleSettingsAccentCode">#67589D</code>
+            <div class="people-settings-palette-list">
+              <div class="people-settings-palette-row" data-palette-key="background">
+                <div class="people-settings-palette-copy">
+                  <strong>Fond principal</strong>
+                  <span>Chat et zone centrale.</span>
+                </div>
+                <input type="color" value="#100E1A" data-palette-picker="background" aria-label="Fond principal" />
+                <input class="people-settings-hex-input" type="text" value="#100E1A" maxlength="7" spellcheck="false" data-palette-hex="background" aria-label="Fond principal en hexadécimal" />
+                <div class="people-settings-rgb" data-palette-rgb="background">
+                  <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
+                  <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
+                  <label>B<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="b" /></label>
+                </div>
+              </div>
+
+              <div class="people-settings-palette-row" data-palette-key="panel">
+                <div class="people-settings-palette-copy">
+                  <strong>Panneaux</strong>
+                  <span>Barres, cartes et zones élevées.</span>
+                </div>
+                <input type="color" value="#181524" data-palette-picker="panel" aria-label="Panneaux" />
+                <input class="people-settings-hex-input" type="text" value="#181524" maxlength="7" spellcheck="false" data-palette-hex="panel" aria-label="Panneaux en hexadécimal" />
+                <div class="people-settings-rgb" data-palette-rgb="panel">
+                  <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
+                  <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
+                  <label>B<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="b" /></label>
+                </div>
+              </div>
+
+              <div class="people-settings-palette-row" data-palette-key="secondary">
+                <div class="people-settings-palette-copy">
+                  <strong>Fond secondaire</strong>
+                  <span>Rail des serveurs, menus et champs.</span>
+                </div>
+                <input type="color" value="#090811" data-palette-picker="secondary" aria-label="Fond secondaire" />
+                <input class="people-settings-hex-input" type="text" value="#090811" maxlength="7" spellcheck="false" data-palette-hex="secondary" aria-label="Fond secondaire en hexadécimal" />
+                <div class="people-settings-rgb" data-palette-rgb="secondary">
+                  <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
+                  <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
+                  <label>B<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="b" /></label>
+                </div>
+              </div>
+
+              <div class="people-settings-palette-row" data-palette-key="text">
+                <div class="people-settings-palette-copy">
+                  <strong>Texte principal</strong>
+                  <span>Messages, titres et texte important.</span>
+                </div>
+                <input type="color" value="#F2EFF8" data-palette-picker="text" aria-label="Texte principal" />
+                <input class="people-settings-hex-input" type="text" value="#F2EFF8" maxlength="7" spellcheck="false" data-palette-hex="text" aria-label="Texte principal en hexadécimal" />
+                <div class="people-settings-rgb" data-palette-rgb="text">
+                  <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
+                  <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
+                  <label>B<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="b" /></label>
+                </div>
+              </div>
+
+              <div class="people-settings-palette-row" data-palette-key="accent">
+                <div class="people-settings-palette-copy">
+                  <strong>Accent</strong>
+                  <span>Boutons, sélections et éléments actifs.</span>
+                </div>
+                <input type="color" value="#67589D" data-palette-picker="accent" aria-label="Accent" />
+                <input class="people-settings-hex-input" type="text" value="#67589D" maxlength="7" spellcheck="false" data-palette-hex="accent" aria-label="Accent en hexadécimal" />
+                <div class="people-settings-rgb" data-palette-rgb="accent">
+                  <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
+                  <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
+                  <label>B<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="b" /></label>
+                </div>
+              </div>
             </div>
 
             <div
@@ -1295,7 +1373,7 @@
                 class="people-settings-secondary"
                 type="button"
               >
-                Réinitialiser
+                Réinitialiser tout
               </button>
             </div>
           </div>
@@ -1477,19 +1555,19 @@
       "peopleSettingsThemes"
     );
 
-  const appearanceAccentPresets =
+  const appearancePaletteEditor =
     document.getElementById(
-      "peopleSettingsAccentPresets"
+      "peopleSettingsPaletteEditor"
     );
 
-  const appearanceAccentColor =
+  const appearancePalettePreview =
     document.getElementById(
-      "peopleSettingsAccentColor"
+      "peopleSettingsPalettePreview"
     );
 
-  const appearanceAccentCode =
+  const appearanceCustomBadge =
     document.getElementById(
-      "peopleSettingsAccentCode"
+      "peopleSettingsCustomBadge"
     );
 
   const appearanceStatus =
@@ -1616,6 +1694,14 @@
   // APPARENCE
   // ==========================================================
 
+  const PEOPLE_SETTINGS_PALETTE_KEYS = [
+    "background",
+    "panel",
+    "secondary",
+    "text",
+    "accent"
+  ];
+
   function setAppearanceStatus(
     text,
     kind = ""
@@ -1638,14 +1724,155 @@
     );
   }
 
-  function appearanceValue() {
-    return (
+  function appearanceDefaults() {
+    const defaults =
       window.PeopleAppearance
-        ?.get?.() ||
-      {
-        theme: "dark",
-        accent: "#67589D"
+        ?.defaults;
+
+    return {
+      theme:
+        defaults?.theme ||
+        "dark",
+      palette: {
+        background:
+          defaults?.palette
+            ?.background ||
+          "#100E1A",
+        panel:
+          defaults?.palette
+            ?.panel ||
+          "#181524",
+        secondary:
+          defaults?.palette
+            ?.secondary ||
+          "#090811",
+        text:
+          defaults?.palette
+            ?.text ||
+          "#F2EFF8",
+        accent:
+          defaults?.palette
+            ?.accent ||
+          "#67589D"
       }
+    };
+  }
+
+  function appearanceValue() {
+    const current =
+      window.PeopleAppearance
+        ?.get?.();
+
+    if (current?.palette) {
+      return {
+        ...current,
+        palette: {
+          ...current.palette
+        }
+      };
+    }
+
+    return appearanceDefaults();
+  }
+
+  function appearanceActivePalette() {
+    const active =
+      window.PeopleAppearance
+        ?.getActivePalette?.();
+
+    if (active) {
+      return {
+        ...active
+      };
+    }
+
+    return {
+      ...appearanceValue().palette
+    };
+  }
+
+  function appearanceHexToRgb(hex) {
+    const helper =
+      window.PeopleAppearance
+        ?.utils?.hexToRgb;
+
+    if (helper) {
+      return helper(hex);
+    }
+
+    const clean = String(hex || "#000000")
+      .replace("#", "")
+      .padEnd(6, "0")
+      .slice(0, 6);
+
+    return {
+      r: parseInt(clean.slice(0, 2), 16) || 0,
+      g: parseInt(clean.slice(2, 4), 16) || 0,
+      b: parseInt(clean.slice(4, 6), 16) || 0
+    };
+  }
+
+  function appearanceRgbToHex(rgb) {
+    const helper =
+      window.PeopleAppearance
+        ?.utils?.rgbToHex;
+
+    if (helper) {
+      return helper(rgb);
+    }
+
+    const part = (value) =>
+      Math.max(
+        0,
+        Math.min(
+          255,
+          Math.round(Number(value) || 0)
+        )
+      )
+        .toString(16)
+        .padStart(2, "0")
+        .toUpperCase();
+
+    return (
+      "#" +
+      part(rgb.r) +
+      part(rgb.g) +
+      part(rgb.b)
+    );
+  }
+
+  function appearanceValidHex(value) {
+    return /^#[0-9A-F]{6}$/.test(
+      String(value || "")
+        .trim()
+        .toUpperCase()
+    );
+  }
+
+  function setPalettePreview(palette) {
+    if (!appearancePalettePreview) {
+      return;
+    }
+
+    appearancePalettePreview.style.setProperty(
+      "--palette-background",
+      palette.background
+    );
+    appearancePalettePreview.style.setProperty(
+      "--palette-panel",
+      palette.panel
+    );
+    appearancePalettePreview.style.setProperty(
+      "--palette-secondary",
+      palette.secondary
+    );
+    appearancePalettePreview.style.setProperty(
+      "--palette-text",
+      palette.text
+    );
+    appearancePalettePreview.style.setProperty(
+      "--palette-accent",
+      palette.accent
     );
   }
 
@@ -1668,31 +1895,98 @@
       );
     }
 
-    for (
-      const swatch of
-      appearanceAccentPresets
-        ?.querySelectorAll(
-          "[data-accent]"
-        ) || []
-    ) {
-      swatch.classList.toggle(
-        "selected",
-        String(
-          swatch.dataset.accent || ""
-        ).toUpperCase() ===
-          appearance.accent
-            .toUpperCase()
+    appearancePaletteEditor
+      ?.classList.toggle(
+        "active",
+        appearance.theme ===
+          "custom"
+      );
+
+    if (appearanceCustomBadge) {
+      appearanceCustomBadge.textContent =
+        appearance.theme === "custom"
+          ? "Personnalisé actif"
+          : "Personnalisé";
+    }
+
+    const palette = {
+      ...appearance.palette
+    };
+
+    setPalettePreview(palette);
+
+    const customPreview =
+      appearanceThemes
+        ?.querySelector(
+          ".people-theme-preview-custom"
+        );
+
+    if (customPreview) {
+      customPreview.style.setProperty(
+        "--custom-background",
+        palette.background
+      );
+      customPreview.style.setProperty(
+        "--custom-panel",
+        palette.panel
+      );
+      customPreview.style.setProperty(
+        "--custom-secondary",
+        palette.secondary
+      );
+      customPreview.style.setProperty(
+        "--custom-text",
+        palette.text
+      );
+      customPreview.style.setProperty(
+        "--custom-accent",
+        palette.accent
       );
     }
 
-    if (appearanceAccentColor) {
-      appearanceAccentColor.value =
-        appearance.accent;
-    }
+    for (const key of PEOPLE_SETTINGS_PALETTE_KEYS) {
+      const row =
+        appearancePaletteEditor
+          ?.querySelector(
+            `[data-palette-key="${key}"]`
+          );
 
-    if (appearanceAccentCode) {
-      appearanceAccentCode.textContent =
-        appearance.accent;
+      if (!row) continue;
+
+      const color =
+        String(palette[key] || "#000000")
+          .toUpperCase();
+      const rgb = appearanceHexToRgb(color);
+
+      const picker =
+        row.querySelector(
+          `[data-palette-picker="${key}"]`
+        );
+      const hexInput =
+        row.querySelector(
+          `[data-palette-hex="${key}"]`
+        );
+      const rgbWrap =
+        row.querySelector(
+          `[data-palette-rgb="${key}"]`
+        );
+
+      if (picker) picker.value = color;
+      if (hexInput) hexInput.value = color;
+
+      if (rgbWrap) {
+        for (
+          const input of
+          rgbWrap.querySelectorAll(
+            "[data-rgb-channel]"
+          )
+        ) {
+          const channel =
+            input.dataset.rgbChannel;
+          input.value =
+            String(rgb[channel] ?? 0);
+        }
+      }
     }
   }
 
@@ -1754,6 +2048,120 @@
     }
   }
 
+  function paletteBaseForEdit() {
+    return {
+      ...appearanceValue().palette
+    };
+  }
+
+  function applyPaletteColor(
+    key,
+    color,
+    options = {}
+  ) {
+    if (
+      !PEOPLE_SETTINGS_PALETTE_KEYS
+        .includes(key) ||
+      !appearanceValidHex(color)
+    ) {
+      return null;
+    }
+
+    const next = {
+      theme: "custom",
+      palette: {
+        ...paletteBaseForEdit(),
+        [key]: String(color)
+          .trim()
+          .toUpperCase()
+      }
+    };
+
+    window.PeopleAppearance
+      ?.apply?.(next);
+
+    if (options.status !== false) {
+      setAppearanceStatus(
+        "Aperçu personnalisé — relâche pour enregistrer"
+      );
+    }
+
+    return next;
+  }
+
+  function paletteColorFromTarget(target) {
+    const row = target.closest(
+      "[data-palette-key]"
+    );
+
+    if (!row) return null;
+
+    const key = row.dataset.paletteKey;
+
+    if (
+      !PEOPLE_SETTINGS_PALETTE_KEYS
+        .includes(key)
+    ) {
+      return null;
+    }
+
+    if (target.matches("[data-palette-picker]")) {
+      return {
+        key,
+        color: String(target.value || "")
+          .toUpperCase()
+      };
+    }
+
+    if (target.matches("[data-palette-hex]")) {
+      const color = String(target.value || "")
+        .trim()
+        .toUpperCase();
+
+      return appearanceValidHex(color)
+        ? { key, color }
+        : null;
+    }
+
+    if (target.matches("[data-rgb-channel]")) {
+      const rgbWrap = target.closest(
+        "[data-palette-rgb]"
+      );
+
+      if (!rgbWrap) return null;
+
+      const values = {};
+
+      for (
+        const input of
+        rgbWrap.querySelectorAll(
+          "[data-rgb-channel]"
+        )
+      ) {
+        const raw = String(input.value ?? "").trim();
+        const number = Number(raw);
+
+        if (
+          raw === "" ||
+          !Number.isFinite(number) ||
+          number < 0 ||
+          number > 255
+        ) {
+          return null;
+        }
+
+        values[input.dataset.rgbChannel] = number;
+      }
+
+      return {
+        key,
+        color: appearanceRgbToHex(values)
+      };
+    }
+
+    return null;
+  }
+
   appearanceThemes
     ?.addEventListener(
       "click",
@@ -1774,7 +2182,10 @@
           ...current,
           theme:
             target.dataset
-              .appearanceTheme
+              .appearanceTheme,
+          palette: {
+            ...current.palette
+          }
         };
 
         window.PeopleAppearance
@@ -1784,75 +2195,81 @@
 
         void saveAppearance(
           next,
-          "Thème enregistré ✓"
+          "Préréglage enregistré ✓"
         );
       }
     );
 
-  appearanceAccentPresets
+  appearancePaletteEditor
     ?.addEventListener(
-      "click",
+      "input",
       (event) => {
         const target =
-          event.target instanceof Element
-            ? event.target.closest(
-                "[data-accent]"
-              )
+          event.target instanceof HTMLInputElement
+            ? event.target
             : null;
 
         if (!target) return;
 
-        const next = {
-          ...appearanceValue(),
-          accent:
-            target.dataset.accent
-        };
+        if (target.matches("[data-palette-hex]")) {
+          target.value = target.value.toUpperCase();
 
-        window.PeopleAppearance
-          ?.apply?.(next);
+          if (!appearanceValidHex(target.value)) {
+            setAppearanceStatus(
+              "Entre une couleur HEX complète, par exemple #12ABEF."
+            );
+            return;
+          }
+        }
 
-        updateAppearanceControls();
+        const value =
+          paletteColorFromTarget(target);
 
-        void saveAppearance(
-          next,
-          "Couleur enregistrée ✓"
+        if (!value) return;
+
+        applyPaletteColor(
+          value.key,
+          value.color
         );
       }
     );
 
-  appearanceAccentColor
-    ?.addEventListener(
-      "input",
-      () => {
-        const next = {
-          ...appearanceValue(),
-          accent:
-            appearanceAccentColor.value
-        };
-
-        window.PeopleAppearance
-          ?.apply?.(next);
-
-        updateAppearanceControls();
-        setAppearanceStatus(
-          "Aperçu — relâche pour enregistrer"
-        );
-      }
-    );
-
-  appearanceAccentColor
+  appearancePaletteEditor
     ?.addEventListener(
       "change",
-      () => {
-        const next = {
-          ...appearanceValue(),
-          accent:
-            appearanceAccentColor.value
-        };
+      (event) => {
+        const target =
+          event.target instanceof HTMLInputElement
+            ? event.target
+            : null;
+
+        if (!target) return;
+
+        const value =
+          paletteColorFromTarget(target);
+
+        if (!value) {
+          updateAppearanceControls();
+          setAppearanceStatus(
+            "Valeur de couleur invalide.",
+            "error"
+          );
+          return;
+        }
+
+        const next = applyPaletteColor(
+          value.key,
+          value.color,
+          {
+            status: false
+          }
+        );
+
+        if (!next) return;
 
         void saveAppearance(
           next,
-          "Couleur personnalisée enregistrée ✓"
+          "Palette personnalisée enregistrée ✓"
         );
       }
     );
@@ -1861,10 +2278,8 @@
     ?.addEventListener(
       "click",
       () => {
-        const next = {
-          theme: "dark",
-          accent: "#67589D"
-        };
+        const next =
+          appearanceDefaults();
 
         window.PeopleAppearance
           ?.apply?.(next);
@@ -1881,9 +2296,7 @@
   window.addEventListener(
     "people-appearance-changed",
     updateAppearanceControls
-  );
-
-  function activateTab(
+  );  function activateTab(
     name
   ) {
     for (
