@@ -182,6 +182,23 @@ let lastVoiceRoster = [];
 let activeVoiceRoster = [];
 let activeVoiceServerId = null;
 
+// === PEOPLE_CALL_EVENT_SOUNDS_V5_START ===
+function peoplePlayCallEventSound(
+  kind
+) {
+  try {
+    return Boolean(
+      window.PeopleSounds
+        ?.playCallEvent?.(
+          kind
+        )
+    );
+  } catch {
+    return false;
+  }
+}
+// === PEOPLE_CALL_EVENT_SOUNDS_V5_END ===
+
 const peers = new Map();
 const pendingCandidates = new Map();
 const reconnectTimers = new Map();
@@ -1110,9 +1127,102 @@ function peopleHandleVoiceState(
       activeVoiceServerId
     )
   ) {
+    // === PEOPLE_REMOTE_VOICE_SOUNDS_V5_START ===
+    const localVoiceUsername =
+      String(
+        username ||
+        ""
+      )
+        .trim()
+        .toLocaleLowerCase();
+
+    const isRemoteVoiceUser =
+      (user) => {
+        if (
+          !user?.id ||
+          user.id === socket.id
+        ) {
+          return false;
+        }
+
+        /*
+          Apres une reconnexion Socket.IO, notre propre ancien
+          socket peut encore etre present dans le roster local
+          pendant quelques millisecondes. On l'exclut aussi par
+          username pour ne pas jouer un faux son de depart.
+        */
+        if (
+          localVoiceUsername &&
+          String(
+            user?.username ||
+            ""
+          )
+            .trim()
+            .toLocaleLowerCase() ===
+              localVoiceUsername
+        ) {
+          return false;
+        }
+
+        return true;
+      };
+
+    const previousRemoteIds =
+      new Set(
+        activeVoiceRoster
+          .filter(
+            isRemoteVoiceUser
+          )
+          .map(
+            (user) =>
+              String(user.id)
+          )
+      );
+
+    const nextRemoteIds =
+      new Set(
+        roster
+          .filter(
+            isRemoteVoiceUser
+          )
+          .map(
+            (user) =>
+              String(user.id)
+          )
+      );
+
+    const someoneJoined =
+      voiceJoined &&
+      [...nextRemoteIds].some(
+        (id) =>
+          !previousRemoteIds.has(
+            id
+          )
+      );
+
+    const someoneLeft =
+      voiceJoined &&
+      [...previousRemoteIds].some(
+        (id) =>
+          !nextRemoteIds.has(
+            id
+          )
+      );
+    // === PEOPLE_REMOTE_VOICE_SOUNDS_V5_END ===
+
     peopleSetActiveVoiceRoster(
       roster
     );
+
+    if (someoneJoined) {
+      peoplePlayCallEventSound(
+        "join"
+      );
+    } else if (someoneLeft) {
+      peoplePlayCallEventSound(
+        "leave"
+      );
+    }
   }
 
   if (
@@ -2847,6 +2957,10 @@ async function joinVoice() {
 
     voiceJoined = true;
 
+    peoplePlayCallEventSound(
+      "join"
+    );
+
     activeVoiceServerId =
       String(
         response.serverId ||
@@ -2965,24 +3079,6 @@ async function disableCamera({ trackAlreadyEnded = false } = {}) {
   }
 }
 
-async function peopleCapScreenTrack720p30(track) {
-  if (!track || typeof track.applyConstraints !== "function") {
-    return;
-  }
-
-  try {
-    await track.applyConstraints({
-      width: { ideal: 1280, max: 1280 },
-      height: { ideal: 720, max: 720 },
-      frameRate: { ideal: 30, max: 30 }
-    });
-  } catch (err) {
-    console.warn(
-      "[People partage ecran 720p30] Impossible d'appliquer toutes les contraintes :",
-      err
-    );
-  }
-}
 async function enableScreenShare() {
   if (screenEnabled) return;
 
@@ -3009,7 +3105,7 @@ async function enableScreenShare() {
         video: {
           frameRate: {
             ideal: 30,
-            max: 30
+            max: 60
           }
         },
         audio: false
@@ -3023,8 +3119,6 @@ async function enableScreenShare() {
         "Aucun écran sélectionné."
       );
     }
-
-    await peopleCapScreenTrack720p30(track);
 
     screenTrack = track;
     screenEnabled = true;
@@ -3108,6 +3202,10 @@ async function disableScreenShare({
 
 function leaveVoice() {
   if (!voiceJoined) return;
+
+  peoplePlayCallEventSound(
+    "leave"
+  );
 
   socket.emit("voice-leave");
   voiceJoined = false;
@@ -3209,6 +3307,13 @@ muteButton.addEventListener(
     }
 
     micMuted = !micMuted;
+
+    peoplePlayCallEventSound(
+      micMuted
+        ? "mute"
+        : "unmute"
+    );
+
     updateMicUi();
   }
 );

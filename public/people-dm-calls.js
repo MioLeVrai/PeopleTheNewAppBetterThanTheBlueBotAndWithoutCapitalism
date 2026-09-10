@@ -71,6 +71,23 @@
   let ringingTimer = null;
   let ringingKind = null;
 
+  // === PEOPLE_DM_CALL_EVENT_SOUNDS_V5_START ===
+  function peopleDmPlayCallEventSound(
+    kind
+  ) {
+    try {
+      return Boolean(
+        window.PeopleSounds
+          ?.playCallEvent?.(
+            kind
+          )
+      );
+    } catch {
+      return false;
+    }
+  }
+  // === PEOPLE_DM_CALL_EVENT_SOUNDS_V5_END ===
+
   const callButton =
     document.createElement(
       "button"
@@ -1927,24 +1944,6 @@
     await sendOffer();
   }
 
-  async function peopleCapScreenTrack720p30(track) {
-    if (!track || typeof track.applyConstraints !== "function") {
-      return;
-    }
-
-    try {
-      await track.applyConstraints({
-        width: { ideal: 1280, max: 1280 },
-        height: { ideal: 720, max: 720 },
-        frameRate: { ideal: 30, max: 30 }
-      });
-    } catch (err) {
-      console.warn(
-        "[People partage ecran 720p30] Impossible d'appliquer toutes les contraintes :",
-        err
-      );
-    }
-  }
   async function enableScreenShare() {
     if (screenEnabled) {
       return;
@@ -1967,7 +1966,7 @@
           video: {
             frameRate: {
               ideal: 30,
-              max: 30
+              max: 60
             }
           },
           audio: false
@@ -1981,8 +1980,6 @@
           "Aucun écran sélectionné."
         );
       }
-
-      await peopleCapScreenTrack720p30(track);
 
       screenTrack = track;
       screenEnabled = true;
@@ -2106,6 +2103,12 @@
 
     micMuted =
       !micMuted;
+
+    peopleDmPlayCallEventSound(
+      micMuted
+        ? "mute"
+        : "unmute"
+    );
 
     for (
       const track of
@@ -2327,6 +2330,23 @@
     } = {}
   ) {
     stopRinging();
+
+    if (
+      [
+        "left",
+        "disconnected"
+      ].includes(
+        String(
+          reason ||
+          ""
+        )
+      )
+    ) {
+      peopleDmPlayCallEventSound(
+        "leave"
+      );
+    }
+
     stopMedia();
 
     const oldCall =
@@ -2428,6 +2448,8 @@
         false,
       remoteScreen:
         false,
+      soundPeerPresent:
+        false,
       rejoin:
         Boolean(
           payload?.rejoin
@@ -2504,6 +2526,14 @@
         ""
       );
 
+    const shouldPlayJoinSound =
+      Boolean(
+        nextPeerSocketId
+      ) &&
+      !Boolean(
+        call.soundPeerPresent
+      );
+
     if (
       peer &&
       previousPeerSocketId &&
@@ -2516,6 +2546,17 @@
 
     call.peerSocketId =
       nextPeerSocketId;
+
+    call.soundPeerPresent =
+      Boolean(
+        nextPeerSocketId
+      );
+
+    if (shouldPlayJoinSound) {
+      peopleDmPlayCallEventSound(
+        "join"
+      );
+    }
 
     if (
       payload?.peerUsername
@@ -2752,7 +2793,9 @@
           remoteScreen:
             Boolean(
               response.peerScreen
-            )
+            ),
+          soundPeerPresent:
+            false
         };
 
         setCallPerson(
@@ -3038,6 +3081,13 @@
 
       call.peerSocketId =
         "";
+      call.soundPeerPresent =
+        false;
+
+      peopleDmPlayCallEventSound(
+        "leave"
+      );
+
       call.remoteMuted =
         false;
       call.remoteCamera =

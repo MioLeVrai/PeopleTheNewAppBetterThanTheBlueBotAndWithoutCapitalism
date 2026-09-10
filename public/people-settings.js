@@ -814,9 +814,133 @@
     return true;
   }
 
+  // === PEOPLE_CALL_EVENT_SOUNDS_V5_START ===
+  /*
+    Petits sons d'interface pour les vocaux et appels MP.
+    Ils passent par le meme AudioContext que les notifications,
+    donc ils suivent aussi le peripherique de sortie choisi.
+  */
+  function playCallEvent(
+    kind = "join"
+  ) {
+    const event =
+      String(
+        kind ||
+        "join"
+      ).toLowerCase();
+
+    ensureAudio();
+
+    if (
+      event ===
+      "mute"
+    ) {
+      note(
+        220,
+        0,
+        0.07,
+        0.052,
+        "triangle"
+      );
+
+      note(
+        165,
+        0.055,
+        0.1,
+        0.042,
+        "sine"
+      );
+
+      return true;
+    }
+
+    if (
+      event ===
+      "unmute"
+    ) {
+      note(
+        392,
+        0,
+        0.065,
+        0.05,
+        "triangle"
+      );
+
+      note(
+        587,
+        0.055,
+        0.105,
+        0.047,
+        "sine"
+      );
+
+      return true;
+    }
+
+    if (
+      event ===
+      "leave"
+    ) {
+      note(
+        659,
+        0,
+        0.1,
+        0.055,
+        "sine"
+      );
+
+      note(
+        494,
+        0.085,
+        0.12,
+        0.052,
+        "sine"
+      );
+
+      note(
+        330,
+        0.175,
+        0.14,
+        0.045,
+        "sine"
+      );
+
+      return true;
+    }
+
+    // join : petite montee courte, distincte de la sonnerie.
+    note(
+      392,
+      0,
+      0.08,
+      0.05,
+      "sine"
+    );
+
+    note(
+      523,
+      0.065,
+      0.11,
+      0.055,
+      "sine"
+    );
+
+    note(
+      659,
+      0.145,
+      0.15,
+      0.05,
+      "sine"
+    );
+
+    return true;
+  }
+  // === PEOPLE_CALL_EVENT_SOUNDS_V5_END ===
+
   window.PeopleSounds = {
     playNotification,
     playRingtonePulse,
+    playCallEvent,
 
     getNotificationSound() {
       return storedSound(
