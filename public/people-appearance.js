@@ -300,64 +300,99 @@
     const surfaceMixTarget = lightSurface ? "#000000" : "#FFFFFF";
     const mutedTarget = palette.background;
 
-    root.style.setProperty("--people-night", palette.background);
-    root.style.setProperty("--people-deep", palette.panel);
-    root.style.setProperty("--people-ink", palette.secondary);
-    root.style.setProperty(
-      "--people-surface",
-      mix(palette.panel, surfaceMixTarget, lightSurface ? 0.05 : 0.08)
+    // style.css contient plusieurs anciennes déclarations :root en !important.
+    // Une variable inline normale ne peut pas les battre : c'était la cause du
+    // thème "moitié custom / moitié sombre". On pose donc les tokens actifs
+    // inline ET en !important, puis on expose aussi les alias historiques.
+    const setRootToken = (name, value) =>
+      root.style.setProperty(name, value, "important");
+
+    const surface = mix(
+      palette.panel,
+      surfaceMixTarget,
+      lightSurface ? 0.05 : 0.08
     );
-    root.style.setProperty(
-      "--people-hover",
-      mix(palette.panel, surfaceMixTarget, lightSurface ? 0.09 : 0.13)
+    const hover = mix(
+      palette.panel,
+      surfaceMixTarget,
+      lightSurface ? 0.09 : 0.13
     );
-    root.style.setProperty(
-      "--people-input",
-      mix(palette.background, palette.secondary, 0.58)
+    const input = mix(
+      palette.background,
+      palette.secondary,
+      0.58
     );
-    root.style.setProperty("--people-text", palette.text);
-    root.style.setProperty(
-      "--people-muted",
-      mix(palette.text, mutedTarget, lightSurface ? 0.42 : 0.36)
+    const muted = mix(
+      palette.text,
+      mutedTarget,
+      lightSurface ? 0.42 : 0.36
     );
-    root.style.setProperty(
-      "--people-subtle",
-      mix(palette.text, mutedTarget, lightSurface ? 0.58 : 0.53)
+    const subtle = mix(
+      palette.text,
+      mutedTarget,
+      lightSurface ? 0.58 : 0.53
     );
-    root.style.setProperty(
-      "--people-border",
-      mix(palette.panel, palette.text, lightSurface ? 0.14 : 0.16)
+    const border = mix(
+      palette.panel,
+      palette.text,
+      lightSurface ? 0.14 : 0.16
     );
-    root.style.setProperty(
+    const accentStrong = mix(
+      palette.accent,
+      "#000000",
+      lightSurface ? 0.12 : 0.15
+    );
+    const accentLight = mix(
+      palette.accent,
+      "#FFFFFF",
+      lightSurface ? 0.08 : 0.24
+    );
+
+    setRootToken("--people-night", palette.background);
+    setRootToken("--people-deep", palette.panel);
+    setRootToken("--people-ink", palette.secondary);
+    setRootToken("--people-surface", surface);
+    setRootToken("--people-hover", hover);
+    setRootToken("--people-input", input);
+    setRootToken("--people-text", palette.text);
+    setRootToken("--people-muted", muted);
+    setRootToken("--people-subtle", subtle);
+    setRootToken("--people-border", border);
+    setRootToken(
       "--people-overlay",
       rgba(palette.secondary, lightSurface ? 0.42 : 0.84)
     );
-    root.style.setProperty(
+    setRootToken(
       "--people-danger",
       lightSurface ? "#C73942" : "#DA4B55"
     );
 
-    root.style.setProperty("--people-accent", palette.accent);
-    root.style.setProperty(
-      "--people-accent-strong",
-      mix(palette.accent, "#000000", lightSurface ? 0.12 : 0.15)
-    );
-    root.style.setProperty(
-      "--people-accent-light",
-      mix(palette.accent, "#FFFFFF", lightSurface ? 0.08 : 0.24)
-    );
-    root.style.setProperty(
+    setRootToken("--people-accent", palette.accent);
+    setRootToken("--people-accent-strong", accentStrong);
+    setRootToken("--people-accent-light", accentLight);
+    setRootToken(
       "--people-accent-soft",
       rgba(palette.accent, lightSurface ? 0.16 : 0.26)
     );
-    root.style.setProperty(
+    setRootToken(
       "--people-accent-faint",
       rgba(palette.accent, lightSurface ? 0.09 : 0.10)
     );
-    root.style.setProperty(
+    setRootToken(
       "--people-accent-border",
       rgba(palette.accent, lightSurface ? 0.34 : 0.40)
     );
+
+    // Compatibilité avec l'ancien style.css. Les vieux blocs utilisent encore
+    // ces noms directement, parfois eux aussi en !important.
+    setRootToken("--bg", palette.background);
+    setRootToken("--panel", palette.panel);
+    setRootToken("--panel-dark", palette.secondary);
+    setRootToken("--input", input);
+    setRootToken("--text", palette.text);
+    setRootToken("--muted", muted);
+    setRootToken("--brand", palette.accent);
+    setRootToken("--hover", hover);
 
     if (options.bumpRevision !== false) {
       activeRevision += 1;
@@ -575,5 +610,5 @@
       });
     }
   });
-  // === PEOPLE_APPEARANCE_CLIENT_V3_END ===
+  // === PEOPLE_APPEARANCE_CLIENT_V4_END ===
 })();

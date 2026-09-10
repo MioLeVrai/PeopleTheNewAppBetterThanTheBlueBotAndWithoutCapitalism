@@ -1277,15 +1277,88 @@
             <div
               id="peopleSettingsPalettePreview"
               class="people-settings-palette-preview"
-              aria-label="Aperçu de la palette"
+              aria-label="Aperçu réaliste de l'interface People"
             >
-              <span class="people-settings-palette-preview-rail"></span>
-              <span class="people-settings-palette-preview-panel"></span>
-              <span class="people-settings-palette-preview-main">
-                <i></i>
-                <b></b>
-                <em></em>
-              </span>
+              <div class="people-settings-preview-rail">
+                <span class="people-settings-preview-rail-icon active">⌂</span>
+                <span class="people-settings-preview-rail-separator"></span>
+                <span class="people-settings-preview-rail-icon">PE</span>
+                <span class="people-settings-preview-rail-icon">SE</span>
+                <span class="people-settings-preview-rail-icon add">+</span>
+              </div>
+
+              <div class="people-settings-preview-sidebar">
+                <div class="people-settings-preview-sidebar-head">
+                  <span class="people-settings-preview-home-icon">⌂</span>
+                  <span class="people-settings-preview-head-copy">
+                    <b>Accueil</b>
+                    <i>Amis et messages privés</i>
+                  </span>
+                </div>
+
+                <div class="people-settings-preview-nav active">
+                  <span>●●</span>
+                  <b>Amis</b>
+                </div>
+
+                <div class="people-settings-preview-label">MESSAGES PRIVÉS</div>
+
+                <div class="people-settings-preview-dm-list">
+                  <span class="people-settings-preview-dm"><i></i><b></b></span>
+                  <span class="people-settings-preview-dm"><i></i><b></b></span>
+                  <span class="people-settings-preview-dm"><i></i><b></b></span>
+                  <span class="people-settings-preview-dm"><i></i><b></b></span>
+                </div>
+
+                <div class="people-settings-preview-profile">
+                  <i></i>
+                  <span><b></b><em></em></span>
+                  <strong>•••</strong>
+                </div>
+              </div>
+
+              <div class="people-settings-preview-main">
+                <div class="people-settings-preview-topbar">
+                  <span><b>Amis</b><i>Tes contacts People</i></span>
+                </div>
+
+                <div class="people-settings-preview-content">
+                  <div class="people-settings-preview-search-card">
+                    <b>Retrouver quelqu'un</b>
+                    <i></i>
+                    <span></span>
+                  </div>
+
+                  <div class="people-settings-preview-section-title">
+                    <b>DEMANDES D'AMI</b><span>0</span>
+                  </div>
+
+                  <div class="people-settings-preview-request-grid">
+                    <div><b>À ACCEPTER</b><i></i></div>
+                    <div><b>ENVOYÉES</b><i></i></div>
+                  </div>
+
+                  <div class="people-settings-preview-section-title friends">
+                    <b>MES AMIS</b><span>6</span>
+                  </div>
+
+                  <div class="people-settings-preview-friends">
+                    <div class="people-settings-preview-friend">
+                      <i></i><span><b></b><em></em></span><strong></strong><strong></strong>
+                    </div>
+                    <div class="people-settings-preview-friend">
+                      <i></i><span><b></b><em></em></span><strong></strong><strong></strong>
+                    </div>
+                    <div class="people-settings-preview-friend">
+                      <i></i><span><b></b><em></em></span><strong></strong><strong></strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="people-settings-preview-note">
+              Cet aperçu reprend les mêmes rôles de couleur que l'application : rail, panneau, fond, texte, champs et accent.
             </div>
 
             <div class="people-settings-palette-list">
