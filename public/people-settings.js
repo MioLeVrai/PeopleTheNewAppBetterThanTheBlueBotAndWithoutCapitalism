@@ -116,7 +116,7 @@
         audioContext?.state ===
         "suspended"
       ) {
-        audioContext
+        void audioContext
           .resume()
           .catch(
             () => {}
@@ -124,12 +124,6 @@
       }
     } catch {}
 
-    /*
-      Le routage de sortie n'a besoin
-      d'être appliqué qu'à la création.
-      Un changement ultérieur de sortie
-      passe déjà par applyOutputToAll().
-    */
     if (
       created &&
       audioContext
@@ -142,6 +136,64 @@
 
     return audioContext;
   }
+
+  // === PEOPLE_CALL_SOUND_UNLOCK_V5_1_START ===
+  async function ensureAudioReady() {
+    const ctx =
+      ensureAudio();
+
+    if (!ctx) {
+      return null;
+    }
+
+    try {
+      if (
+        ctx.state ===
+        "suspended"
+      ) {
+        await ctx.resume();
+      }
+    } catch {}
+
+    if (
+      ctx.state !==
+      "running"
+    ) {
+      return null;
+    }
+
+    try {
+      void window.PeopleAudioDevices
+        ?.applyContext?.(
+          ctx
+        );
+    } catch {}
+
+    return ctx;
+  }
+
+  function unlockPeopleAudioFromGesture() {
+    void ensureAudioReady();
+  }
+
+  document.addEventListener(
+    "pointerdown",
+    unlockPeopleAudioFromGesture,
+    {
+      once: true,
+      capture: true
+    }
+  );
+
+  document.addEventListener(
+    "keydown",
+    unlockPeopleAudioFromGesture,
+    {
+      once: true,
+      capture: true
+    }
+  );
+  // === PEOPLE_CALL_SOUND_UNLOCK_V5_1_END ===
 
   // === PEOPLE_AUDIO_DEVICES_V1_START ===
   const AUDIO_DEVICE_KEYS = {
@@ -814,9 +866,140 @@
     return true;
   }
 
+  // === PEOPLE_CALL_EVENT_SOUNDS_V5_1_START ===
+  /*
+    Sons join / leave / mute / unmute communs aux vocaux serveur
+    et aux appels MP. Le contexte audio est explicitement reveille
+    avant de programmer les notes : le premier evenement n'est donc
+    plus perdu quand Chrome suspend Web Audio.
+  */
+  function playCallEvent(
+    kind = "join"
+  ) {
+    const event =
+      String(
+        kind ||
+        "join"
+      ).toLowerCase();
+
+    void (async () => {
+      const ctx =
+        await ensureAudioReady();
+
+      if (!ctx) {
+        return;
+      }
+
+      if (
+        event ===
+        "mute"
+      ) {
+        note(
+          220,
+          0,
+          0.07,
+          0.052,
+          "triangle"
+        );
+
+        note(
+          165,
+          0.055,
+          0.1,
+          0.042,
+          "sine"
+        );
+
+        return;
+      }
+
+      if (
+        event ===
+        "unmute"
+      ) {
+        note(
+          392,
+          0,
+          0.065,
+          0.05,
+          "triangle"
+        );
+
+        note(
+          587,
+          0.055,
+          0.105,
+          0.047,
+          "sine"
+        );
+
+        return;
+      }
+
+      if (
+        event ===
+        "leave"
+      ) {
+        note(
+          659,
+          0,
+          0.1,
+          0.055,
+          "sine"
+        );
+
+        note(
+          494,
+          0.085,
+          0.12,
+          0.052,
+          "sine"
+        );
+
+        note(
+          330,
+          0.175,
+          0.14,
+          0.045,
+          "sine"
+        );
+
+        return;
+      }
+
+      note(
+        392,
+        0,
+        0.08,
+        0.05,
+        "sine"
+      );
+
+      note(
+        523,
+        0.065,
+        0.11,
+        0.055,
+        "sine"
+      );
+
+      note(
+        659,
+        0.145,
+        0.15,
+        0.05,
+        "sine"
+      );
+    })();
+
+    return true;
+  }
+  // === PEOPLE_CALL_EVENT_SOUNDS_V5_1_END ===
+
   window.PeopleSounds = {
     playNotification,
     playRingtonePulse,
+    playCallEvent,
 
     getNotificationSound() {
       return storedSound(
