@@ -158,6 +158,7 @@ const voiceUsers = document.getElementById("voiceUsers");
 const voiceCount = document.getElementById("voiceCount");
 const muteButton = document.getElementById("muteButton");
 const cameraButton = document.getElementById("cameraButton");
+const screenButton = document.getElementById("screenButton");
 const leaveVoiceQuickButton = document.getElementById("leaveVoiceQuickButton");
 const micState = document.getElementById("micState");
 const audioContainer = document.getElementById("audioContainer");
@@ -167,8 +168,10 @@ const videoGrid = document.getElementById("videoGrid");
 let username = "";
 let localStream = null;
 let cameraTrack = null;
+let screenTrack = null;
 let micMuted = false;
 let cameraEnabled = false;
+let screenEnabled = false;
 let voiceJoined = false;
 let lastVoiceRoster = [];
 
@@ -1273,7 +1276,12 @@ function renderVoiceUsers(roster) {
     const icons = document.createElement("div");
     icons.className = "voice-media-icons";
 
-    if (user.camera) {
+    if (user.screen) {
+      const screen = document.createElement("span");
+      screen.title = "Partage d'écran actif";
+      screen.textContent = "🖥️";
+      icons.appendChild(screen);
+    } else if (user.camera) {
       const cam = document.createElement("span");
       cam.title = "Caméra activée";
       cam.textContent = "📹";
@@ -1390,12 +1398,35 @@ function syncVideoStageVisibility() {
 }
 
 function syncVideoTilesWithRoster() {
-  const cameraUsers = new Set(
-    activeVoiceRoster.filter(user => user.camera).map(user => user.id)
+  const videoUsers = new Set(
+    activeVoiceRoster
+      .filter(user => user.camera || user.screen)
+      .map(user => user.id)
   );
 
-  if (cameraEnabled && voiceJoined) {
-    ensureVideoTile(socket.id || "local", username || "Moi", true);
+  if ((cameraEnabled || screenEnabled) && voiceJoined) {
+    const tile = ensureVideoTile(socket.id || "local", username || "Moi", true);
+    tile.classList.toggle("screen-share", screenEnabled);
+
+    const label = tile.querySelector(".video-label");
+    const video = tile.querySelector("video");
+
+    if (video) {
+      video.style.objectFit =
+        screenEnabled
+          ? "contain"
+          : "cover";
+      video.style.transform =
+        screenEnabled
+          ? "none"
+          : "";
+    }
+
+    if (label) {
+      label.textContent = screenEnabled
+        ? `${username || "Moi"} • partage d'écran`
+        : `${username || "Moi"} (toi)`;
+    }
   } else {
     removeVideoTile(socket.id || "local", true);
   }
@@ -1403,8 +1434,25 @@ function syncVideoTilesWithRoster() {
   for (const user of activeVoiceRoster) {
     if (user.id === socket.id) continue;
 
-    if (user.camera) {
-      ensureVideoTile(user.id, user.username, false);
+    if (user.camera || user.screen) {
+      const tile = ensureVideoTile(user.id, user.username, false);
+      tile.classList.toggle("screen-share", Boolean(user.screen));
+
+      const label = tile.querySelector(".video-label");
+      const video = tile.querySelector("video");
+
+      if (video) {
+        video.style.objectFit =
+          user.screen
+            ? "contain"
+            : "cover";
+      }
+
+      if (label) {
+        label.textContent = user.screen
+          ? `${user.username} • partage d'écran`
+          : user.username;
+      }
     } else {
       removeVideoTile(user.id, false);
     }
@@ -1412,24 +1460,53 @@ function syncVideoTilesWithRoster() {
 
   for (const tile of [...videoGrid.querySelectorAll(".video-tile:not(.local)")]) {
     const peerId = tile.dataset.peerId;
-    if (!cameraUsers.has(peerId)) tile.remove();
+    if (!videoUsers.has(peerId)) tile.remove();
   }
 
   syncVideoStageVisibility();
 }
 
 function attachLocalPreview() {
-  if (!cameraEnabled || !cameraTrack) return;
+  const previewTrack =
+    screenEnabled && screenTrack
+      ? screenTrack
+      : (cameraEnabled ? cameraTrack : null);
+
+  if (!previewTrack) {
+    removeVideoTile(socket.id || "local", true);
+    syncVideoStageVisibility();
+    return;
+  }
 
   const tile = ensureVideoTile(socket.id || "local", username || "Moi", true);
+  tile.classList.toggle("screen-share", screenEnabled);
+
   const video = tile.querySelector("video");
   const placeholder = tile.querySelector(".video-placeholder");
+  const label = tile.querySelector(".video-label");
 
   if (video) {
-    video.srcObject = new MediaStream([cameraTrack]);
+    video.srcObject = new MediaStream([previewTrack]);
+    video.style.objectFit =
+      screenEnabled
+        ? "contain"
+        : "cover";
+    video.style.transform =
+      screenEnabled
+        ? "none"
+        : "";
     video.play().catch(() => {});
   }
-  if (placeholder) placeholder.style.display = "none";
+
+  if (placeholder) {
+    placeholder.style.display = "none";
+  }
+
+  if (label) {
+    label.textContent = screenEnabled
+      ? `${username || "Moi"} • partage d'écran`
+      : `${username || "Moi"} (toi)`;
+  }
 
   syncVideoStageVisibility();
 }
@@ -1470,11 +1547,24 @@ function attachRemoteMedia(peerId, stream) {
   if (videoTracks.length) {
     const user = getVoiceUser(peerId);
     const tile = ensureVideoTile(peerId, user?.username || "Caméra", false);
+    tile.classList.toggle("screen-share", Boolean(user?.screen));
+
+    const label = tile.querySelector(".video-label");
+    if (label) {
+      label.textContent = user?.screen
+        ? `${user?.username || "Utilisateur"} • partage d'écran`
+        : (user?.username || "Caméra");
+    }
+
     const video = tile.querySelector("video");
     const placeholder = tile.querySelector(".video-placeholder");
 
     if (video) {
       video.srcObject = new MediaStream(videoTracks);
+      video.style.objectFit =
+        user?.screen
+          ? "contain"
+          : "cover";
       video.play().catch(() => {});
     }
     if (placeholder) placeholder.style.display = "none";
@@ -2353,6 +2443,11 @@ function peopleSyncUnifiedCallControls() {
     inDmCall
   );
 
+  screenButton?.classList.toggle(
+    "people-current-call-control",
+    inDmCall
+  );
+
   leaveVoiceQuickButton
     ?.classList.toggle(
       "people-current-call-danger",
@@ -2397,6 +2492,29 @@ function peopleSyncUnifiedCallControls() {
       dmCall.camera
         ? "Couper la caméra de l'appel MP"
         : "Activer la caméra de l'appel MP";
+
+    if (screenButton) {
+      screenButton.textContent =
+        dmCall.screen
+          ? "🛑"
+          : "🖥️";
+
+      screenButton.classList.toggle(
+        "active",
+        Boolean(dmCall.screen)
+      );
+
+      screenButton.disabled = false;
+      screenButton.setAttribute(
+        "aria-disabled",
+        "false"
+      );
+
+      screenButton.title =
+        dmCall.screen
+          ? "Arrêter le partage d'écran de l'appel MP"
+          : "Partager l'écran dans l'appel MP";
+    }
 
     if (
       leaveVoiceQuickButton
@@ -2504,6 +2622,48 @@ function updateCameraUi() {
   peopleSyncUnifiedCallControls();
 }
 
+function updateScreenUi() {
+  if (
+    peopleDmCallStateForControls()
+  ) {
+    peopleSyncUnifiedCallControls();
+    return;
+  }
+
+  if (!screenButton) {
+    return;
+  }
+
+  screenButton.textContent =
+    screenEnabled
+      ? "🛑"
+      : "🖥️";
+
+  screenButton.classList.toggle(
+    "active",
+    screenEnabled
+  );
+
+  const allowed =
+    voiceJoined ||
+    screenEnabled;
+
+  screenButton.disabled = !allowed;
+  screenButton.setAttribute(
+    "aria-disabled",
+    allowed ? "false" : "true"
+  );
+
+  screenButton.title =
+    screenEnabled
+      ? "Arrêter le partage d'écran"
+      : (
+          voiceJoined
+            ? "Partager l'écran"
+            : "Rejoins le vocal pour partager ton écran"
+        );
+}
+
 function peopleVoiceJoinRequest(
   serverId =
     activeVoiceServerId ||
@@ -2559,7 +2719,9 @@ function peopleVoiceJoinRequest(
           muted:
             micMuted,
           camera:
-            cameraEnabled
+            cameraEnabled,
+          screen:
+            screenEnabled
         },
         finish
       );
@@ -2586,6 +2748,16 @@ function peopleVoiceRejectJoin(
 
   cameraEnabled =
     false;
+
+  if (screenTrack) {
+    try {
+      screenTrack.stop();
+    } catch {}
+
+    screenTrack = null;
+  }
+
+  screenEnabled = false;
 
   if (localStream) {
     for (
@@ -2627,6 +2799,7 @@ function peopleVoiceRejectJoin(
 
   updateMicUi();
   updateCameraUi();
+  updateScreenUi();
   syncVideoStageVisibility();
 }
 
@@ -2683,6 +2856,7 @@ async function joinVoice() {
 
     updateMicUi();
     updateCameraUi();
+    updateScreenUi();
 
     peopleSyncVoiceUiContext();
 
@@ -2783,6 +2957,127 @@ async function disableCamera({ trackAlreadyEnded = false } = {}) {
   }
 }
 
+async function enableScreenShare() {
+  if (screenEnabled) return;
+
+  if (!voiceJoined) {
+    voiceStatus.textContent =
+      "Rejoins le vocal pour partager ton écran";
+    updateScreenUi();
+    return;
+  }
+
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    voiceStatus.textContent =
+      "Le partage d'écran n'est pas disponible ici";
+    return;
+  }
+
+  try {
+    if (screenButton) {
+      screenButton.textContent = "…";
+    }
+
+    const displayStream =
+      await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: {
+            ideal: 30,
+            max: 60
+          }
+        },
+        audio: false
+      });
+
+    const track =
+      displayStream.getVideoTracks()[0];
+
+    if (!track) {
+      throw new Error(
+        "Aucun écran sélectionné."
+      );
+    }
+
+    screenTrack = track;
+    screenEnabled = true;
+
+    screenTrack.addEventListener(
+      "ended",
+      () => {
+        if (screenEnabled) {
+          void disableScreenShare({
+            trackAlreadyEnded: true
+          });
+        }
+      },
+      { once: true }
+    );
+
+    attachLocalPreview();
+    updateScreenUi();
+
+    socket.emit(
+      "voice-screen",
+      { screen: true }
+    );
+
+    await rebuildPeersForMediaChange();
+
+    voiceStatus.textContent =
+      "Partage d'écran actif";
+  } catch (err) {
+    console.warn(
+      "[People partage écran vocal]",
+      err
+    );
+
+    screenEnabled = false;
+    screenTrack = null;
+    updateScreenUi();
+
+    if (err?.name !== "NotAllowedError") {
+      voiceStatus.textContent =
+        "Partage d'écran indisponible";
+    }
+  }
+}
+
+async function disableScreenShare({
+  trackAlreadyEnded = false
+} = {}) {
+  if (!screenEnabled && !screenTrack) {
+    return;
+  }
+
+  const oldTrack = screenTrack;
+  screenEnabled = false;
+  screenTrack = null;
+
+  if (
+    oldTrack &&
+    !trackAlreadyEnded
+  ) {
+    try {
+      oldTrack.stop();
+    } catch {}
+  }
+
+  attachLocalPreview();
+  updateScreenUi();
+
+  socket.emit(
+    "voice-screen",
+    { screen: false }
+  );
+
+  if (voiceJoined) {
+    await rebuildPeersForMediaChange();
+
+    voiceStatus.textContent =
+      "Connecté au vocal";
+  }
+}
+
 function leaveVoice() {
   if (!voiceJoined) return;
 
@@ -2807,6 +3102,12 @@ function leaveVoice() {
   }
   cameraEnabled = false;
 
+  if (screenTrack) {
+    try { screenTrack.stop(); } catch {}
+    screenTrack = null;
+  }
+  screenEnabled = false;
+
   if (localStream) {
     for (const track of localStream.getTracks()) track.stop();
     localStream = null;
@@ -2820,6 +3121,7 @@ function leaveVoice() {
   voiceCount.textContent = lastVoiceRoster.length ? `(${lastVoiceRoster.length})` : "";
   updateMicUi();
   updateCameraUi();
+  updateScreenUi();
   syncVideoStageVisibility();
 }
 
@@ -2906,6 +3208,34 @@ cameraButton.addEventListener(
       await disableCamera();
     } else {
       await enableCamera();
+    }
+  }
+);
+
+screenButton?.addEventListener(
+  "click",
+  async () => {
+    const dmCall =
+      peopleDmCallStateForControls();
+
+    if (dmCall) {
+      await window.PeopleDmCalls
+        ?.toggleScreen?.();
+
+      return;
+    }
+
+    if (!voiceJoined && !screenEnabled) {
+      voiceStatus.textContent =
+        "Rejoins le vocal pour partager ton écran";
+      updateScreenUi();
+      return;
+    }
+
+    if (screenEnabled) {
+      await disableScreenShare();
+    } else {
+      await enableScreenShare();
     }
   }
 );
@@ -2998,8 +3328,23 @@ function createPeer(peerId) {
 
   if (localStream) {
     for (const track of localStream.getTracks()) {
+      if (
+        track.kind === "video" &&
+        screenEnabled &&
+        screenTrack
+      ) {
+        continue;
+      }
+
       pc.addTrack(track, localStream);
     }
+  }
+
+  if (screenEnabled && screenTrack) {
+    pc.addTrack(
+      screenTrack,
+      new MediaStream([screenTrack])
+    );
   }
 
   pc.onicecandidate = (event) => {
@@ -3193,6 +3538,7 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 updateCameraUi();
+updateScreenUi();
 
 // === PEOPLE_ONLINE_PANEL_V1_START ===
 const peopleAppRoot = document.querySelector(".app");

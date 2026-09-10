@@ -57,8 +57,10 @@
   let localStream = null;
   let remoteStream = null;
   let cameraTrack = null;
+  let screenTrack = null;
   let micMuted = false;
   let cameraEnabled = false;
+  let screenEnabled = false;
   let pendingIce = [];
   let localAudioRequest = null;
   let connectionWatchTimer = null;
@@ -220,6 +222,16 @@
         </button>
 
         <button
+          id="peopleDmCallScreen"
+          class="people-dm-call-control"
+          type="button"
+          title="Partager l'écran"
+        >
+          <span>🖥️</span>
+          <small>Écran</small>
+        </button>
+
+        <button
           id="peopleDmCallHangup"
           class="people-dm-call-control danger"
           type="button"
@@ -309,6 +321,11 @@
   const cameraButton =
     document.getElementById(
       "peopleDmCallCamera"
+    );
+
+  const screenButton =
+    document.getElementById(
+      "peopleDmCallScreen"
     );
 
   const hangupButton =
@@ -593,6 +610,14 @@
       camera:
         Boolean(
           cameraEnabled
+        ),
+      screen:
+        Boolean(
+          screenEnabled
+        ),
+      remoteScreen:
+        Boolean(
+          call?.remoteScreen
         )
     };
   }
@@ -722,19 +747,54 @@
         ? "Couper la caméra"
         : "Activer la caméra";
 
+    screenButton.classList.toggle(
+      "active",
+      screenEnabled
+    );
+
+    screenButton.querySelector(
+      "span"
+    ).textContent =
+      screenEnabled
+        ? "🛑"
+        : "🖥️";
+
+    screenButton.querySelector(
+      "small"
+    ).textContent =
+      screenEnabled
+        ? "Stop"
+        : "Écran";
+
+    screenButton.title =
+      screenEnabled
+        ? "Arrêter le partage d'écran"
+        : "Partager l'écran";
+
     peopleDmCallPublishState();
   }
 
   function syncLocalPreview() {
-    if (
-      cameraEnabled &&
-      cameraTrack &&
-      localStream
-    ) {
+    const previewTrack =
+      screenEnabled && screenTrack
+        ? screenTrack
+        : (
+            cameraEnabled &&
+            cameraTrack
+              ? cameraTrack
+              : null
+          );
+
+    if (previewTrack) {
       localVideo.srcObject =
         new MediaStream(
-          [cameraTrack]
+          [previewTrack]
         );
+
+      localVideo.style.objectFit =
+        screenEnabled
+          ? "contain"
+          : "cover";
 
       localVideo.classList.remove(
         "hidden"
@@ -796,12 +856,20 @@
 
     if (
       videoTracks.length &&
-      call?.remoteCamera
+      (
+        call?.remoteCamera ||
+        call?.remoteScreen
+      )
     ) {
       remoteVideo.srcObject =
         new MediaStream(
           videoTracks
         );
+
+      remoteVideo.style.objectFit =
+        call?.remoteScreen
+          ? "contain"
+          : "cover";
 
       remoteVideo.classList.remove(
         "hidden"
@@ -1566,6 +1634,39 @@
     }
   );
 
+  function findVideoSender(
+    pc = peer
+  ) {
+    if (!pc) {
+      return null;
+    }
+
+    const activeSender =
+      pc
+        .getSenders()
+        .find(
+          (item) =>
+            item.track?.kind ===
+            "video"
+        );
+
+    if (activeSender) {
+      return activeSender;
+    }
+
+    return (
+      pc
+        .getTransceivers?.()
+        .find(
+          (item) =>
+            item.receiver?.track?.kind ===
+              "video"
+        )
+        ?.sender ||
+      null
+    );
+  }
+
   async function enableCamera() {
     if (
       cameraEnabled
@@ -1611,11 +1712,25 @@
         cameraTrack
       );
 
-      if (peer) {
-        peer.addTrack(
-          cameraTrack,
-          localStream
-        );
+      if (
+        peer &&
+        !screenEnabled
+      ) {
+        const sender =
+          findVideoSender(
+            peer
+          );
+
+        if (sender) {
+          await sender.replaceTrack(
+            cameraTrack
+          );
+        } else {
+          peer.addTrack(
+            cameraTrack,
+            localStream
+          );
+        }
       }
 
       cameraTrack.addEventListener(
@@ -1645,7 +1760,9 @@
           muted:
             micMuted,
           camera:
-            true
+            true,
+          screen:
+            screenEnabled
         }
       );
 
@@ -1683,7 +1800,8 @@
 
     if (
       peer &&
-      oldTrack
+      oldTrack &&
+      !screenEnabled
     ) {
       const sender =
         peer
@@ -1692,7 +1810,10 @@
             (item) =>
               item.track ===
               oldTrack
-          );
+          ) ||
+        findVideoSender(
+          peer
+        );
 
       if (sender) {
         try {
@@ -1734,11 +1855,194 @@
         muted:
           micMuted,
         camera:
-          false
+          false,
+        screen:
+          screenEnabled
       }
     );
 
     await sendOffer();
+  }
+
+  async function enableScreenShare() {
+    if (screenEnabled) {
+      return;
+    }
+
+    if (!call || call.phase !== "active") {
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      setStatus(
+        "Partage d'écran indisponible"
+      );
+      return;
+    }
+
+    try {
+      const stream =
+        await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            frameRate: {
+              ideal: 30,
+              max: 60
+            }
+          },
+          audio: false
+        });
+
+      const track =
+        stream.getVideoTracks()[0];
+
+      if (!track) {
+        throw new Error(
+          "Aucun écran sélectionné."
+        );
+      }
+
+      screenTrack = track;
+      screenEnabled = true;
+
+      screenTrack.addEventListener(
+        "ended",
+        () => {
+          if (screenEnabled) {
+            void disableScreenShare(
+              true
+            );
+          }
+        },
+        { once: true }
+      );
+
+      const pc = createPeer();
+      const sender =
+        findVideoSender(
+          pc
+        );
+
+      if (sender) {
+        await sender.replaceTrack(
+          screenTrack
+        );
+      } else {
+        pc.addTrack(
+          screenTrack,
+          new MediaStream(
+            [screenTrack]
+          )
+        );
+
+        await sendOffer();
+      }
+
+      syncLocalPreview();
+      updateMediaButtons();
+
+      socket.emit(
+        "dm-call-media-state",
+        {
+          callId:
+            call?.id,
+          muted:
+            micMuted,
+          camera:
+            cameraEnabled,
+          screen:
+            true
+        }
+      );
+
+      setStatus(
+        "Appel en cours • partage d'écran"
+      );
+    } catch (err) {
+      console.warn(
+        "[People appel MP/partage écran]",
+        err
+      );
+
+      screenTrack = null;
+      screenEnabled = false;
+      updateMediaButtons();
+
+      if (err?.name !== "NotAllowedError") {
+        setStatus(
+          "Partage d'écran indisponible"
+        );
+      }
+    }
+  }
+
+  async function disableScreenShare(
+    alreadyEnded = false
+  ) {
+    if (
+      !screenEnabled &&
+      !screenTrack
+    ) {
+      return;
+    }
+
+    const oldTrack =
+      screenTrack;
+
+    screenEnabled = false;
+    screenTrack = null;
+
+    if (
+      oldTrack &&
+      !alreadyEnded
+    ) {
+      try {
+        oldTrack.stop();
+      } catch {}
+    }
+
+    if (
+      peer &&
+      oldTrack
+    ) {
+      const sender =
+        peer
+          .getSenders()
+          .find(
+            (item) =>
+              item.track ===
+              oldTrack
+          );
+
+      if (sender) {
+        await sender.replaceTrack(
+          cameraEnabled &&
+          cameraTrack
+            ? cameraTrack
+            : null
+        );
+      }
+    }
+
+    syncLocalPreview();
+    updateMediaButtons();
+
+    socket.emit(
+      "dm-call-media-state",
+      {
+        callId:
+          call?.id,
+        muted:
+          micMuted,
+        camera:
+          cameraEnabled,
+        screen:
+          false
+      }
+    );
+
+    setStatus(
+      "Appel en cours"
+    );
   }
 
   async function toggleMute() {
@@ -1767,7 +2071,9 @@
         muted:
           micMuted,
         camera:
-          cameraEnabled
+          cameraEnabled,
+        screen:
+          screenEnabled
       }
     );
   }
@@ -1812,6 +2118,15 @@
     localStream = null;
     cameraTrack = null;
     cameraEnabled = false;
+
+    if (screenTrack) {
+      try {
+        screenTrack.stop();
+      } catch {}
+    }
+
+    screenTrack = null;
+    screenEnabled = false;
     micMuted = false;
 
     if (remoteStream) {
@@ -1950,6 +2265,8 @@
       peerSocketId:
         null,
       remoteCamera:
+        false,
+      remoteScreen:
         false
     };
 
@@ -2018,6 +2335,11 @@
         payload?.peerCamera
       );
 
+    call.remoteScreen =
+      Boolean(
+        payload?.peerScreen
+      );
+
     call.initiator =
       Boolean(
         payload?.initiator
@@ -2082,7 +2404,9 @@
         muted:
           micMuted,
         camera:
-          cameraEnabled
+          cameraEnabled,
+        screen:
+          screenEnabled
       }
     );
 
@@ -2175,6 +2499,8 @@
           peerSocketId:
             null,
           remoteCamera:
+            false,
+          remoteScreen:
             false
         };
 
@@ -2332,6 +2658,17 @@
     }
   );
 
+  screenButton.addEventListener(
+    "click",
+    () => {
+      if (screenEnabled) {
+        void disableScreenShare();
+      } else {
+        void enableScreenShare();
+      }
+    }
+  );
+
   socket.on(
     "dm-call-incoming",
     showIncoming
@@ -2441,9 +2778,20 @@
           payload?.camera
         );
 
+      call.remoteScreen =
+        Boolean(
+          payload?.screen
+        );
+
       syncRemoteMedia();
 
-      if (
+      if (payload?.screen) {
+        setStatus(
+          payload?.muted
+            ? "Appel en cours • partage d'écran • micro distant coupé"
+            : "Appel en cours • partage d'écran"
+        );
+      } else if (
         payload?.muted
       ) {
         setStatus(
@@ -2498,6 +2846,20 @@
         await disableCamera();
       } else {
         await enableCamera();
+      }
+
+      return true;
+    },
+
+    async toggleScreen() {
+      if (!call || call.phase !== "active") {
+        return false;
+      }
+
+      if (screenEnabled) {
+        await disableScreenShare();
+      } else {
+        await enableScreenShare();
       }
 
       return true;

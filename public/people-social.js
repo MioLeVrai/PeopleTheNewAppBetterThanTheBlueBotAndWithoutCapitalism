@@ -2971,6 +2971,9 @@
     }
   }
 
+// === PEOPLE_DM_NO_FLICKER_V1_START ===
+// La preview optimiste reste visible jusqu'au rendu serveur frais.
+// === PEOPLE_DM_NO_FLICKER_V1_END ===
 // === PEOPLE_DM_INSTANT_SEND_V2 ===
 // === PEOPLE_DM_GROUPING_V1_START ===
   const PEOPLE_DM_GROUP_MAX_MESSAGES = 10;
@@ -3703,6 +3706,20 @@ function dmTextLine(
         requestVersion === peopleDmLoadRequestVersion &&
         peopleDmUsernameKey(activeDmUser?.username) === wanted
       ) {
+        /*
+          PEOPLE_DM_NO_FLICKER_V1
+          Si un envoi optimiste vient d'être confirmé par le POST,
+          on garde sa bulle affichée pendant TOUT le refresh réseau.
+          On retire l'entrée pending seulement une fois l'historique frais
+          disponible, juste avant le remplacement atomique du DOM.
+          => plus de séquence : apparition -> disparition -> réapparition.
+        */
+        if (options?.settlePendingId) {
+          peopleDmRemovePending(
+            options.settlePendingId
+          );
+        }
+
         peopleDmRenderConversation(
           username,
           fresh.user,
@@ -4115,16 +4132,7 @@ function dmTextLine(
           }
         );
 
-        if (pending) {
-          /*
-            On enlève seulement l'entrée de la file.
-            Le DOM optimiste reste affiché jusqu'au remplacement
-            atomique par loadActiveDm(), donc aucun flash/disparition.
-          */
-          peopleDmRemovePending(
-            pending.id
-          );
-        } else {
+        if (!pending) {
           dmInput.value =
             "";
 
@@ -4139,8 +4147,27 @@ function dmTextLine(
           activeDmUser?.username ===
           targetUsername
         ) {
-          await loadActiveDm();
+          await loadActiveDm(
+            pending
+              ? {
+                  skipCache: true,
+                  settlePendingId:
+                    pending.id
+                }
+              : null
+          );
         } else {
+          /*
+            Si l'utilisateur a changé de MP entre-temps, il n'y a plus
+            de DOM à préserver pour cette conversation. Le POST étant
+            confirmé, on peut retirer l'entrée pending normalement.
+          */
+          if (pending) {
+            peopleDmRemovePending(
+              pending.id
+            );
+          }
+
           void refreshConversations();
         }
       } catch (err) {

@@ -10944,6 +10944,10 @@ function peopleVoicePublicUser(
     camera:
       Boolean(
         user?.camera
+      ),
+    screen:
+      Boolean(
+        user?.screen
       )
   };
 }
@@ -11535,6 +11539,8 @@ io.on("connection", (socket) => {
           initiator:
             true,
           peerCamera:
+            false,
+          peerScreen:
             false
         }
       );
@@ -11553,6 +11559,8 @@ io.on("connection", (socket) => {
           initiator:
             false,
           peerCamera:
+            false,
+          peerScreen:
             false
         }
       );
@@ -11830,7 +11838,8 @@ io.on("connection", (socket) => {
     ({
       callId,
       muted,
-      camera
+      camera,
+      screen
     } = {}) => {
       const call =
         peopleDmCallForActiveSocket(
@@ -11866,6 +11875,10 @@ io.on("connection", (socket) => {
           camera:
             Boolean(
               camera
+            ),
+          screen:
+            Boolean(
+              screen
             )
         }
       );
@@ -12212,7 +12225,8 @@ io.on("connection", (socket) => {
         serverId:
           requestedServerId,
         muted,
-        camera
+        camera,
+        screen
       } = {},
       ack = () => {}
     ) => {
@@ -12388,6 +12402,10 @@ io.on("connection", (socket) => {
             camera:
               Boolean(
                 camera
+              ),
+            screen:
+              Boolean(
+                screen
               )
           }
         );
@@ -12490,6 +12508,30 @@ io.on("connection", (socket) => {
 
       user.camera =
         Boolean(camera);
+
+      voiceUsers.set(
+        socket.id,
+        user
+      );
+
+      emitVoiceState(
+        user.serverId
+      );
+    }
+  );
+
+  socket.on(
+    "voice-screen",
+    ({ screen } = {}) => {
+      const user =
+        voiceUsers.get(
+          socket.id
+        );
+
+      if (!user) return;
+
+      user.screen =
+        Boolean(screen);
 
       voiceUsers.set(
         socket.id,
