@@ -42,19 +42,19 @@
       id: "soft",
       name: "Doux",
       description:
-        "Une notification plus discrète."
+        "Une notification plus douce."
     },
     {
       id: "digital",
       name: "Digital",
       description:
-        "Court et plus électronique."
+        "Une notification vibe retro comme on aime."
     },
     {
       id: "pop",
       name: "Pop",
       description:
-        "Petit son rapide et lumineux."
+        "Une notification plus petite, rapide et lumineuse."
     }
   ];
 
@@ -75,19 +75,19 @@
       id: "retro",
       name: "Rétro",
       description:
-        "Un style téléphone numérique."
+        "Une sonnerie de vieille console."
     },
     {
       id: "calm",
       name: "Calme",
       description:
-        "Plus douce et moins agressive."
+        "Une sonnerie plus douce et moins agressive."
     },
     {
       id: "bright",
       name: "Claire",
       description:
-        "Une sonnerie plus aiguë."
+        "Une sonnerie plus discrète."
     }
   ];
 

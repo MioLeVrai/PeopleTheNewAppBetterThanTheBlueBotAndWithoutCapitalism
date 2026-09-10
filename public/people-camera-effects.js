@@ -11,11 +11,11 @@
   // Dessins du filtre Chat fournis pour People. Chaque élément reste séparé
   // afin de suivre correctement la rotation et la taille du visage.
   const CAT_ASSET_URLS = Object.freeze({
-    leftEar: "assets/people-facefx/cat/ear-left.png",
-    rightEar: "assets/people-facefx/cat/ear-right.png",
-    leftWhiskers: "assets/people-facefx/cat/whiskers-left.png",
-    rightWhiskers: "assets/people-facefx/cat/whiskers-right.png",
-    nose: "assets/people-facefx/cat/nose.png"
+    leftEar: "assets/people-facefx/cat/ear-left.png?v=people-cat-fix-v2-20260911a",
+    rightEar: "assets/people-facefx/cat/ear-right.png?v=people-cat-fix-v2-20260911a",
+    leftWhiskers: "assets/people-facefx/cat/whiskers-left.png?v=people-cat-fix-v2-20260911a",
+    rightWhiskers: "assets/people-facefx/cat/whiskers-right.png?v=people-cat-fix-v2-20260911a",
+    nose: "assets/people-facefx/cat/nose.png?v=people-cat-fix-v2-20260911a"
   });
 
   const EFFECTS = Object.freeze([
@@ -437,7 +437,6 @@
   function drawCat(face) {
     if (catAssetsState !== "ready") {
       if (catAssetsState === "idle") void ensureCatAssets();
-      drawCatFallback(face);
       return;
     }
 
