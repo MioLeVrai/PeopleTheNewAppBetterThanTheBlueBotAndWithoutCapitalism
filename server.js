@@ -14070,31 +14070,6 @@ io.on("connection", (socket) => {
     }
   );
 
-  // === PEOPLE_TEXT_CHANNEL_INSTANT_V1_PREFETCH_START ===
-  // Lecture seule : contrairement a server-channel-select, ce prechargement
-  // ne change jamais le salon actif du socket.
-  socket.on(
-    "server-channel-prefetch",
-    async ({ serverId, channelId } = {}, ack = () => {}) => {
-      try {
-        const accountId = userIds.get(socket.id);
-        const sid = String(serverId || socketServerIds.get(socket.id) || "");
-        if (!accountId || !sid) return ack({ ok: false, error: "Session invalide." });
-        if (!(await peopleIsServerMember(accountId, sid))) {
-          return ack({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-        }
-        const channel = await peopleGetServerChannel(sid, channelId, "text");
-        if (!channel) return ack({ ok: false, error: "Salon textuel introuvable." });
-        const history = await peopleServerLoadMessages(sid, channel.id, 100);
-        ack({ ok: true, serverId: sid, activeChannelId: String(channel.id), history });
-      } catch (err) {
-        console.error("[People channel/prefetch]", err);
-        ack({ ok: false, error: "Impossible de precharger ce salon." });
-      }
-    }
-  );
-  // === PEOPLE_TEXT_CHANNEL_INSTANT_V1_PREFETCH_END ===
-
   // === PEOPLE_GENERAL_OPTIMISTIC_SERVER_V1_START ===
   socket.on(
     "chat-message",
@@ -14102,8 +14077,6 @@ io.on("connection", (socket) => {
       {
         text,
         imageId,
-        serverId: requestedServerId,
-        channelId: requestedChannelId,
         replyToId,
         clientId
       } = {},
@@ -14120,54 +14093,13 @@ io.on("connection", (socket) => {
       const senderId =
         userIds.get(socket.id);
 
-      let serverId =
+      const serverId =
         socketServerIds.get(socket.id);
 
-      let channelId =
+      const channelId =
         socketTextChannelIds.get(socket.id);
 
-      const explicitServerId = String(requestedServerId || "");
-      const explicitChannelId = String(requestedChannelId || "");
-
-      if (!username || !senderId) {
-        reply({ ok: false, error: "Session invalide." });
-        return;
-      }
-
-      if (explicitServerId && String(serverId || "") !== explicitServerId) {
-        try {
-          if (!(await peopleIsServerMember(senderId, explicitServerId))) {
-            reply({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-            return;
-          }
-          serverId = explicitServerId;
-          socketServerIds.set(socket.id, serverId);
-        } catch {
-          reply({ ok: false, error: "Impossible de verifier le serveur." });
-          return;
-        }
-      }
-
-      if (explicitChannelId && String(channelId || "") !== explicitChannelId) {
-        try {
-          const explicitChannel = await peopleGetServerChannel(
-            serverId,
-            explicitChannelId,
-            "text"
-          );
-          if (!explicitChannel) {
-            reply({ ok: false, error: "Salon textuel introuvable." });
-            return;
-          }
-          channelId = String(explicitChannel.id);
-          socketTextChannelIds.set(socket.id, channelId);
-        } catch {
-          reply({ ok: false, error: "Impossible de verifier le salon textuel." });
-          return;
-        }
-      }
-
-      if (!serverId || !channelId) {
+      if (!username || !senderId || !serverId || !channelId) {
         reply({
           ok: false,
           error: "Session ou serveur invalide."
@@ -14269,7 +14201,7 @@ io.on("connection", (socket) => {
   socket.on(
     "chat-message-delete",
     async (
-      { id, serverId: requestedServerId, channelId: requestedChannelId } = {},
+      { id } = {},
       ack = () => {}
     ) => {
       try {
@@ -14278,41 +14210,18 @@ io.on("connection", (socket) => {
             socket.id
           );
 
-        let serverId =
+        const serverId =
           socketServerIds.get(
             socket.id
           );
 
-        let channelId =
+        const channelId =
           socketTextChannelIds.get(
             socket.id
           );
 
-        const explicitServerId = String(requestedServerId || "");
-        const explicitChannelId = String(requestedChannelId || "");
-
-        if (!senderId) {
-          return ack({ ok: false, error: "Session invalide." });
-        }
-
-        if (explicitServerId && String(serverId || "") !== explicitServerId) {
-          if (!(await peopleIsServerMember(senderId, explicitServerId))) {
-            return ack({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-          }
-          serverId = explicitServerId;
-          socketServerIds.set(socket.id, serverId);
-        }
-
-        if (explicitChannelId && String(channelId || "") !== explicitChannelId) {
-          const explicitChannel = await peopleGetServerChannel(serverId, explicitChannelId, "text");
-          if (!explicitChannel) {
-            return ack({ ok: false, error: "Salon textuel introuvable." });
-          }
-          channelId = String(explicitChannel.id);
-          socketTextChannelIds.set(socket.id, channelId);
-        }
-
         if (
+          !senderId ||
           !serverId ||
           !channelId
         ) {

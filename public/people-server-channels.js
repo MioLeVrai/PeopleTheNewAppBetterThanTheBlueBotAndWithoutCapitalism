@@ -19,7 +19,6 @@
   let menu = null;
   let activeDialog = null;
   let draggedChannelId = null;
-  let textPrefetchTimer = null;
 
   function closeMenu() {
     menu?.remove();
@@ -415,17 +414,7 @@
 
     if (channel.type === "text") {
       button.classList.toggle("active", String(state.activeTextChannelId || "") === String(channel.id));
-      button.addEventListener("pointerenter", () => {
-        clearTimeout(textPrefetchTimer);
-        textPrefetchTimer = setTimeout(() => {
-          void window.PeopleServerRuntime?.prefetchTextChannel?.(channel.id);
-        }, 120);
-      });
-      button.addEventListener("pointerleave", () => {
-        clearTimeout(textPrefetchTimer);
-      });
       button.addEventListener("click", async () => {
-        clearTimeout(textPrefetchTimer);
         const response = await window.PeopleServerRuntime?.selectTextChannel?.(channel.id);
         if (response?.ok === false) alert(response.error || "Impossible d'ouvrir ce salon.");
       });

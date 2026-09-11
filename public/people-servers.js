@@ -1064,27 +1064,6 @@
 
   readInvitePath();
 
-  // === PEOPLE_SERVER_SETTINGS_V1_UPDATE_EVENT_START ===
-  window.addEventListener(
-    "people-server-updated",
-    (event) => {
-      const updated = event.detail?.server;
-      if (!updated?.id) return;
-      const id = String(updated.id);
-      const existing = serverById.get(id) || {};
-      const merged = { ...existing, ...updated, id };
-      serverById.set(id, merged);
-      servers = servers.map(server => String(server.id) === id ? merged : server);
-      if (activeServer && String(activeServer.id) === id) {
-        activeServer = { ...activeServer, ...merged };
-        updateServerChrome(activeServer);
-      }
-      renderRail();
-      updateRailSelection();
-    }
-  );
-  // === PEOPLE_SERVER_SETTINGS_V1_UPDATE_EVENT_END ===
-
   window.PeopleServers = {
     refresh:
       refreshServers,

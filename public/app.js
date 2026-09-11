@@ -80,11 +80,7 @@ function peopleDeleteGeneralMessageFromServer(
     (resolve, reject) => {
       socket.emit(
         "chat-message-delete",
-        {
-          id,
-          serverId: peopleActiveServerId,
-          channelId: peopleActiveTextChannelId
-        },
+        { id },
         (response) => {
           if (!response?.ok) {
             reject(
@@ -1869,93 +1865,6 @@ function peopleCachedServerPayload(serverId) {
 }
 // === PEOPLE_SERVER_INSTANT_OPEN_V2_END ===
 
-// === PEOPLE_TEXT_CHANNEL_INSTANT_V1_START ===
-// Cache par salon, comme pour les MP : l'interface peut afficher le dernier
-// contenu connu immediatement pendant que le serveur renvoie l'etat frais.
-const PEOPLE_TEXT_CHANNEL_VIEW_CACHE_MAX = 12;
-const PEOPLE_TEXT_CHANNEL_HISTORY_CACHE_MAX = 120;
-const PEOPLE_TEXT_CHANNEL_PREFETCH_MAX_AGE_MS = 30000;
-const peopleTextChannelViewCache = new Map();
-const peopleTextChannelPrefetchPromises = new Map();
-let peopleTextChannelSelectRequestVersion = 0;
-
-function peopleTextChannelCacheKey(serverId, channelId) {
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  return sid && cid ? sid + "\u001f" + cid : "";
-}
-
-function peopleRememberTextChannelView(serverId, channelId, history) {
-  const key = peopleTextChannelCacheKey(serverId, channelId);
-  if (!key) return null;
-
-  const value = {
-    serverId: String(serverId),
-    channelId: String(channelId),
-    history: Array.isArray(history)
-      ? history.slice(-PEOPLE_TEXT_CHANNEL_HISTORY_CACHE_MAX)
-      : [],
-    updatedAt: Date.now()
-  };
-
-  peopleTextChannelViewCache.delete(key);
-  peopleTextChannelViewCache.set(key, value);
-
-  while (peopleTextChannelViewCache.size > PEOPLE_TEXT_CHANNEL_VIEW_CACHE_MAX) {
-    const first = peopleTextChannelViewCache.keys().next().value;
-    if (first === undefined) break;
-    peopleTextChannelViewCache.delete(first);
-  }
-
-  return value;
-}
-
-function peopleCachedTextChannelView(serverId, channelId) {
-  const key = peopleTextChannelCacheKey(serverId, channelId);
-  if (!key) return null;
-  const cached = peopleTextChannelViewCache.get(key);
-  if (!cached) return null;
-  peopleTextChannelViewCache.delete(key);
-  peopleTextChannelViewCache.set(key, cached);
-  return cached;
-}
-
-function peoplePrefetchTextChannel(serverId, channelId) {
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  const key = peopleTextChannelCacheKey(sid, cid);
-  if (!key) return Promise.resolve(null);
-
-  const cached = peopleTextChannelViewCache.get(key);
-  if (
-    cached &&
-    Date.now() - Number(cached.updatedAt || 0) < PEOPLE_TEXT_CHANNEL_PREFETCH_MAX_AGE_MS
-  ) {
-    return Promise.resolve(cached);
-  }
-
-  if (peopleTextChannelPrefetchPromises.has(key)) {
-    return peopleTextChannelPrefetchPromises.get(key);
-  }
-
-  const promise = new Promise((resolve) => {
-    socket.emit(
-      "server-channel-prefetch",
-      { serverId: sid, channelId: cid },
-      (response) => {
-        if (!response?.ok) return resolve(null);
-        resolve(peopleRememberTextChannelView(sid, cid, response.history || []));
-      }
-    );
-  }).finally(() => {
-    peopleTextChannelPrefetchPromises.delete(key);
-  });
-
-  peopleTextChannelPrefetchPromises.set(key, promise);
-  return promise;
-}
-// === PEOPLE_TEXT_CHANNEL_INSTANT_V1_END ===
-
 function peopleApplySelectedServerPayload(
   payload
 ) {
@@ -1963,14 +1872,6 @@ function peopleApplySelectedServerPayload(
     payload?.channels || peopleServerChannels,
     payload?.activeChannelId || peopleActiveTextChannelId
   );
-
-  if (peopleActiveServerId && peopleActiveTextChannelId) {
-    peopleRememberTextChannelView(
-      peopleActiveServerId,
-      peopleActiveTextChannelId,
-      payload?.history || []
-    );
-  }
 
   renderChatHistory(
     payload?.history || []
@@ -2034,7 +1935,6 @@ window.PeopleServerRuntime = {
     peopleActiveTextChannelId = null;
     peopleServerChannels = [];
     peopleServerSelectRequestVersion += 1;
-    peopleTextChannelSelectRequestVersion += 1;
 
     renderChatHistory([]);
     peopleRenderOnlineUsers([]);
@@ -2056,7 +1956,6 @@ window.PeopleServerRuntime = {
     const previousId = peopleActiveServerId;
     const previousPayload = peopleCachedServerPayload(previousId);
     const requestVersion = ++peopleServerSelectRequestVersion;
-    peopleTextChannelSelectRequestVersion += 1;
 
     /*
       L'état visuel change immédiatement. Si le serveur a déjà été visité,
@@ -2145,139 +2044,29 @@ window.PeopleServerRuntime = {
     const cid = String(channelId || "");
     if (!sid || !cid) return { ok: false, error: "Salon invalide." };
 
-    if (String(peopleActiveTextChannelId || "") === cid) {
-      return { ok: true, serverId: sid, activeChannelId: cid, cached: true };
-    }
-
-    const previousChannelId = String(peopleActiveTextChannelId || "");
-    const previousView = previousChannelId
-      ? peopleCachedTextChannelView(sid, previousChannelId)
-      : null;
-    const requestVersion = ++peopleTextChannelSelectRequestVersion;
-    const cachedView = peopleCachedTextChannelView(sid, cid);
-
-    // === PEOPLE_TEXT_CHANNEL_PREVIEW_V2_START ===
-    // Preview a la maniere des MP : le salon devient visuellement actif
-    // immediatement, meme s'il n'existe encore aucun cache local.
-    peopleActiveTextChannelId = cid;
-    peopleGeneralReplyController?.clear();
-    peopleGeneralImagePicker?.clear();
-
-    const oldServerCache = peopleCachedServerPayload(sid) || {};
-    peopleRememberServerPayload(sid, {
-      ...oldServerCache,
-      ok: true,
-      channels: peopleServerChannels,
-      activeChannelId: cid,
-      history: cachedView?.history || []
-    });
-
-    // IMPORTANT : selection/header/sidebar d'abord. On ne bloque jamais
-    // l'ouverture visuelle sur le rendu des messages ou sur Socket.IO.
-    peopleDispatchServerChannelState();
-
-    // Sans cache, on affiche tout de suite une conversation vide au lieu de
-    // laisser l'ancien salon visible pendant le chargement.
-    if (!cachedView) {
-      renderChatHistory([]);
-    }
-
-    // La requete part immediatement, mais sa reponse ne sera appliquee
-    // qu'apres au moins une frame d'affichage de la preview.
-    const responsePromise = new Promise((resolve) => {
+    const response = await new Promise((resolve) => {
       socket.emit("server-channel-select", { serverId: sid, channelId: cid }, (value) => {
         resolve(value || { ok: false, error: "Le serveur n'a pas répondu." });
       });
     });
 
-    // Si le survol avait deja commence un prechargement, on profite de son
-    // resultat sans jamais retarder la preview.
-    const prefetchKey = peopleTextChannelCacheKey(sid, cid);
-    const pendingPrefetch = peopleTextChannelPrefetchPromises.get(prefetchKey);
-    if (pendingPrefetch) {
-      void pendingPrefetch.then((view) => {
-        if (
-          view &&
-          requestVersion === peopleTextChannelSelectRequestVersion &&
-          String(peopleActiveServerId || "") === sid &&
-          String(peopleActiveTextChannelId || "") === cid
-        ) {
-          renderChatHistory(view.history || []);
-        }
-      });
-    }
+    if (!response?.ok) return response;
+    peopleActiveTextChannelId = String(response.activeChannelId || cid);
+    peopleGeneralReplyController?.clear();
+    peopleGeneralImagePicker?.clear();
+    renderChatHistory(response.history || []);
 
-    // On laisse le navigateur/Electron peindre au moins une frame avec le
-    // nouveau salon selectionne avant de rendre un historique potentiellement
-    // lourd. C'est le comportement ressenti des MP.
-    await new Promise((resolve) => {
-      const raf = window.requestAnimationFrame || ((cb) => setTimeout(cb, 0));
-      raf(() => resolve());
+    const cached = peopleCachedServerPayload(sid) || {};
+    peopleRememberServerPayload(sid, {
+      ...cached,
+      ok: true,
+      channels: peopleServerChannels,
+      activeChannelId: peopleActiveTextChannelId,
+      history: response.history || []
     });
 
-    if (
-      cachedView &&
-      requestVersion === peopleTextChannelSelectRequestVersion &&
-      String(peopleActiveServerId || "") === sid &&
-      String(peopleActiveTextChannelId || "") === cid
-    ) {
-      renderChatHistory(cachedView.history || []);
-    }
-
-    const response = await responsePromise;
-    // === PEOPLE_TEXT_CHANNEL_PREVIEW_V2_END ===
-
-    if (!response?.ok) {
-      if (
-        requestVersion === peopleTextChannelSelectRequestVersion &&
-        String(peopleActiveServerId || "") === sid &&
-        String(peopleActiveTextChannelId || "") === cid
-      ) {
-        const fallback = previousChannelId && peopleServerChannelById(previousChannelId)?.type === "text"
-          ? previousChannelId
-          : null;
-        peopleActiveTextChannelId = fallback;
-        renderChatHistory(previousView?.history || []);
-        peopleDispatchServerChannelState();
-      }
-      return response;
-    }
-
-    const confirmedId = String(response.activeChannelId || cid);
-    const freshView = peopleRememberTextChannelView(sid, confirmedId, response.history || []);
-
-    // Une reponse lente d'un ancien clic ne doit jamais remplacer le salon
-    // sur lequel l'utilisateur est passe entre-temps.
-    if (
-      requestVersion === peopleTextChannelSelectRequestVersion &&
-      String(peopleActiveServerId || "") === sid &&
-      String(peopleActiveTextChannelId || "") === cid
-    ) {
-      peopleActiveTextChannelId = confirmedId;
-      renderChatHistory(freshView?.history || []);
-
-      const cachedServer = peopleCachedServerPayload(sid) || {};
-      peopleRememberServerPayload(sid, {
-        ...cachedServer,
-        ok: true,
-        channels: peopleServerChannels,
-        activeChannelId: confirmedId,
-        history: freshView?.history || []
-      });
-
-      peopleDispatchServerChannelState();
-    }
-
+    peopleDispatchServerChannelState();
     return response;
-  },
-
-  prefetchTextChannel(channelId) {
-    const sid = String(peopleActiveServerId || "");
-    const cid = String(channelId || "");
-    if (!sid || !cid || String(peopleActiveTextChannelId || "") === cid) {
-      return Promise.resolve(null);
-    }
-    return peoplePrefetchTextChannel(sid, cid);
   },
 
   async joinVoiceChannel(channelId) {
@@ -2648,8 +2437,6 @@ messageForm.addEventListener(
         {
           text,
           imageId,
-          serverId: peopleActiveServerId,
-          channelId: peopleActiveTextChannelId,
           replyToId:
             reply?.id ||
             null,
