@@ -17,7 +17,6 @@
   };
   let currentUserId = null;
   let menu = null;
-  let activeDialog = null;
   let draggedChannelId = null;
 
   function closeMenu() {
@@ -54,184 +53,37 @@
     return String(value || "").trim().replace(/\s+/g, " ").slice(0, 50);
   }
 
-  function closeDialog(result = null) {
-    if (!activeDialog) return;
-    const { overlay, resolve } = activeDialog;
-    activeDialog = null;
-    overlay.remove();
-    resolve(result);
-  }
-
-  function peopleDialog({
-    title = "People",
-    description = "",
-    value = "",
-    placeholder = "",
-    confirmText = "Valider",
-    cancelText = "Annuler",
-    danger = false,
-    input = true
-  } = {}) {
-    if (activeDialog) closeDialog(null);
-
-    return new Promise((resolve) => {
-      const overlay = document.createElement("div");
-      overlay.className = "people-channel-dialog-overlay";
-
-      const panel = document.createElement("form");
-      panel.className = "people-channel-dialog";
-
-      const heading = document.createElement("h3");
-      heading.textContent = title;
-      panel.appendChild(heading);
-
-      if (description) {
-        const text = document.createElement("p");
-        text.textContent = description;
-        panel.appendChild(text);
-      }
-
-      let field = null;
-      if (input) {
-        field = document.createElement("input");
-        field.className = "people-channel-dialog-input";
-        field.type = "text";
-        field.maxLength = 50;
-        field.value = String(value || "");
-        field.placeholder = placeholder;
-        field.autocomplete = "off";
-        panel.appendChild(field);
-      }
-
-      const actions = document.createElement("div");
-      actions.className = "people-channel-dialog-actions";
-
-      const cancel = document.createElement("button");
-      cancel.type = "button";
-      cancel.className = "people-channel-dialog-cancel";
-      cancel.textContent = cancelText;
-
-      const confirm = document.createElement("button");
-      confirm.type = "submit";
-      confirm.className = `people-channel-dialog-confirm${danger ? " danger" : ""}`;
-      confirm.textContent = confirmText;
-
-      actions.append(cancel, confirm);
-      panel.appendChild(actions);
-      overlay.appendChild(panel);
-      document.body.appendChild(overlay);
-
-      activeDialog = { overlay, resolve };
-
-      const finish = (answer) => {
-        if (!activeDialog || activeDialog.overlay !== overlay) return;
-        closeDialog(answer);
-      };
-
-      cancel.addEventListener("click", () => finish(null));
-      overlay.addEventListener("pointerdown", (event) => {
-        if (event.target === overlay) finish(null);
-      });
-      panel.addEventListener("submit", (event) => {
-        event.preventDefault();
-        finish(input ? String(field?.value || "") : true);
-      });
-      overlay.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          finish(null);
-        }
-      });
-
-      requestAnimationFrame(() => {
-        if (field) {
-          field.focus();
-          field.select();
-        } else {
-          confirm.focus();
-        }
-      });
-    });
-  }
-
-  async function refreshChannelsFromServer(expectedServerId = state.serverId) {
-    const sid = String(expectedServerId || "");
-    if (!sid) return false;
-    const result = await api(`/api/servers/${encodeURIComponent(sid)}/channels`);
-    if (String(state.serverId || "") !== sid) return false;
-    state.channels = Array.isArray(result.channels) ? result.channels : [];
-    render();
-    return true;
-  }
-
-  function upsertLocalChannel(channel) {
-    if (!channel?.id) return;
-    const id = String(channel.id);
-    const index = state.channels.findIndex((item) => String(item?.id || "") === id);
-    if (index >= 0) state.channels[index] = channel;
-    else state.channels.push(channel);
-    render();
-  }
-
   async function createItem(type, parentId = null) {
     const labels = {
-      category: ["Créer une catégorie", "Nom de la catégorie"],
-      text: ["Créer un salon textuel", "Nom du salon textuel"],
-      voice: ["Créer un salon vocal", "Nom du salon vocal"]
+      category: "Nom de la catégorie",
+      text: "Nom du salon textuel",
+      voice: "Nom du salon vocal"
     };
     const defaults = { category: "Nouvelle catégorie", text: "nouveau-salon", voice: "Nouveau vocal" };
-    const [title, description] = labels[type] || ["Créer", "Nom"];
-    const value = await peopleDialog({
-      title,
-      description,
-      value: defaults[type] || "",
-      placeholder: defaults[type] || "",
-      confirmText: "Créer"
-    });
+    const value = prompt(labels[type] || "Nom", defaults[type] || "");
     if (value === null) return;
     const name = cleanName(value);
     if (!name) return;
-
-    const sid = String(state.serverId || activeServer()?.id || "");
-    if (!sid) return;
-
     try {
-      const result = await api(`/api/servers/${encodeURIComponent(sid)}/channels`, {
+      await api(`/api/servers/${encodeURIComponent(state.serverId)}/channels`, {
         method: "POST",
         body: JSON.stringify({ type, name, parentId })
       });
-      if (String(state.serverId || "") === sid && result.channel) {
-        upsertLocalChannel(result.channel);
-      }
-      try { await refreshChannelsFromServer(sid); } catch (syncErr) {
-        console.warn("[People salons/synchronisation après création]", syncErr);
-      }
     } catch (err) {
       alert(err.message);
     }
   }
 
   async function renameItem(channel) {
-    const value = await peopleDialog({
-      title: "Renommer",
-      description: `Nouveau nom pour « ${channel.name || "cet élément"} »`,
-      value: channel.name || "",
-      confirmText: "Enregistrer"
-    });
+    const value = prompt("Nouveau nom", channel.name || "");
     if (value === null) return;
     const name = cleanName(value);
     if (!name || name === channel.name) return;
-
-    const sid = String(state.serverId || "");
     try {
-      const result = await api(`/api/servers/${encodeURIComponent(sid)}/channels/${encodeURIComponent(channel.id)}`, {
+      await api(`/api/servers/${encodeURIComponent(state.serverId)}/channels/${encodeURIComponent(channel.id)}`, {
         method: "PATCH",
         body: JSON.stringify({ name })
       });
-      if (result.channel) upsertLocalChannel(result.channel);
-      try { await refreshChannelsFromServer(sid); } catch (syncErr) {
-        console.warn("[People salons/synchronisation après renommage]", syncErr);
-      }
     } catch (err) {
       alert(err.message);
     }
@@ -241,26 +93,16 @@
     if (channel.type === "category") return;
     const categories = state.channels.filter((item) => item.type === "category");
     const choices = ["0 — Sans catégorie", ...categories.map((item, index) => `${index + 1} — ${item.name}`)].join("\n");
-    const raw = await peopleDialog({
-      title: "Déplacer le salon",
-      description: `Choisis la catégorie avec son numéro :\n${choices}`,
-      value: "0",
-      confirmText: "Déplacer"
-    });
+    const raw = prompt(`Déplacer « ${channel.name} » vers :\n\n${choices}\n\nEntre le numéro.`, "0");
     if (raw === null) return;
     const index = Number(raw);
     if (!Number.isInteger(index) || index < 0 || index > categories.length) return;
     const parentId = index === 0 ? null : categories[index - 1].id;
-    const sid = String(state.serverId || "");
     try {
-      const result = await api(`/api/servers/${encodeURIComponent(sid)}/channels/${encodeURIComponent(channel.id)}`, {
+      await api(`/api/servers/${encodeURIComponent(state.serverId)}/channels/${encodeURIComponent(channel.id)}`, {
         method: "PATCH",
         body: JSON.stringify({ parentId })
       });
-      if (result.channel) upsertLocalChannel(result.channel);
-      try { await refreshChannelsFromServer(sid); } catch (syncErr) {
-        console.warn("[People salons/synchronisation après déplacement]", syncErr);
-      }
     } catch (err) {
       alert(err.message);
     }
@@ -273,25 +115,11 @@
       : channel.type === "text"
         ? "Son historique sera supprimé définitivement."
         : "Les personnes qui s'y trouvent seront déconnectées.";
-    const confirmed = await peopleDialog({
-      title: `Supprimer ${what}`,
-      description: `« ${channel.name} »\n\n${detail}`,
-      confirmText: "Supprimer",
-      danger: true,
-      input: false
-    });
-    if (!confirmed) return;
-
-    const sid = String(state.serverId || "");
+    if (!confirm(`Supprimer ${what} « ${channel.name} » ?\n\n${detail}`)) return;
     try {
-      await api(`/api/servers/${encodeURIComponent(sid)}/channels/${encodeURIComponent(channel.id)}`, {
+      await api(`/api/servers/${encodeURIComponent(state.serverId)}/channels/${encodeURIComponent(channel.id)}`, {
         method: "DELETE"
       });
-      state.channels = state.channels.filter((item) => String(item?.id || "") !== String(channel.id));
-      render();
-      try { await refreshChannelsFromServer(sid); } catch (syncErr) {
-        console.warn("[People salons/synchronisation après suppression]", syncErr);
-      }
     } catch (err) {
       alert(err.message);
     }
@@ -361,16 +189,11 @@
   }
 
   async function patchParent(channelId, parentId) {
-    const sid = String(state.serverId || "");
     try {
-      const result = await api(`/api/servers/${encodeURIComponent(sid)}/channels/${encodeURIComponent(channelId)}`, {
+      await api(`/api/servers/${encodeURIComponent(state.serverId)}/channels/${encodeURIComponent(channelId)}`, {
         method: "PATCH",
         body: JSON.stringify({ parentId })
       });
-      if (result.channel) upsertLocalChannel(result.channel);
-      try { await refreshChannelsFromServer(sid); } catch (syncErr) {
-        console.warn("[People salons/synchronisation après glisser-déposer]", syncErr);
-      }
     } catch (err) {
       alert(err.message);
     }
@@ -583,21 +406,10 @@
   });
   window.addEventListener("blur", closeMenu);
 
-  async function hydrateCurrentUser() {
-    if (currentUserId) return;
-    try {
-      const result = await api("/api/auth/me");
-      currentUserId = result?.user?.id ? String(result.user.id) : null;
-      render();
-    } catch {}
-  }
-
   window.addEventListener("people-authenticated", (event) => {
     currentUserId = event.detail?.id ? String(event.detail.id) : null;
     render();
   });
-
-  void hydrateCurrentUser();
 
   window.addEventListener("people-server-channel-state", (event) => {
     const detail = event.detail || {};
