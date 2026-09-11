@@ -741,14 +741,6 @@ function peopleFailPendingGeneralMessage(
 function peopleHandleIncomingGeneralMessage(
   data
 ) {
-  if (
-    data?.channelId &&
-    peopleActiveTextChannelId &&
-    String(data.channelId) !== String(peopleActiveTextChannelId)
-  ) {
-    return;
-  }
-
   const clientId =
     String(
       data?.clientId || ""
@@ -1180,16 +1172,6 @@ function peopleHandleVoiceState(
             : []
         );
 
-  const activeChannelRoster =
-    activeVoiceChannelId
-      ? roster.filter((user) => String(user?.channelId || "") === String(activeVoiceChannelId))
-      : roster;
-
-  if (peopleActiveServerId && peopleVoiceSameServer(serverId, peopleActiveServerId)) {
-    lastVoiceRoster = roster;
-    peopleDispatchServerChannelState({ voice: roster });
-  }
-
   if (
     activeVoiceServerId &&
     peopleVoiceSameServer(
@@ -1251,7 +1233,7 @@ function peopleHandleVoiceState(
 
     const nextRemoteIds =
       new Set(
-        activeChannelRoster
+        roster
           .filter(
             isRemoteVoiceUser
           )
@@ -1281,7 +1263,7 @@ function peopleHandleVoiceState(
     // === PEOPLE_REMOTE_VOICE_SOUNDS_V5_END ===
 
     peopleSetActiveVoiceRoster(
-      activeChannelRoster
+      roster
     );
 
     if (someoneJoined) {
@@ -1302,8 +1284,9 @@ function peopleHandleVoiceState(
       peopleActiveServerId
     )
   ) {
-    lastVoiceRoster = roster;
-    peopleDispatchServerChannelState({ voice: roster });
+    renderVoiceUsers(
+      roster
+    );
   }
 }
 
@@ -1348,8 +1331,7 @@ async function peopleReconnectVoiceSession() {
 
   const response =
     await peopleVoiceJoinRequest(
-      activeVoiceServerId,
-      activeVoiceChannelId
+      activeVoiceServerId
     );
 
   if (
@@ -1374,8 +1356,6 @@ async function peopleReconnectVoiceSession() {
       response.serverId ||
       activeVoiceServerId
     );
-  activeVoiceChannelId =
-    String(response.channelId || activeVoiceChannelId || "") || null;
 
   peopleSetActiveVoiceRoster(
     response.roster ||
@@ -1791,40 +1771,6 @@ function attachRemoteMedia(peerId, stream) {
 
 // === PEOPLE_SERVER_RUNTIME_V1_START ===
 let peopleActiveServerId = null;
-let peopleActiveTextChannelId = null;
-let peopleServerChannels = [];
-let activeVoiceChannelId = null;
-let peopleRequestedVoiceChannelId = null;
-
-
-function peopleServerChannelById(channelId) {
-  const wanted = String(channelId || "");
-  return peopleServerChannels.find((item) => String(item?.id || "") === wanted) || null;
-}
-
-function peopleDispatchServerChannelState(extra = {}) {
-  window.dispatchEvent(new CustomEvent("people-server-channel-state", {
-    detail: {
-      serverId: peopleActiveServerId,
-      activeTextChannelId: peopleActiveTextChannelId,
-      activeVoiceServerId,
-      activeVoiceChannelId,
-      channels: Array.isArray(peopleServerChannels) ? peopleServerChannels : [],
-      voice: Array.isArray(lastVoiceRoster) ? lastVoiceRoster : [],
-      ...extra
-    }
-  }));
-}
-
-function peopleSetServerChannels(channels, activeChannelId = peopleActiveTextChannelId) {
-  peopleServerChannels = Array.isArray(channels) ? channels : [];
-  const wanted = String(activeChannelId || "");
-  const text = peopleServerChannels.find((item) =>
-    item?.type === "text" && String(item.id) === wanted
-  ) || peopleServerChannels.find((item) => item?.type === "text") || null;
-  peopleActiveTextChannelId = text ? String(text.id) : null;
-  peopleDispatchServerChannelState();
-}
 
 // === PEOPLE_SERVER_INSTANT_OPEN_V2_START ===
 // Les derniers payloads de serveurs visités restent en RAM afin que le
@@ -1843,8 +1789,7 @@ function peopleRememberServerPayload(serverId, payload) {
     ...payload,
     history: Array.isArray(payload.history) ? payload.history : [],
     online: Array.isArray(payload.online) ? payload.online : [],
-    voice: Array.isArray(payload.voice) ? payload.voice : [],
-    channels: Array.isArray(payload.channels) ? payload.channels : []
+    voice: Array.isArray(payload.voice) ? payload.voice : []
   });
 
   while (peopleServerViewCache.size > PEOPLE_SERVER_VIEW_CACHE_MAX) {
@@ -1868,11 +1813,6 @@ function peopleCachedServerPayload(serverId) {
 function peopleApplySelectedServerPayload(
   payload
 ) {
-  peopleSetServerChannels(
-    payload?.channels || peopleServerChannels,
-    payload?.activeChannelId || peopleActiveTextChannelId
-  );
-
   renderChatHistory(
     payload?.history || []
   );
@@ -1893,13 +1833,13 @@ function peopleApplySelectedServerPayload(
       ).length
     );
 
-  lastVoiceRoster = Array.isArray(payload?.voice) ? payload.voice : [];
-  peopleDispatchServerChannelState({ voice: lastVoiceRoster });
+  renderVoiceUsers(
+    payload?.voice || []
+  );
 }
 
 function peopleSelectServerSocket(
-  serverId,
-  channelId = null
+  serverId
 ) {
   return new Promise(
     (resolve) => {
@@ -1907,9 +1847,7 @@ function peopleSelectServerSocket(
         "server-select",
         {
           serverId:
-            String(serverId),
-          channelId:
-            channelId ? String(channelId) : null
+            String(serverId)
         },
         (response) => {
           resolve(
@@ -1932,15 +1870,12 @@ window.PeopleServerRuntime = {
       sur le vocal WebRTC actif.
     */
     peopleActiveServerId = null;
-    peopleActiveTextChannelId = null;
-    peopleServerChannels = [];
     peopleServerSelectRequestVersion += 1;
 
     renderChatHistory([]);
     peopleRenderOnlineUsers([]);
     userCount.textContent = "0";
-    lastVoiceRoster = [];
-    peopleDispatchServerChannelState({ voice: [] });
+    renderVoiceUsers([]);
     peopleSyncVoiceUiContext();
   },
 
@@ -1968,11 +1903,11 @@ window.PeopleServerRuntime = {
 
     const cached = peopleCachedServerPayload(serverId);
     peopleApplySelectedServerPayload(
-      cached || { history: [], online: [], voice: [], channels: [] }
+      cached || { history: [], online: [], voice: [] }
     );
     peopleSyncVoiceUiContext();
 
-    const response = await peopleSelectServerSocket(serverId, peopleActiveTextChannelId);
+    const response = await peopleSelectServerSocket(serverId);
 
     if (!response?.ok) {
       if (
@@ -1981,7 +1916,7 @@ window.PeopleServerRuntime = {
       ) {
         peopleActiveServerId = previousId || null;
         peopleApplySelectedServerPayload(
-          previousPayload || { history: [], online: [], voice: [], channels: [] }
+          previousPayload || { history: [], online: [], voice: [] }
         );
         peopleSyncVoiceUiContext();
       }
@@ -2008,7 +1943,7 @@ window.PeopleServerRuntime = {
 
     const serverId = String(peopleActiveServerId);
     const requestVersion = ++peopleServerSelectRequestVersion;
-    const response = await peopleSelectServerSocket(serverId, peopleActiveTextChannelId);
+    const response = await peopleSelectServerSocket(serverId);
 
     if (!response?.ok) {
       if (
@@ -2037,74 +1972,6 @@ window.PeopleServerRuntime = {
       */
       peopleSyncVoiceUiContext();
     }
-  },
-
-  async selectTextChannel(channelId) {
-    const sid = String(peopleActiveServerId || "");
-    const cid = String(channelId || "");
-    if (!sid || !cid) return { ok: false, error: "Salon invalide." };
-
-    const response = await new Promise((resolve) => {
-      socket.emit("server-channel-select", { serverId: sid, channelId: cid }, (value) => {
-        resolve(value || { ok: false, error: "Le serveur n'a pas répondu." });
-      });
-    });
-
-    if (!response?.ok) return response;
-    peopleActiveTextChannelId = String(response.activeChannelId || cid);
-    peopleGeneralReplyController?.clear();
-    peopleGeneralImagePicker?.clear();
-    renderChatHistory(response.history || []);
-
-    const cached = peopleCachedServerPayload(sid) || {};
-    peopleRememberServerPayload(sid, {
-      ...cached,
-      ok: true,
-      channels: peopleServerChannels,
-      activeChannelId: peopleActiveTextChannelId,
-      history: response.history || []
-    });
-
-    peopleDispatchServerChannelState();
-    return response;
-  },
-
-  async joinVoiceChannel(channelId) {
-    const cid = String(channelId || "");
-    if (!cid) return false;
-    peopleRequestedVoiceChannelId = cid;
-    if (voiceJoined) {
-      if (
-        peopleVoiceSameServer(activeVoiceServerId, peopleActiveServerId) &&
-        String(activeVoiceChannelId || "") === cid
-      ) {
-        leaveVoice();
-        return true;
-      }
-      voiceStatus.textContent = "Tu es déjà dans un autre vocal. Quitte-le avant d'en rejoindre un autre.";
-      return false;
-    }
-    return await joinVoice(cid);
-  },
-
-  leaveVoiceChannel() {
-    if (voiceJoined) leaveVoice();
-  },
-
-  getChannels() {
-    return Array.isArray(peopleServerChannels) ? [...peopleServerChannels] : [];
-  },
-
-  getActiveTextChannelId() {
-    return peopleActiveTextChannelId;
-  },
-
-  getActiveVoiceChannelId() {
-    return activeVoiceChannelId;
-  },
-
-  getActiveVoiceServerId() {
-    return activeVoiceServerId;
   },
 
   getActiveServerId() {
@@ -2392,7 +2259,6 @@ messageForm.addEventListener(
         peopleNewGeneralClientId();
 
       addChatMessage({
-        channelId: peopleActiveTextChannelId,
         username,
         text,
         imageId,
@@ -2546,15 +2412,6 @@ socket.on("disconnect", () => {
   closeAllPeers();
 });
 
-socket.on("server-channels-updated", ({ serverId, channels } = {}) => {
-  if (String(serverId || "") !== String(peopleActiveServerId || "")) return;
-  const previous = peopleActiveTextChannelId;
-  peopleSetServerChannels(channels || [], previous);
-  if (previous && !peopleServerChannelById(previous) && peopleActiveTextChannelId) {
-    void window.PeopleServerRuntime?.selectTextChannel?.(peopleActiveTextChannelId);
-  }
-});
-
 socket.on("chat-history", renderChatHistory);
 socket.on(
   "profile-avatar-updated",
@@ -2570,8 +2427,7 @@ socket.on(
 // === PEOPLE_GENERAL_DELETE_CLIENT_V1_START ===
 socket.on(
   "chat-message-deleted",
-  ({ id, channelId } = {}) => {
-    if (channelId && peopleActiveTextChannelId && String(channelId) !== String(peopleActiveTextChannelId)) return;
+  ({ id } = {}) => {
     if (id) {
       peopleRemoveGeneralMessageFromDom(
         id
@@ -2585,10 +2441,7 @@ socket.on(
   "chat-message",
   peopleHandleIncomingGeneralMessage
 );
-socket.on("system-message", (data) => {
-  if (data?.channelId && peopleActiveTextChannelId && String(data.channelId) !== String(peopleActiveTextChannelId)) return;
-  addSystemMessage(data);
-});
+socket.on("system-message", addSystemMessage);
 socket.on("user-count", count => userCount.textContent = count);
 socket.on(
   "voice-state",
@@ -3002,10 +2855,7 @@ function updateScreenUi() {
 function peopleVoiceJoinRequest(
   serverId =
     activeVoiceServerId ||
-    peopleActiveServerId,
-  channelId =
-    activeVoiceChannelId ||
-    peopleRequestedVoiceChannelId
+    peopleActiveServerId
 ) {
   return new Promise(
     (resolve) => {
@@ -3054,8 +2904,6 @@ function peopleVoiceJoinRequest(
               serverId ||
               ""
             ),
-          channelId:
-            channelId ? String(channelId) : null,
           muted:
             micMuted,
           camera:
@@ -3144,7 +2992,7 @@ function peopleVoiceRejectJoin(
   syncVideoStageVisibility();
 }
 
-async function joinVoice(channelId = peopleRequestedVoiceChannelId) {
+async function joinVoice() {
   if (voiceJoined) return true;
 
   try {
@@ -3165,8 +3013,7 @@ async function joinVoice(channelId = peopleRequestedVoiceChannelId) {
 
     const response =
       await peopleVoiceJoinRequest(
-        targetVoiceServerId,
-        channelId
+        targetVoiceServerId
       );
 
     if (
@@ -3190,10 +3037,6 @@ async function joinVoice(channelId = peopleRequestedVoiceChannelId) {
         response.serverId ||
         targetVoiceServerId
       );
-
-    activeVoiceChannelId =
-      String(response.channelId || channelId || "") || null;
-    peopleRequestedVoiceChannelId = activeVoiceChannelId;
 
     peopleSetActiveVoiceRoster(
       response.roster ||
@@ -3558,8 +3401,6 @@ function leaveVoice() {
 
   activeVoiceServerId =
     null;
-  activeVoiceChannelId = null;
-  peopleRequestedVoiceChannelId = null;
 
   activeVoiceRoster =
     [];
@@ -3598,16 +3439,13 @@ function leaveVoice() {
   updateCameraUi();
   updateScreenUi();
   syncVideoStageVisibility();
-  peopleDispatchServerChannelState();
 }
 
 voiceButton.addEventListener(
   "click",
   () => {
     if (!voiceJoined) {
-      const fallbackVoice = peopleServerChannels.find((item) => item?.type === "voice");
-      peopleRequestedVoiceChannelId = fallbackVoice ? String(fallbackVoice.id) : null;
-      void joinVoice(peopleRequestedVoiceChannelId);
+      void joinVoice();
       return;
     }
 

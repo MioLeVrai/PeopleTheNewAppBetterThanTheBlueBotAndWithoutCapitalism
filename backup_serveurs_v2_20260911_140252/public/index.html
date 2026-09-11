@@ -20,7 +20,6 @@
   <link rel="stylesheet" href="people-media-fullscreen.css?v=people-media-fullscreen-v1-20260911a">
   <link rel="stylesheet" href="people-image-viewer.css?v=people-image-viewer-v1-20260911a" />
   <link rel="stylesheet" href="people-server-voice-ui.css?v=people-server-voice-ui-v1-20260911a">
-  <link rel="stylesheet" href="people-server-channels.css?v=people-server-channels-v2">
       <link rel="stylesheet" href="people-appearance-settings-v2.css?v=people-appearance-settings-v2-3-20260911a" />
 </head>
 <body>
@@ -141,15 +140,6 @@
 
           <div class="server-title-actions">
             <button
-              id="serverChannelCreateButton"
-              class="server-invite-button"
-              type="button"
-              title="Créer une catégorie ou un salon"
-              aria-label="Créer une catégorie ou un salon"
-            >
-              ＋
-            </button>
-            <button
               id="serverInviteButton"
               class="server-invite-button"
               type="button"
@@ -161,10 +151,14 @@
           </div>
         </div>
 
-        <div id="peopleServerChannelTree" class="people-server-channel-tree"></div>
+        <div class="channel-group">
+          <div class="group-label">SALONS TEXTUELS</div>
+          <button class="channel active"># général</button>
+        </div>
 
-        <div class="people-server-voice-bridge" aria-hidden="true">
-          <button id="voiceButton" class="channel" type="button">
+        <div class="channel-group voice-group">
+          <div class="group-label">SALONS VOCAUX</div>
+          <button id="voiceButton" class="channel">
             🔊 vocal <span id="voiceCount"></span>
           </button>
           <div id="voiceStatus" class="voice-status">Pas connecté</div>
@@ -224,7 +218,7 @@
     <main id="peopleMain" class="main">
       <header class="topbar">
         <div>
-          <strong id="activeTextChannelName"># général</strong>
+          <strong># général</strong>
           <span id="activeTextChannelSubtitle">Salon général</span>
         </div>
 
@@ -656,7 +650,6 @@
   <script src="people-settings.js?v=people-camera-device-v1-20260911a"></script>
   <script src="people-social.js"></script>
   <script src="people-servers.js"></script>
-  <script src="people-server-channels.js?v=people-server-channels-v2"></script>
   <script src="people-local-controls.js?v=people-server-voice-ui-v1-20260911a"></script>
   <script src="people-page-title.js"></script>
   <script src="people-mobile.js"></script>

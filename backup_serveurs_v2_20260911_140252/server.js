@@ -7541,8 +7541,7 @@ function peopleReadLocalServers() {
     ) {
       return {
         servers: [],
-        members: [],
-        channels: []
+        members: []
       };
     }
 
@@ -7562,17 +7561,12 @@ function peopleReadLocalServers() {
       members:
         Array.isArray(raw?.members)
           ? raw.members
-          : [],
-      channels:
-        Array.isArray(raw?.channels)
-          ? raw.channels
           : []
     };
   } catch {
     return {
       servers: [],
-      members: [],
-      channels: []
+      members: []
     };
   }
 }
@@ -7589,10 +7583,6 @@ function peopleWriteLocalServers(data) {
         members:
           Array.isArray(data?.members)
             ? data.members
-            : [],
-        channels:
-          Array.isArray(data?.channels)
-            ? data.channels
             : []
       },
       null,
@@ -8045,16 +8035,6 @@ async function peopleDeleteServerIfEmpty(
           ) !== id
       );
 
-    data.channels =
-      (data.channels || []).filter(
-        (channel) =>
-          String(
-            channel.serverId ??
-            channel.server_id ??
-            ""
-          ) !== id
-      );
-
     peopleWriteLocalServers(
       data
     );
@@ -8489,17 +8469,13 @@ async function peopleCreateServer(
 async function peopleServerReplyPreview(
   serverId,
   replyToId,
-  db = peoplePool,
-  channelId = null
+  db = peoplePool
 ) {
   const id =
     peopleReplyId(replyToId);
 
   const sid =
     String(serverId || "");
-
-  const cid =
-    channelId ? String(channelId) : "";
 
   if (!id || !sid) {
     return null;
@@ -8519,10 +8495,11 @@ async function peopleServerReplyPreview(
         "(SELECT i.id FROM people_message_images i " +
         "WHERE i.general_message_id = gm.id LIMIT 1) AS image_id " +
         "FROM people_general_messages gm " +
-        "WHERE gm.id = $1 AND gm.server_id = $2 " +
-        (cid ? "AND gm.channel_id = $3 " : "") +
-        "LIMIT 1",
-        cid ? [id, sid, cid] : [id, sid]
+        "WHERE gm.id = $1 AND gm.server_id = $2 LIMIT 1",
+        [
+          id,
+          sid
+        ]
       );
 
     const row =
@@ -8553,8 +8530,7 @@ async function peopleServerReplyPreview(
       .find(
         (item) =>
           String(item.id) === id &&
-          String(item.serverId) === sid &&
-          (!cid || String(item.channelId || "") === cid)
+          String(item.serverId) === sid
       );
 
   if (!message) {
@@ -8579,7 +8555,6 @@ async function peopleServerReplyPreview(
 
 async function peopleServerSaveMessage(
   serverId,
-  channelId,
   senderId,
   username,
   text,
@@ -8588,9 +8563,6 @@ async function peopleServerSaveMessage(
 ) {
   const sid =
     String(serverId);
-
-  const cid =
-    String(channelId || "");
 
   const cleanUsername =
     peopleUsername(username)
@@ -8613,7 +8585,6 @@ async function peopleServerSaveMessage(
 
   if (
     !sid ||
-    !cid ||
     !cleanUsername ||
     (
       !cleanText &&
@@ -8635,8 +8606,7 @@ async function peopleServerSaveMessage(
           ? await peopleServerReplyPreview(
               sid,
               replyKey,
-              client,
-              cid
+              client
             )
           : null;
 
@@ -8656,12 +8626,11 @@ async function peopleServerSaveMessage(
       const result =
         await client.query(
           "INSERT INTO people_general_messages " +
-          "(server_id, channel_id, sender_id, username, body, reply_to_id) " +
-          "VALUES ($1, $2, $3, $4, $5, $6) " +
+          "(server_id, sender_id, username, body, reply_to_id) " +
+          "VALUES ($1, $2, $3, $4, $5) " +
           "RETURNING id, username, body, reply_to_id, created_at",
           [
             sid,
-            cid,
             String(senderId),
             cleanUsername,
             peopleEncryptMessageText(
@@ -8704,8 +8673,6 @@ async function peopleServerSaveMessage(
           String(row.id),
         serverId:
           sid,
-        channelId:
-          cid,
         username:
           row.username,
         text:
@@ -8739,9 +8706,7 @@ async function peopleServerSaveMessage(
     replyKey
       ? await peopleServerReplyPreview(
           sid,
-          replyKey,
-          peoplePool,
-          cid
+          replyKey
         )
       : null;
 
@@ -8763,8 +8728,6 @@ async function peopleServerSaveMessage(
       cryptoAccounts.randomUUID(),
     serverId:
       sid,
-    channelId:
-      cid,
     senderId:
       String(senderId),
     username:
@@ -8814,14 +8777,10 @@ async function peopleServerSaveMessage(
 
 async function peopleServerLoadMessages(
   serverId,
-  channelId,
   limit = 100
 ) {
   const sid =
     String(serverId);
-
-  const cid =
-    String(channelId || "");
 
   const safeLimit =
     Math.max(
@@ -8845,12 +8804,11 @@ async function peopleServerLoadMessages(
         "WHERE ri.general_message_id = rgm.id LIMIT 1) AS reply_image_id " +
         "FROM people_general_messages gm " +
         "LEFT JOIN people_general_messages rgm " +
-        "ON rgm.id = gm.reply_to_id AND rgm.server_id = gm.server_id AND rgm.channel_id = gm.channel_id " +
-        "WHERE gm.server_id = $1 AND gm.channel_id = $2 " +
-        "ORDER BY gm.created_at DESC LIMIT $3",
+        "ON rgm.id = gm.reply_to_id AND rgm.server_id = gm.server_id " +
+        "WHERE gm.server_id = $1 " +
+        "ORDER BY gm.created_at DESC LIMIT $2",
         [
           sid,
-          cid,
           safeLimit
         ]
       );
@@ -8863,8 +8821,6 @@ async function peopleServerLoadMessages(
             String(row.id),
           serverId:
             sid,
-          channelId:
-            cid,
           system:
             Boolean(row.is_system),
           username:
@@ -8919,9 +8875,7 @@ async function peopleServerLoadMessages(
       .filter(
         (message) =>
           String(message.serverId) ===
-          sid &&
-          String(message.channelId || "") ===
-          cid
+          sid
       );
 
   const byId =
@@ -8953,8 +8907,6 @@ async function peopleServerLoadMessages(
             String(message.id || ""),
           serverId:
             sid,
-          channelId:
-            cid,
           system:
             Boolean(
               message.system ||
@@ -9014,7 +8966,6 @@ async function peopleServerLoadMessages(
 async function peopleServerDeleteMessage(
   accountId,
   serverId,
-  channelId,
   messageId
 ) {
   const owner =
@@ -9023,16 +8974,12 @@ async function peopleServerDeleteMessage(
   const sid =
     String(serverId);
 
-  const cid =
-    String(channelId || "");
-
   const id =
     peopleReplyId(messageId);
 
   if (
     !owner ||
     !sid ||
-    !cid ||
     !id
   ) {
     return false;
@@ -9049,13 +8996,12 @@ async function peopleServerDeleteMessage(
     const result =
       await peoplePool.query(
         "DELETE FROM people_general_messages " +
-        "WHERE id = $1 AND sender_id = $2 AND server_id = $3 AND channel_id = $4 " +
+        "WHERE id = $1 AND sender_id = $2 AND server_id = $3 " +
         "RETURNING id",
         [
           id,
           owner,
-          sid,
-          cid
+          sid
         ]
       );
 
@@ -9072,8 +9018,7 @@ async function peopleServerDeleteMessage(
       (item) =>
         String(item.id) === id &&
         String(item.senderId) === owner &&
-        String(item.serverId) === sid &&
-        String(item.channelId || "") === cid
+        String(item.serverId) === sid
     );
 
   if (index < 0) {
@@ -9325,420 +9270,6 @@ async function peopleInitServersV1() {
   );
 }
 
-
-// === PEOPLE_SERVER_CHANNELS_V2_START ===
-function peopleChannelName(value) {
-  return String(value || "")
-    .normalize("NFKC")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 50);
-}
-
-function peopleValidChannelName(value) {
-  const name = peopleChannelName(value);
-  return Boolean(
-    name &&
-    name.length <= 50 &&
-    !/[\u0000-\u001f\u007f]/u.test(name)
-  );
-}
-
-function peopleChannelType(value) {
-  const type = String(value || "").toLowerCase();
-  return ["category", "text", "voice"].includes(type)
-    ? type
-    : "";
-}
-
-function peopleChannelPublic(channel) {
-  if (!channel) return null;
-  return {
-    id: String(channel.id),
-    serverId: String(channel.serverId ?? channel.server_id ?? ""),
-    type: peopleChannelType(channel.type),
-    name: String(channel.name || ""),
-    parentId: channel.parentId ?? channel.parent_id ?? null,
-    position: Number(channel.position || 0),
-    createdAt: channel.createdAt ?? channel.created_at ?? null
-  };
-}
-
-async function peopleListServerChannels(serverId) {
-  const sid = String(serverId || "");
-  if (!sid) return [];
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT id, server_id, type, name, parent_id, position, created_at " +
-      "FROM people_server_channels WHERE server_id = $1 " +
-      "ORDER BY position ASC, id ASC",
-      [sid]
-    );
-    return result.rows.map(peopleChannelPublic);
-  }
-
-  const data = peopleReadLocalServers();
-  return (data.channels || [])
-    .filter((item) => String(item.serverId ?? item.server_id ?? "") === sid)
-    .map(peopleChannelPublic)
-    .sort((a, b) => (a.position - b.position) || a.name.localeCompare(b.name, "fr"));
-}
-
-async function peopleGetServerChannel(serverId, channelId, wantedType = "") {
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  const expected = peopleChannelType(wantedType);
-  if (!sid || !cid) return null;
-
-  const channels = await peopleListServerChannels(sid);
-  return channels.find((item) =>
-    String(item.id) === cid && (!expected || item.type === expected)
-  ) || null;
-}
-
-async function peopleDefaultServerChannel(serverId, type = "text") {
-  const wanted = peopleChannelType(type) || "text";
-  const channels = await peopleListServerChannels(serverId);
-  return channels.find((item) => item.type === wanted) || null;
-}
-
-async function peopleCanManageServerChannels(accountId, serverId) {
-  const server = await peopleGetServer(serverId);
-  return Boolean(
-    server &&
-    server.ownerId &&
-    String(server.ownerId) === String(accountId)
-  );
-}
-
-async function peopleBroadcastServerChannels(serverId) {
-  const sid = String(serverId || "");
-  if (!sid) return;
-  const channels = await peopleListServerChannels(sid);
-  io.to(peopleServerRoom(sid)).emit("server-channels-updated", {
-    serverId: sid,
-    channels
-  });
-}
-
-async function peopleCreateServerChannel(serverId, rawType, rawName, rawParentId = null) {
-  const sid = String(serverId || "");
-  const type = peopleChannelType(rawType);
-  const name = peopleChannelName(rawName);
-  let parentId = rawParentId ? String(rawParentId) : null;
-
-  if (!sid || !type || !peopleValidChannelName(name)) {
-    const err = new Error("CHANNEL_INVALID");
-    err.code = "CHANNEL_INVALID";
-    throw err;
-  }
-
-  if (type === "category") {
-    parentId = null;
-  } else if (parentId) {
-    const parent = await peopleGetServerChannel(sid, parentId, "category");
-    if (!parent) parentId = null;
-  }
-
-  const existing = await peopleListServerChannels(sid);
-  const position = existing.length
-    ? Math.max(...existing.map((item) => Number(item.position || 0))) + 1
-    : 0;
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "INSERT INTO people_server_channels (server_id, type, name, parent_id, position) " +
-      "VALUES ($1, $2, $3, $4, $5) " +
-      "RETURNING id, server_id, type, name, parent_id, position, created_at",
-      [sid, type, name, parentId, position]
-    );
-    return peopleChannelPublic(result.rows[0]);
-  }
-
-  const data = peopleReadLocalServers();
-  const channel = {
-    id: cryptoAccounts.randomUUID(),
-    serverId: sid,
-    type,
-    name,
-    parentId,
-    position,
-    createdAt: new Date().toISOString()
-  };
-  data.channels = Array.isArray(data.channels) ? data.channels : [];
-  data.channels.push(channel);
-  peopleWriteLocalServers(data);
-  return peopleChannelPublic(channel);
-}
-
-async function peopleUpdateServerChannel(serverId, channelId, patch = {}) {
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  const current = await peopleGetServerChannel(sid, cid);
-  if (!current) return null;
-
-  let name = current.name;
-  if (Object.prototype.hasOwnProperty.call(patch, "name")) {
-    name = peopleChannelName(patch.name);
-    if (!peopleValidChannelName(name)) {
-      const err = new Error("CHANNEL_INVALID");
-      err.code = "CHANNEL_INVALID";
-      throw err;
-    }
-  }
-
-  let parentId = current.parentId ? String(current.parentId) : null;
-  if (current.type === "category") {
-    parentId = null;
-  } else if (Object.prototype.hasOwnProperty.call(patch, "parentId")) {
-    const requested = patch.parentId ? String(patch.parentId) : null;
-    if (requested) {
-      const parent = await peopleGetServerChannel(sid, requested, "category");
-      parentId = parent ? String(parent.id) : null;
-    } else {
-      parentId = null;
-    }
-  }
-
-  const position = Number.isFinite(Number(patch.position))
-    ? Math.max(0, Math.floor(Number(patch.position)))
-    : current.position;
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "UPDATE people_server_channels SET name = $3, parent_id = $4, position = $5 " +
-      "WHERE id = $1 AND server_id = $2 " +
-      "RETURNING id, server_id, type, name, parent_id, position, created_at",
-      [cid, sid, name, parentId, position]
-    );
-    return peopleChannelPublic(result.rows[0]);
-  }
-
-  const data = peopleReadLocalServers();
-  const item = (data.channels || []).find((entry) =>
-    String(entry.id) === cid && String(entry.serverId ?? entry.server_id ?? "") === sid
-  );
-  if (!item) return null;
-  item.name = name;
-  item.parentId = parentId;
-  item.position = position;
-  peopleWriteLocalServers(data);
-  return peopleChannelPublic(item);
-}
-
-async function peopleDeleteServerChannel(serverId, channelId) {
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  const current = await peopleGetServerChannel(sid, cid);
-  if (!current) return { ok: false, code: "NOT_FOUND" };
-
-  const channels = await peopleListServerChannels(sid);
-  if (current.type === "text" && channels.filter((item) => item.type === "text").length <= 1) {
-    return { ok: false, code: "LAST_TEXT" };
-  }
-
-  if (current.type === "voice") {
-    for (const [socketId, voiceUser] of [...voiceUsers.entries()]) {
-      if (
-        String(voiceUser?.serverId || "") === sid &&
-        String(voiceUser?.channelId || "") === cid
-      ) {
-        const targetSocket = io.sockets.sockets.get(socketId);
-        if (targetSocket) leaveVoice(targetSocket);
-      }
-    }
-  }
-
-  if (peoplePool) {
-    const client = await peoplePool.connect();
-    try {
-      await client.query("BEGIN");
-      if (current.type === "category") {
-        await client.query(
-          "UPDATE people_server_channels SET parent_id = NULL WHERE server_id = $1 AND parent_id = $2",
-          [sid, cid]
-        );
-      }
-      await client.query(
-        "DELETE FROM people_server_channels WHERE id = $1 AND server_id = $2",
-        [cid, sid]
-      );
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK").catch(() => {});
-      throw err;
-    } finally {
-      client.release();
-    }
-  } else {
-    const data = peopleReadLocalServers();
-    if (current.type === "category") {
-      for (const item of data.channels || []) {
-        if (String(item.parentId ?? item.parent_id ?? "") === cid) item.parentId = null;
-      }
-    }
-    data.channels = (data.channels || []).filter((item) => String(item.id) !== cid);
-    peopleWriteLocalServers(data);
-
-    if (current.type === "text") {
-      const messages = peopleReadLocalGeneral();
-      const removed = messages.filter((message) =>
-        String(message.serverId || "") === sid && String(message.channelId || "") === cid
-      );
-      for (const message of removed) {
-        peopleDeleteLocalBoundMessageImage("general", message.id);
-      }
-      peopleWriteLocalGeneral(messages.filter((message) =>
-        !(String(message.serverId || "") === sid && String(message.channelId || "") === cid)
-      ));
-    }
-  }
-
-  return { ok: true, channel: current };
-}
-
-async function peopleInitServerChannelsV2() {
-  if (peoplePool) {
-    await peoplePool.query(
-      "CREATE TABLE IF NOT EXISTS people_server_channels (" +
-      "id BIGSERIAL PRIMARY KEY, " +
-      "server_id BIGINT NOT NULL REFERENCES people_servers(id) ON DELETE CASCADE, " +
-      "type VARCHAR(12) NOT NULL CHECK(type IN ('category','text','voice')), " +
-      "name VARCHAR(50) NOT NULL, " +
-      "parent_id BIGINT NULL REFERENCES people_server_channels(id) ON DELETE SET NULL, " +
-      "position INTEGER NOT NULL DEFAULT 0, " +
-      "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()" +
-      ")"
-    );
-    await peoplePool.query(
-      "CREATE INDEX IF NOT EXISTS people_server_channels_server_position_idx " +
-      "ON people_server_channels(server_id, position, id)"
-    );
-    await peoplePool.query(
-      "ALTER TABLE people_general_messages ADD COLUMN IF NOT EXISTS channel_id BIGINT NULL " +
-      "REFERENCES people_server_channels(id) ON DELETE CASCADE"
-    );
-
-    const servers = await peoplePool.query("SELECT id FROM people_servers ORDER BY id ASC");
-    for (const row of servers.rows) {
-      const sid = String(row.id);
-      let text = await peopleDefaultServerChannel(sid, "text");
-      if (!text) text = await peopleCreateServerChannel(sid, "text", "général", null);
-      let voice = await peopleDefaultServerChannel(sid, "voice");
-      if (!voice) voice = await peopleCreateServerChannel(sid, "voice", "vocal", null);
-      await peoplePool.query(
-        "UPDATE people_general_messages SET channel_id = $2 WHERE server_id = $1 AND channel_id IS NULL",
-        [sid, text.id]
-      );
-    }
-    await peoplePool.query(
-      "CREATE INDEX IF NOT EXISTS people_general_messages_channel_created_idx " +
-      "ON people_general_messages(channel_id, created_at DESC)"
-    );
-    console.log("[People] Catégories et salons serveur V2 prêts.");
-    return;
-  }
-
-  const data = peopleReadLocalServers();
-  data.channels = Array.isArray(data.channels) ? data.channels : [];
-  for (const server of data.servers || []) {
-    const sid = String(server.id);
-    let text = data.channels.find((item) => String(item.serverId || "") === sid && item.type === "text");
-    if (!text) {
-      text = {
-        id: cryptoAccounts.randomUUID(), serverId: sid, type: "text", name: "général",
-        parentId: null, position: data.channels.length, createdAt: new Date().toISOString()
-      };
-      data.channels.push(text);
-    }
-    if (!data.channels.some((item) => String(item.serverId || "") === sid && item.type === "voice")) {
-      data.channels.push({
-        id: cryptoAccounts.randomUUID(), serverId: sid, type: "voice", name: "vocal",
-        parentId: null, position: data.channels.length, createdAt: new Date().toISOString()
-      });
-    }
-    const messages = peopleReadLocalGeneral();
-    let changed = false;
-    for (const message of messages) {
-      if (String(message.serverId || "") === sid && !message.channelId) {
-        message.channelId = String(text.id);
-        changed = true;
-      }
-    }
-    if (changed) peopleWriteLocalGeneral(messages);
-  }
-  peopleWriteLocalServers(data);
-  console.log("[People] Catégories et salons serveur locaux V2 prêts.");
-}
-
-app.get("/api/servers/:id/channels", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res);
-    if (!session) return;
-    const member = await peopleIsServerMember(session.id, req.params.id);
-    if (!member) return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-    res.json({ ok: true, channels: await peopleListServerChannels(req.params.id) });
-  } catch (err) {
-    console.error("[People channels/list]", err);
-    res.status(500).json({ ok: false, error: "Impossible de charger les salons." });
-  }
-});
-
-app.post("/api/servers/:id/channels", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res);
-    if (!session) return;
-    if (!(await peopleCanManageServerChannels(session.id, req.params.id))) {
-      return res.status(403).json({ ok: false, error: "Seul le propriétaire peut gérer les salons pour le moment." });
-    }
-    const channel = await peopleCreateServerChannel(req.params.id, req.body?.type, req.body?.name, req.body?.parentId);
-    await peopleBroadcastServerChannels(req.params.id);
-    res.status(201).json({ ok: true, channel });
-  } catch (err) {
-    const status = err?.code === "CHANNEL_INVALID" ? 400 : 500;
-    res.status(status).json({ ok: false, error: status === 400 ? "Nom ou type de salon invalide." : "Impossible de créer cet élément." });
-  }
-});
-
-app.patch("/api/servers/:id/channels/:channelId", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res);
-    if (!session) return;
-    if (!(await peopleCanManageServerChannels(session.id, req.params.id))) {
-      return res.status(403).json({ ok: false, error: "Seul le propriétaire peut gérer les salons pour le moment." });
-    }
-    const channel = await peopleUpdateServerChannel(req.params.id, req.params.channelId, req.body || {});
-    if (!channel) return res.status(404).json({ ok: false, error: "Salon introuvable." });
-    await peopleBroadcastServerChannels(req.params.id);
-    res.json({ ok: true, channel });
-  } catch (err) {
-    const status = err?.code === "CHANNEL_INVALID" ? 400 : 500;
-    res.status(status).json({ ok: false, error: status === 400 ? "Nom de salon invalide." : "Impossible de modifier cet élément." });
-  }
-});
-
-app.delete("/api/servers/:id/channels/:channelId", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res);
-    if (!session) return;
-    if (!(await peopleCanManageServerChannels(session.id, req.params.id))) {
-      return res.status(403).json({ ok: false, error: "Seul le propriétaire peut gérer les salons pour le moment." });
-    }
-    const result = await peopleDeleteServerChannel(req.params.id, req.params.channelId);
-    if (!result.ok && result.code === "LAST_TEXT") {
-      return res.status(400).json({ ok: false, error: "Un serveur doit garder au moins un salon textuel." });
-    }
-    if (!result.ok) return res.status(404).json({ ok: false, error: "Salon introuvable." });
-    await peopleBroadcastServerChannels(req.params.id);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("[People channels/delete]", err);
-    res.status(500).json({ ok: false, error: "Impossible de supprimer cet élément." });
-  }
-});
-// === PEOPLE_SERVER_CHANNELS_V2_END ===
-
 app.get(
   "/api/servers",
   async (req, res) => {
@@ -9792,13 +9323,6 @@ app.post(
           session.id,
           req.body?.name
         );
-
-      if (!(await peopleDefaultServerChannel(server.id, "text"))) {
-        await peopleCreateServerChannel(server.id, "text", "général", null);
-      }
-      if (!(await peopleDefaultServerChannel(server.id, "voice"))) {
-        await peopleCreateServerChannel(server.id, "voice", "vocal", null);
-      }
 
       res.status(201).json({
         ok: true,
@@ -9913,20 +9437,15 @@ async function peopleSaveServerSystemMessage(
     return null;
   }
 
-  const textChannel = await peopleDefaultServerChannel(sid, "text");
-  const channelId = textChannel ? String(textChannel.id) : null;
-  if (!channelId) return null;
-
   if (peoplePool) {
     const result =
       await peoplePool.query(
         "INSERT INTO people_general_messages " +
-        "(server_id, channel_id, sender_id, username, body, is_system) " +
-        "VALUES ($1, $2, NULL, $3, $4, TRUE) " +
+        "(server_id, sender_id, username, body, is_system) " +
+        "VALUES ($1, NULL, $2, $3, TRUE) " +
         "RETURNING id, body, created_at",
         [
           sid,
-          channelId,
           "Système",
           peopleEncryptMessageText(
             cleanText
@@ -9942,7 +9461,6 @@ async function peopleSaveServerSystemMessage(
         String(row.id),
       serverId:
         sid,
-      channelId,
       username:
         "Système",
       text:
@@ -9966,7 +9484,6 @@ async function peopleSaveServerSystemMessage(
       cryptoAccounts.randomUUID(),
     serverId:
       sid,
-    channelId,
     senderId:
       null,
     username:
@@ -10557,7 +10074,6 @@ app.get("/health", (req, res) => {
 const users = new Map();
 const userIds = new Map();
 const socketServerIds = new Map();
-const socketTextChannelIds = new Map();
 const voiceUsers = new Map();
 
 // === PEOPLE_DM_CALLS_V1_START ===
@@ -12537,10 +12053,6 @@ function peopleVoiceRoom(
     sid
   );
 }
-
-function peopleVoiceChannelRoom(serverId, channelId) {
-  return "people:voice-channel:" + String(serverId || "") + ":" + String(channelId || "");
-}
 // === PEOPLE_VOICE_NAVIGATION_V2_END ===
 
 // === PEOPLE_MULTI_VOICE_V1_START ===
@@ -12783,8 +12295,6 @@ function peopleVoicePublicUser(
       ),
     username:
       user?.username,
-    channelId:
-      user?.channelId ? String(user.channelId) : null,
     muted:
       Boolean(
         user?.muted
@@ -12943,15 +12453,6 @@ function leaveVoice(socket) {
         sid
       )
     );
-
-    if (current.channelId) {
-      void socket.leave(
-        peopleVoiceChannelRoom(
-          sid,
-          current.channelId
-        )
-      );
-    }
   }
 
   if (accountId) {
@@ -13834,7 +13335,7 @@ io.on("connection", (socket) => {
   socket.on(
     "server-select",
     async (
-      { serverId, channelId } = {},
+      { serverId } = {},
       ack = () => {}
     ) => {
       try {
@@ -13901,9 +13402,6 @@ io.on("connection", (socket) => {
           socketServerIds.delete(
             socket.id
           );
-          socketTextChannelIds.delete(
-            socket.id
-          );
 
           emitOnlineUsers(
             oldServerId
@@ -13921,25 +13419,12 @@ io.on("connection", (socket) => {
           )
         );
 
-        const channels = await peopleListServerChannels(server.id);
-        const requestedText = channelId
-          ? channels.find((item) => String(item.id) === String(channelId) && item.type === "text")
-          : null;
-        const activeTextChannel = requestedText || channels.find((item) => item.type === "text") || null;
-
-        if (!activeTextChannel) {
-          return ack({ ok: false, error: "Ce serveur n'a aucun salon textuel." });
-        }
-
-        socketTextChannelIds.set(socket.id, String(activeTextChannel.id));
-
         // === PEOPLE_NAVIGATION_PARALLEL_V1_SERVER ===
         // Historique et présence ne dépendent pas l'un de l'autre.
         const [history, online] =
           await Promise.all([
             peopleServerLoadMessages(
               server.id,
-              activeTextChannel.id,
               100
             ),
             peopleServerPresenceRoster(
@@ -13965,9 +13450,7 @@ io.on("connection", (socket) => {
             ),
           history,
           online,
-          voice,
-          channels,
-          activeChannelId: String(activeTextChannel.id)
+          voice
         });
       } catch (err) {
         console.error(
@@ -13980,28 +13463,6 @@ io.on("connection", (socket) => {
           error:
             "Impossible d'ouvrir ce serveur."
         });
-      }
-    }
-  );
-
-
-  socket.on(
-    "server-channel-select",
-    async ({ serverId, channelId } = {}, ack = () => {}) => {
-      try {
-        const accountId = userIds.get(socket.id);
-        const sid = String(serverId || socketServerIds.get(socket.id) || "");
-        if (!accountId || !sid) return ack({ ok: false, error: "Session invalide." });
-        if (!(await peopleIsServerMember(accountId, sid))) return ack({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-        const channel = await peopleGetServerChannel(sid, channelId, "text");
-        if (!channel) return ack({ ok: false, error: "Salon textuel introuvable." });
-        socketServerIds.set(socket.id, sid);
-        socketTextChannelIds.set(socket.id, String(channel.id));
-        const history = await peopleServerLoadMessages(sid, channel.id, 100);
-        ack({ ok: true, serverId: sid, channel, activeChannelId: String(channel.id), history });
-      } catch (err) {
-        console.error("[People channel/select]", err);
-        ack({ ok: false, error: "Impossible d'ouvrir ce salon." });
       }
     }
   );
@@ -14032,10 +13493,7 @@ io.on("connection", (socket) => {
       const serverId =
         socketServerIds.get(socket.id);
 
-      const channelId =
-        socketTextChannelIds.get(socket.id);
-
-      if (!username || !senderId || !serverId || !channelId) {
+      if (!username || !senderId || !serverId) {
         reply({
           ok: false,
           error: "Session ou serveur invalide."
@@ -14070,7 +13528,6 @@ io.on("connection", (socket) => {
         const saved =
           await peopleServerSaveMessage(
             serverId,
-            channelId,
             senderId,
             username,
             cleanText,
@@ -14151,15 +13608,9 @@ io.on("connection", (socket) => {
             socket.id
           );
 
-        const channelId =
-          socketTextChannelIds.get(
-            socket.id
-          );
-
         if (
           !senderId ||
-          !serverId ||
-          !channelId
+          !serverId
         ) {
           return ack({
             ok: false,
@@ -14172,7 +13623,6 @@ io.on("connection", (socket) => {
           await peopleServerDeleteMessage(
             senderId,
             serverId,
-            channelId,
             id
           );
 
@@ -14192,9 +13642,7 @@ io.on("connection", (socket) => {
           "chat-message-deleted",
           {
             id:
-              String(id),
-            channelId:
-              String(channelId)
+              String(id)
           }
         );
 
@@ -14222,8 +13670,6 @@ io.on("connection", (socket) => {
       {
         serverId:
           requestedServerId,
-        channelId:
-          requestedChannelId,
         muted,
         camera,
         screen
@@ -14295,23 +13741,6 @@ io.on("connection", (socket) => {
             server.id
           );
 
-        const voiceChannel =
-          await peopleGetServerChannel(
-            sid,
-            requestedChannelId,
-            "voice"
-          ) ||
-          await peopleDefaultServerChannel(
-            sid,
-            "voice"
-          );
-
-        if (!voiceChannel) {
-          return ack({ ok: false, error: "Salon vocal introuvable." });
-        }
-
-        const voiceChannelId = String(voiceChannel.id);
-
         const aid =
           String(
             accountId
@@ -14330,18 +13759,11 @@ io.on("connection", (socket) => {
           if (
             String(
               currentVoice.serverId
-            ) === sid &&
-            String(currentVoice.channelId || "") === voiceChannelId
+            ) === sid
           ) {
             await socket.join(
               peopleVoiceRoom(
                 sid
-              )
-            );
-            await socket.join(
-              peopleVoiceChannelRoom(
-                sid,
-                voiceChannelId
               )
             );
 
@@ -14354,9 +13776,7 @@ io.on("connection", (socket) => {
               ok: true,
               serverId:
                 sid,
-              channelId:
-                voiceChannelId,
-              roster: roster.filter((user) => String(user.channelId || "") === voiceChannelId),
+              roster,
               voiceRooms:
                 peopleVoiceAccountServerIds(
                   aid
@@ -14420,8 +13840,6 @@ io.on("connection", (socket) => {
               sid,
             accountId:
               aid,
-            channelId:
-              voiceChannelId,
             username,
             muted:
               Boolean(
@@ -14444,13 +13862,6 @@ io.on("connection", (socket) => {
           )
         );
 
-        await socket.join(
-          peopleVoiceChannelRoom(
-            sid,
-            voiceChannelId
-          )
-        );
-
         const roster =
           peopleVoiceRoster(
             sid
@@ -14460,8 +13871,8 @@ io.on("connection", (socket) => {
           "voice-peers",
           roster.filter(
             (user) =>
-              user.id !== socket.id &&
-              String(user.channelId || "") === voiceChannelId
+              user.id !==
+              socket.id
           )
         );
 
@@ -14481,9 +13892,7 @@ io.on("connection", (socket) => {
           ok: true,
           serverId:
             sid,
-          channelId:
-            voiceChannelId,
-          roster: roster.filter((user) => String(user.channelId || "") === voiceChannelId),
+          roster,
           voiceRooms:
             roomCount
         });
@@ -14602,8 +14011,6 @@ io.on("connection", (socket) => {
         !other ||
         String(mine.serverId) !==
           String(other.serverId) ||
-        String(mine.channelId || "") !==
-          String(other.channelId || "") ||
         !sdp
       ) {
         return;
@@ -14645,8 +14052,6 @@ io.on("connection", (socket) => {
         !other ||
         String(mine.serverId) !==
           String(other.serverId) ||
-        String(mine.channelId || "") !==
-          String(other.channelId || "") ||
         !sdp
       ) {
         return;
@@ -14684,8 +14089,6 @@ io.on("connection", (socket) => {
         !other ||
         String(mine.serverId) !==
           String(other.serverId) ||
-        String(mine.channelId || "") !==
-          String(other.channelId || "") ||
         !candidate
       ) {
         return;
@@ -14719,9 +14122,7 @@ io.on("connection", (socket) => {
         !mine ||
         !other ||
         String(mine.serverId) !==
-          String(other.serverId) ||
-        String(mine.channelId || "") !==
-          String(other.channelId || "")
+          String(other.serverId)
       ) {
         return;
       }
@@ -14761,10 +14162,6 @@ io.on("connection", (socket) => {
       );
 
       socketServerIds.delete(
-        socket.id
-      );
-
-      socketTextChannelIds.delete(
         socket.id
       );
 
@@ -14979,7 +14376,6 @@ const PORT = Number(process.env.PORT) || 3000;
 peopleInitAccounts()
   .then(() => peopleInitSocial())
   .then(() => peopleInitServersV1())
-  .then(() => peopleInitServerChannelsV2())
   .then(() => peopleMigrateStoredMessageEncryption())
   // === PEOPLE_DELETE_EMPTY_ON_STARTUP_V1 ===
   .then(() => peopleDeleteAllEmptyServers())
