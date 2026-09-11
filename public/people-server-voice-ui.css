@@ -1,0 +1,213 @@
+/* === PEOPLE_SERVER_VOICE_UI_V1 === */
+
+/* Le vocal serveur devient une vraie carte d'appel, proche de l'UI des MP. */
+#videoStage.people-server-call-stage:not(.hidden) {
+  position: relative;
+  width: min(1180px, calc(100% - 28px));
+  max-height: min(68vh, 760px);
+  margin: 14px auto 0;
+  padding: 12px 12px 84px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--people-accent, #67589d) 25%, #302a3b);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(119, 103, 180, .10), transparent 46%),
+    color-mix(in srgb, var(--people-panel, #17131f) 92%, #09080d);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .24);
+}
+
+#videoStage.people-server-call-stage .video-grid.people-server-call-grid {
+  width: 100%;
+  max-width: none;
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+#videoStage.people-server-call-stage .video-tile {
+  min-height: 190px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 14px;
+  background: #08080b;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .24);
+}
+
+#videoStage.people-server-call-stage .video-label {
+  left: 12px;
+  bottom: 12px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 9px;
+  background: rgba(12, 10, 17, .72);
+  backdrop-filter: blur(10px);
+}
+
+/* Inversion demandée sur ta caméra locale : effets à gauche, plein écran à droite. */
+.video-tile.local > .people-video-effects-button {
+  left: 9px !important;
+  right: auto !important;
+}
+
+.video-tile > .people-media-server-fullscreen {
+  left: auto !important;
+  right: 9px !important;
+}
+
+/* Barre de contrôles du vocal, façon appel MP. */
+.people-server-call-controls {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 9px;
+  max-width: calc(100% - 24px);
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 15px;
+  background: rgba(15, 12, 21, .88);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .32);
+  backdrop-filter: blur(14px);
+}
+
+.people-server-call-control {
+  min-width: 70px;
+  min-height: 56px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  background: color-mix(in srgb, var(--people-surface, #292335) 90%, #111015);
+  color: var(--text, #f2f3f5);
+  font: inherit;
+  cursor: pointer;
+  transition: transform .12s ease, background .12s ease, opacity .12s ease;
+}
+
+.people-server-call-control:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--people-accent, #67589d) 32%, #292335);
+}
+
+.people-server-call-control:active:not(:disabled) {
+  transform: translateY(1px) scale(.98);
+}
+
+.people-server-call-control.active {
+  background: color-mix(in srgb, var(--people-accent, #67589d) 58%, #241f31);
+}
+
+.people-server-call-control.muted {
+  background: rgba(218, 55, 60, .18);
+}
+
+.people-server-call-control.danger {
+  background: #da4751;
+  color: #fff;
+}
+
+.people-server-call-control.danger:hover:not(:disabled) {
+  background: #e6535d;
+}
+
+.people-server-call-control:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.people-server-call-control-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.people-server-call-control-label {
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+/*
+  Volume individuel : l'ancien module fonctionnait seulement avec le vieux
+  payload voice-state (tableau). Le JS patché accepte maintenant roster.
+  Ici on rend les contrôles compacts et bien visibles sous chaque autre membre.
+*/
+#voiceUsers .voice-user {
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+#voiceUsers .people-local-audio-controls {
+  grid-column: 2 / -1;
+  width: 100%;
+  padding: 2px 0 4px !important;
+  display: grid !important;
+  grid-template-columns: 28px minmax(52px, 1fr) 34px !important;
+  gap: 6px !important;
+  align-items: center;
+}
+
+#voiceUsers .people-local-mute {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+}
+
+#voiceUsers .people-local-volume {
+  min-width: 0;
+  width: 100%;
+}
+
+#voiceUsers .people-local-volume-value {
+  display: block;
+  width: 34px;
+  font-size: 9px;
+  text-align: right;
+}
+
+#voiceUsers {
+  max-height: min(34vh, 320px);
+}
+
+@media (max-width: 760px) {
+  #videoStage.people-server-call-stage:not(.hidden) {
+    width: calc(100% - 12px);
+    margin-top: 6px;
+    padding: 7px 7px 74px;
+    border-radius: 13px;
+    max-height: 62vh;
+  }
+
+  .people-server-call-controls {
+    gap: 5px;
+    padding: 6px;
+    bottom: 8px;
+  }
+
+  .people-server-call-control {
+    min-width: 52px;
+    min-height: 50px;
+    padding: 6px;
+  }
+
+  .people-server-call-control-label {
+    font-size: 9px;
+  }
+
+  #voiceUsers .people-local-volume-value {
+    display: none;
+  }
+
+  #voiceUsers .people-local-audio-controls {
+    grid-template-columns: 26px minmax(42px, 1fr) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .people-server-call-control { transition: none; }
+}

@@ -337,16 +337,7 @@
     );
   }
 
-  // === PEOPLE_LOCAL_AUDIO_VOICE_PAYLOAD_V2 ===
-function peopleLocalAudioRosterFromVoiceState(payload) {
-  if (Array.isArray(payload)) return payload;
-  return Array.isArray(payload?.roster) ? payload.roster : [];
-}
-
-peopleSocket.on("voice-state", (payload) => {
-  scheduleRosterRender(peopleLocalAudioRosterFromVoiceState(payload));
-});
-// === PEOPLE_LOCAL_AUDIO_VOICE_PAYLOAD_V2_END ===
+  peopleSocket.on("voice-state", scheduleRosterRender);
 
   if (audioContainer) {
     const observer = new MutationObserver(scheduleApplyAllPrefs);

@@ -4779,9 +4779,32 @@
   pipRestore.textContent =
     "↗";
 
+  const pipClose =
+    document.createElement(
+      "button"
+    );
+
+  pipClose.type =
+    "button";
+
+  pipClose.className =
+    "people-dm-call-video-pip-close";
+
+  pipClose.title =
+    "Masquer la caméra";
+
+  pipClose.setAttribute(
+    "aria-label",
+    "Masquer la caméra"
+  );
+
+  pipClose.textContent =
+    "×";
+
   pipHeader.append(
     pipTitle,
-    pipRestore
+    pipRestore,
+    pipClose
   );
 
   const pipVideo =
@@ -4978,13 +5001,6 @@
     const callHere =
       currentDmMatchesCall();
 
-    // V2 : le mode Reduire appartient uniquement au MP actuellement ouvert.
-    // Si on va sur Amis / un serveur / un autre MP, on revient automatiquement
-    // a l'etat normal et aucune mini-fenetre ne suit l'utilisateur.
-    if (!callHere && pipForced) {
-      setManualMini(false);
-    }
-
     if (
       remoteCamera &&
       !previousRemoteCamera
@@ -5020,8 +5036,11 @@
 
     const shouldShow =
       remoteCamera &&
-      callHere &&
-      pipForced;
+      (
+        !callHere ||
+        pipForced
+      ) &&
+      !pipDismissed;
 
     pip.classList.toggle(
       "hidden",
@@ -5087,10 +5106,35 @@
     }
   );
 
+  pipClose.addEventListener(
+    "click",
+    (event) => {
+      event.stopPropagation();
+
+      /*
+        Fermer la fenêtre réduite annule le mode manuel.
+        Hors du MP, elle reste simplement masquée jusqu'à ce que
+        l'utilisateur revienne dans l'appel et choisisse Réduire.
+      */
+      if (pipForced) {
+        setManualMini(
+          false
+        );
+      }
+
+      pipDismissed =
+        !currentDmMatchesCall();
+
+      syncPip();
+    }
+  );
+
   pipHeader.addEventListener(
     "pointerdown",
     (event) => {
       if (
+        event.target ===
+          pipClose ||
         event.target ===
           pipRestore
       ) {
