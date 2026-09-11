@@ -11,11 +11,11 @@
   // Dessins du filtre Chat fournis pour People. Chaque élément reste séparé
   // afin de suivre correctement la rotation et la taille du visage.
   const CAT_ASSET_URLS = Object.freeze({
-    leftEar: "assets/people-facefx/cat/ear-left.png?v=people-cat-fix-v5-20260911a",
-    rightEar: "assets/people-facefx/cat/ear-right.png?v=people-cat-fix-v5-20260911a",
-    leftWhiskers: "assets/people-facefx/cat/whiskers-left.png?v=people-cat-fix-v5-20260911a",
-    rightWhiskers: "assets/people-facefx/cat/whiskers-right.png?v=people-cat-fix-v5-20260911a",
-    nose: "assets/people-facefx/cat/nose.png?v=people-cat-fix-v5-20260911a"
+    leftEar: "assets/people-facefx/cat/ear-left.png?v=people-cat-fix-v6-20260911a",
+    rightEar: "assets/people-facefx/cat/ear-right.png?v=people-cat-fix-v6-20260911a",
+    leftWhiskers: "assets/people-facefx/cat/whiskers-left.png?v=people-cat-fix-v6-20260911a",
+    rightWhiskers: "assets/people-facefx/cat/whiskers-right.png?v=people-cat-fix-v6-20260911a",
+    nose: "assets/people-facefx/cat/nose.png?v=people-cat-fix-v6-20260911a"
   });
 
   const EFFECTS = Object.freeze([
@@ -446,24 +446,27 @@
 
       // Les proportions sont volontairement liées à la boîte du visage :
       // le dessin grandit/rétrécit avec la personne et suit l'inclinaison de la tête.
-      // V5 : oreilles légèrement réduites, remontées et un peu plus écartées.
-      const earW = w * 0.47;
-      const earH = w * 0.425;
-      const earY = -h * 0.88;
-      context.drawImage(catAssets.leftEar, -w * 0.60, earY, earW, earH);
-      context.drawImage(catAssets.rightEar, w * 0.60 - earW, earY, earW, earH);
+      // V6 : réglage calé sur le gabarit beige fourni.
+      // Oreilles plus hautes, plus écartées et légèrement plus compactes.
+      const earW = w * 0.425;
+      const earH = w * 0.405;
+      const earY = -h * 1.02;
+      context.drawImage(catAssets.leftEar, -w * 0.69, earY, earW, earH);
+      context.drawImage(catAssets.rightEar, w * 0.69 - earW, earY, earW, earH);
 
-      const whiskersW = w * 0.41;
-      const whiskersH = h * 0.25;
-      const whiskersY = h * 0.03;
-      const whiskersInnerGap = w * 0.17;
+      // Les moustaches restent bien séparées du nez et sont raccourcies
+      // pour correspondre aux traits beige du gabarit.
+      const whiskersW = w * 0.335;
+      const whiskersH = h * 0.215;
+      const whiskersY = -h * 0.025;
+      const whiskersInnerGap = w * 0.235;
       context.drawImage(catAssets.leftWhiskers, -whiskersInnerGap - whiskersW, whiskersY, whiskersW, whiskersH);
       context.drawImage(catAssets.rightWhiskers, whiskersInnerGap, whiskersY, whiskersW, whiskersH);
 
-      // Nez remonté pour mieux coller au dessin de référence.
-      const noseW = w * 0.12;
-      const noseH = h * 0.105;
-      const noseY = h * 0.055;
+      // Petit nez placé plus haut, comme sur le gabarit beige.
+      const noseW = w * 0.072;
+      const noseH = h * 0.064;
+      const noseY = -h * 0.015;
       context.drawImage(catAssets.nose, -noseW / 2, noseY, noseW, noseH);
     });
   }
