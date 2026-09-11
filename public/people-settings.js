@@ -2086,7 +2086,11 @@
       theme: String(source.theme || fallback.theme),
       palette: {
         ...fallback.palette,
-        ...(source.palette || {})
+        ...(source.palette || {}),
+        gradient: {
+          ...fallback.palette.gradient,
+          ...(source.palette?.gradient || {})
+        }
       }
     };
   }
@@ -2142,7 +2146,27 @@
         accent:
           defaults?.palette
             ?.accent ||
-          "#67589D"
+          "#67589D",
+        gradient: {
+          enabled:
+            defaults?.palette
+              ?.gradient?.enabled !== false,
+          direction:
+            Number(defaults?.palette
+              ?.gradient?.direction) || 135,
+          intensity:
+            Number(defaults?.palette
+              ?.gradient?.intensity) || 72,
+          start:
+            String(defaults?.palette
+              ?.gradient?.start || "#5865F2").toUpperCase(),
+          middle:
+            String(defaults?.palette
+              ?.gradient?.middle || "#8B5CF6").toUpperCase(),
+          end:
+            String(defaults?.palette
+              ?.gradient?.end || "#EB459E").toUpperCase()
+        }
       }
     };
   }
@@ -2181,7 +2205,13 @@
         (key) =>
           a.palette[key] ===
           b.palette[key]
-      )
+      ) &&
+      a.palette.gradient.enabled === b.palette.gradient.enabled &&
+      a.palette.gradient.direction === b.palette.gradient.direction &&
+      a.palette.gradient.intensity === b.palette.gradient.intensity &&
+      a.palette.gradient.start === b.palette.gradient.start &&
+      a.palette.gradient.middle === b.palette.gradient.middle &&
+      a.palette.gradient.end === b.palette.gradient.end
     );
   }
 
@@ -2261,6 +2291,68 @@
         palette[key]
       );
     }
+
+    // La grande preview doit refléter le vrai dégradé du thème, pas seulement
+    // les cinq couleurs de base. On mélange les trois stops du dégradé avec
+    // chaque surface afin de garder le rôle visuel du fond / panneau / rail.
+    const rawGradient = palette.gradient || {};
+    const enabled = rawGradient.enabled !== false;
+    const direction = Math.max(
+      0,
+      Math.min(360, Math.round(Number(rawGradient.direction) || 135))
+    );
+    const intensity = Math.max(
+      0,
+      Math.min(100, Math.round(Number(rawGradient.intensity) || 72))
+    );
+    const start = appearanceValidHex(rawGradient.start)
+      ? String(rawGradient.start).toUpperCase()
+      : String(palette.background).toUpperCase();
+    const middle = appearanceValidHex(rawGradient.middle)
+      ? String(rawGradient.middle).toUpperCase()
+      : String(palette.accent).toUpperCase();
+    const end = appearanceValidHex(rawGradient.end)
+      ? String(rawGradient.end).toUpperCase()
+      : String(palette.secondary).toUpperCase();
+
+    // Reproduit exactement le mix sRGB utilisé par people-appearance.js.
+    // Avant, la preview utilisait color-mix() et des coefficients légèrement
+    // différents, ce qui pouvait la rendre un peu plus claire que le vrai thème.
+    const mixExact = (base, color, ratio) => {
+      const a = appearanceHexToRgb(base);
+      const b = appearanceHexToRgb(color);
+      const t = Math.max(0, Math.min(1, Number(ratio) || 0));
+      return appearanceRgbToHex({
+        r: a.r + (b.r - a.r) * t,
+        g: a.g + (b.g - a.g) * t,
+        b: a.b + (b.b - a.b) * t
+      });
+    };
+
+    const gradientFor = (base, strength = 1) => {
+      if (!enabled || intensity <= 0) return base;
+      const power = (intensity / 100) * strength;
+      return `linear-gradient(${direction}deg, ${mixExact(base, start, power)} 0%, ${mixExact(base, middle, power)} 50%, ${mixExact(base, end, power)} 100%)`;
+    };
+
+    // Même coefficients que le rendu réel :
+    // main = 1.00, panneaux = 0.78, rail = 0.62.
+    appearancePalettePreview.style.setProperty(
+      "--preview-gradient-main",
+      gradientFor(palette.background, 1)
+    );
+    appearancePalettePreview.style.setProperty(
+      "--preview-gradient-panel",
+      gradientFor(palette.panel, 0.78)
+    );
+    appearancePalettePreview.style.setProperty(
+      "--preview-gradient-panel-soft",
+      gradientFor(palette.panel, 0.78)
+    );
+    appearancePalettePreview.style.setProperty(
+      "--preview-gradient-secondary",
+      gradientFor(palette.secondary, 0.62)
+    );
   }
 
   function setAppearanceButtons() {
@@ -2331,6 +2423,62 @@
     };
 
     setPalettePreview(palette);
+
+    const gradient = {
+      enabled: palette.gradient?.enabled !== false,
+      direction: Math.max(0, Math.min(360, Math.round(Number(palette.gradient?.direction) || 135))),
+      intensity: Math.max(0, Math.min(100, Math.round(Number(palette.gradient?.intensity) || 72))),
+      start: appearanceValidHex(palette.gradient?.start)
+        ? String(palette.gradient.start).toUpperCase()
+        : String(palette.background).toUpperCase(),
+      middle: appearanceValidHex(palette.gradient?.middle)
+        ? String(palette.gradient.middle).toUpperCase()
+        : String(palette.accent).toUpperCase(),
+      end: appearanceValidHex(palette.gradient?.end)
+        ? String(palette.gradient.end).toUpperCase()
+        : String(palette.secondary).toUpperCase()
+    };
+    const gradientEnabled = appearancePaletteEditor
+      ?.querySelector("[data-appearance-gradient-enabled]");
+    const gradientDirection = appearancePaletteEditor
+      ?.querySelector("[data-appearance-gradient-direction]");
+    const gradientIntensity = appearancePaletteEditor
+      ?.querySelector("[data-appearance-gradient-intensity]");
+    const gradientDirectionValue = appearancePaletteEditor
+      ?.querySelector("[data-appearance-gradient-direction-value]");
+    const gradientIntensityValue = appearancePaletteEditor
+      ?.querySelector("[data-appearance-gradient-intensity-value]");
+    const gradientPreview = appearancePaletteEditor
+      ?.querySelector("[data-appearance-gradient-preview]");
+    const gradientStart = appearancePaletteEditor
+      ?.querySelector('[data-appearance-gradient-color="start"]');
+    const gradientMiddle = appearancePaletteEditor
+      ?.querySelector('[data-appearance-gradient-color="middle"]');
+    const gradientEnd = appearancePaletteEditor
+      ?.querySelector('[data-appearance-gradient-color="end"]');
+
+    if (gradientEnabled instanceof HTMLInputElement) {
+      gradientEnabled.checked = gradient.enabled;
+    }
+    if (gradientDirection instanceof HTMLInputElement) {
+      gradientDirection.value = String(gradient.direction);
+    }
+    if (gradientIntensity instanceof HTMLInputElement) {
+      gradientIntensity.value = String(gradient.intensity);
+    }
+    if (gradientDirectionValue) {
+      gradientDirectionValue.textContent = `${gradient.direction}°`;
+    }
+    if (gradientIntensityValue) {
+      gradientIntensityValue.textContent = `${gradient.intensity}%`;
+    }
+    if (gradientStart instanceof HTMLInputElement) gradientStart.value = gradient.start;
+    if (gradientMiddle instanceof HTMLInputElement) gradientMiddle.value = gradient.middle;
+    if (gradientEnd instanceof HTMLInputElement) gradientEnd.value = gradient.end;
+    if (gradientPreview instanceof HTMLElement) {
+      gradientPreview.style.background =
+        `linear-gradient(${gradient.direction}deg, ${gradient.start} 0%, ${gradient.middle} 50%, ${gradient.end} 100%)`;
+    }
 
     const customPreview =
       appearanceThemes
@@ -2663,6 +2811,50 @@
 
         if (!target) return;
 
+        if (
+          target.matches("[data-appearance-gradient-enabled], [data-appearance-gradient-direction], [data-appearance-gradient-intensity], [data-appearance-gradient-color]")
+        ) {
+          const base = appearanceValue();
+          const gradient = {
+            ...base.palette.gradient
+          };
+
+          if (target.matches("[data-appearance-gradient-enabled]")) {
+            gradient.enabled = target.checked;
+          } else if (target.matches("[data-appearance-gradient-direction]")) {
+            gradient.direction = Math.max(0, Math.min(360, Math.round(Number(target.value) || 0)));
+          } else if (target.matches("[data-appearance-gradient-intensity]")) {
+            gradient.intensity = Math.max(0, Math.min(100, Math.round(Number(target.value) || 0)));
+          } else if (target.matches("[data-appearance-gradient-color]")) {
+            const key = String(target.dataset.appearanceGradientColor || "");
+            if (["start", "middle", "end"].includes(key) && appearanceValidHex(target.value)) {
+              gradient[key] = target.value.toUpperCase();
+            }
+          }
+
+          previewAppearance({
+            ...base,
+            palette: {
+              ...base.palette,
+              gradient
+            }
+          }, { skipInputs: true });
+
+          const directionValue = appearancePaletteEditor
+            ?.querySelector("[data-appearance-gradient-direction-value]");
+          const intensityValue = appearancePaletteEditor
+            ?.querySelector("[data-appearance-gradient-intensity-value]");
+          if (directionValue) directionValue.textContent = `${gradient.direction}°`;
+          if (intensityValue) intensityValue.textContent = `${gradient.intensity}%`;
+          const gradientPreview = appearancePaletteEditor
+            ?.querySelector("[data-appearance-gradient-preview]");
+          if (gradientPreview instanceof HTMLElement) {
+            gradientPreview.style.background =
+              `linear-gradient(${gradient.direction}deg, ${gradient.start} 0%, ${gradient.middle} 50%, ${gradient.end} 100%)`;
+          }
+          return;
+        }
+
         if (target.matches("[data-palette-hex]")) {
           target.value = target.value.toUpperCase();
 
@@ -2717,6 +2909,15 @@
             : null;
 
         if (!target) return;
+
+        if (
+          target.matches("[data-appearance-gradient-enabled], [data-appearance-gradient-direction], [data-appearance-gradient-intensity], [data-appearance-gradient-color]")
+        ) {
+          setAppearanceStatus(
+            "Aperçu local — pense à enregistrer."
+          );
+          return;
+        }
 
         const value =
           paletteColorFromTarget(target);

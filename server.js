@@ -1787,6 +1787,15 @@ const PEOPLE_DEFAULT_APPEARANCE_PALETTE = Object.freeze({
   accent: "#67589D"
 });
 
+const PEOPLE_DEFAULT_APPEARANCE_GRADIENT = Object.freeze({
+  enabled: true,
+  direction: 135,
+  intensity: 72,
+  start: "#5865F2",
+  middle: "#8B5CF6",
+  end: "#EB459E"
+});
+
 const PEOPLE_APPEARANCE_PALETTE_KEYS = Object.freeze([
   "background",
   "panel",
@@ -1799,7 +1808,10 @@ const PEOPLE_DEFAULT_APPEARANCE = {
   theme: "dark",
   accent: PEOPLE_DEFAULT_APPEARANCE_PALETTE.accent,
   palette: {
-    ...PEOPLE_DEFAULT_APPEARANCE_PALETTE
+    ...PEOPLE_DEFAULT_APPEARANCE_PALETTE,
+    gradient: {
+      ...PEOPLE_DEFAULT_APPEARANCE_GRADIENT
+    }
   }
 };
 
@@ -1844,6 +1856,41 @@ function peopleReadAppearancePalette(value) {
   return null;
 }
 
+function peopleNormalizeAppearanceGradient(value, fallbackColors = {}) {
+  const source =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? value
+      : {};
+
+  const direction = Number(source.direction);
+  const intensity = Number(source.intensity);
+
+  return {
+    enabled:
+      source.enabled == null
+        ? PEOPLE_DEFAULT_APPEARANCE_GRADIENT.enabled
+        : source.enabled !== false,
+    direction: Number.isFinite(direction)
+      ? Math.max(0, Math.min(360, Math.round(direction)))
+      : PEOPLE_DEFAULT_APPEARANCE_GRADIENT.direction,
+    intensity: Number.isFinite(intensity)
+      ? Math.max(0, Math.min(100, Math.round(intensity)))
+      : PEOPLE_DEFAULT_APPEARANCE_GRADIENT.intensity,
+    start: peopleNormalizeAppearanceHex(
+      source.start,
+      peopleNormalizeAppearanceHex(fallbackColors.start, PEOPLE_DEFAULT_APPEARANCE_GRADIENT.start)
+    ),
+    middle: peopleNormalizeAppearanceHex(
+      source.middle,
+      peopleNormalizeAppearanceHex(fallbackColors.middle, PEOPLE_DEFAULT_APPEARANCE_GRADIENT.middle)
+    ),
+    end: peopleNormalizeAppearanceHex(
+      source.end,
+      peopleNormalizeAppearanceHex(fallbackColors.end, PEOPLE_DEFAULT_APPEARANCE_GRADIENT.end)
+    )
+  };
+}
+
 function peopleNormalizeAppearancePalette(value, legacyAccent) {
   const source = peopleReadAppearancePalette(value) || {};
   const base = PEOPLE_DEFAULT_APPEARANCE_PALETTE;
@@ -1868,7 +1915,12 @@ function peopleNormalizeAppearancePalette(value, legacyAccent) {
     accent: peopleNormalizeAppearanceHex(
       source.accent || legacyAccent,
       base.accent
-    )
+    ),
+    gradient: peopleNormalizeAppearanceGradient(source.gradient, {
+      start: source.background || base.background,
+      middle: source.accent || legacyAccent || base.accent,
+      end: source.secondary || base.secondary
+    })
   };
 }
 
@@ -5418,6 +5470,37 @@ app.put(
           return res.status(400).json({
             ok: false,
             error: "Couleur invalide pour " + key + "."
+          });
+        }
+      }
+
+      if (rawPalette.gradient != null) {
+        const gradient = rawPalette.gradient;
+        const direction = Number(gradient?.direction);
+        const intensity = Number(gradient?.intensity);
+        const gradientColors = [
+          gradient?.start,
+          gradient?.middle,
+          gradient?.end
+        ];
+
+        if (
+          !gradient ||
+          typeof gradient !== "object" ||
+          Array.isArray(gradient) ||
+          !Number.isFinite(direction) ||
+          direction < 0 ||
+          direction > 360 ||
+          !Number.isFinite(intensity) ||
+          intensity < 0 ||
+          intensity > 100 ||
+          gradientColors.some((color) =>
+            color != null && !/^#[0-9A-F]{6}$/i.test(String(color).trim())
+          )
+        ) {
+          return res.status(400).json({
+            ok: false,
+            error: "Réglages de dégradé invalides."
           });
         }
       }

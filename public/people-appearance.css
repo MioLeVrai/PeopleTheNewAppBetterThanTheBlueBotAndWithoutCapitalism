@@ -355,3 +355,50 @@
   background: var(--people-hover) !important;
 }
 /* === PEOPLE_APPEARANCE_THEME_V1_END === */
+
+
+/* === PEOPLE_GRADIENT_THEMES_V1_START === */
+:root[data-people-gradient="on"] body,
+:root[data-people-gradient="on"] .app,
+:root[data-people-gradient="on"] .main,
+:root[data-people-gradient="on"] .home-main,
+:root[data-people-gradient="on"] .messages,
+:root[data-people-gradient="on"] .dm-view,
+:root[data-people-gradient="on"] .dm-messages,
+:root[data-people-gradient="on"] .friends-view {
+  background-color: var(--people-night) !important;
+  background-image: var(--people-gradient-main) !important;
+}
+
+:root[data-people-gradient="on"] .sidebar,
+:root[data-people-gradient="on"] .online-panel,
+:root[data-people-gradient="on"] .server-title,
+:root[data-people-gradient="on"] .topbar,
+:root[data-people-gradient="on"] .home-topbar,
+:root[data-people-gradient="on"] .dm-header,
+:root[data-people-gradient="on"] .profile,
+:root[data-people-gradient="on"] .friends-search-card,
+:root[data-people-gradient="on"] .profile-card-section,
+:root[data-people-gradient="on"] .profile-card-modal,
+:root[data-people-gradient="on"] .join-card,
+:root[data-people-gradient="on"] .people-server-modal-card,
+:root[data-people-gradient="on"] .people-invite-card,
+:root[data-people-gradient="on"] .people-card {
+  background-color: var(--people-deep) !important;
+  background-image: var(--people-gradient-panel) !important;
+}
+
+:root[data-people-gradient="on"] .server-rail,
+:root[data-people-gradient="on"] .people-message-context-menu,
+:root[data-people-gradient="on"] .people-server-context-menu,
+:root[data-people-gradient="on"] .people-dm-context-menu {
+  background-color: var(--people-ink) !important;
+  background-image: var(--people-gradient-rail) !important;
+}
+
+:root[data-people-gradient="on"] .people-settings-modal,
+:root[data-people-gradient="on"] .people-settings-content,
+:root[data-people-gradient="on"] .people-server-settings-shell {
+  background-image: var(--people-gradient-main) !important;
+}
+/* === PEOPLE_GRADIENT_THEMES_V1_END === */

@@ -77,6 +77,23 @@
       normalized[key] = color;
     }
 
+    const rawGradient = palette.gradient || source?.gradient || {};
+    const direction = Number(rawGradient.direction);
+    const intensity = Number(rawGradient.intensity);
+
+    normalized.gradient = {
+      enabled: rawGradient.enabled !== false,
+      direction: Number.isFinite(direction)
+        ? Math.max(0, Math.min(360, Math.round(direction)))
+        : 135,
+      intensity: Number.isFinite(intensity)
+        ? Math.max(0, Math.min(100, Math.round(intensity)))
+        : 72,
+      start: normalizeHex(rawGradient.start) || normalized.background,
+      middle: normalizeHex(rawGradient.middle) || normalized.accent,
+      end: normalizeHex(rawGradient.end) || normalized.secondary
+    };
+
     return {
       name:
         typeof value?.name === "string" && value.name.trim()
@@ -151,6 +168,55 @@
       element?.classList.add("people-appearance-advanced-content");
     }
 
+    const gradientControls = document.createElement("div");
+    gradientControls.className =
+      "people-appearance-gradient people-appearance-advanced-content";
+    gradientControls.innerHTML = `
+      <div class="people-appearance-gradient-head">
+        <div>
+          <strong>Dégradé du thème</strong>
+          <span>Ajoute un dégradé doux aux fonds, comme les thèmes colorés de Discord.</span>
+        </div>
+        <label class="people-appearance-gradient-switch">
+          <input type="checkbox" data-appearance-gradient-enabled />
+          <span>Actif</span>
+        </label>
+      </div>
+      <div class="people-appearance-gradient-colors">
+        <span class="people-appearance-gradient-colors-label">Couleurs</span>
+        <div class="people-appearance-gradient-colorbar" data-appearance-gradient-preview>
+          <label class="people-appearance-gradient-color people-gradient-color-start" title="Couleur de gauche">
+            <input type="color" value="#5865F2" data-appearance-gradient-color="start" aria-label="Couleur gauche du dégradé" />
+            <span>Gauche</span>
+          </label>
+          <label class="people-appearance-gradient-color people-gradient-color-middle" title="Couleur du milieu">
+            <input type="color" value="#8B5CF6" data-appearance-gradient-color="middle" aria-label="Couleur centrale du dégradé" />
+            <span>Milieu</span>
+          </label>
+          <label class="people-appearance-gradient-color people-gradient-color-end" title="Couleur de droite">
+            <input type="color" value="#EB459E" data-appearance-gradient-color="end" aria-label="Couleur droite du dégradé" />
+            <span>Droite</span>
+          </label>
+        </div>
+      </div>
+      <label class="people-appearance-gradient-control">
+        <span>Direction <b data-appearance-gradient-direction-value>135°</b></span>
+        <input type="range" min="0" max="360" step="1" value="135" data-appearance-gradient-direction />
+      </label>
+      <label class="people-appearance-gradient-control">
+        <span>Intensité <b data-appearance-gradient-intensity-value>46%</b></span>
+        <input type="range" min="0" max="100" step="1" value="46" data-appearance-gradient-intensity />
+      </label>
+    `;
+
+    if (previewNote) {
+      previewNote.insertAdjacentElement("afterend", gradientControls);
+    } else if (preview) {
+      preview.insertAdjacentElement("afterend", gradientControls);
+    } else {
+      actions.insertAdjacentElement("beforebegin", gradientControls);
+    }
+
     const portable = document.createElement("div");
     portable.className =
       "people-appearance-portable people-appearance-advanced-content";
@@ -188,6 +254,38 @@
         picker.value = palette[key];
         picker.dispatchEvent(new Event("input", { bubbles: true }));
       }
+
+      const gradient = palette.gradient || {};
+      const enabled = editor.querySelector("[data-appearance-gradient-enabled]");
+      const direction = editor.querySelector("[data-appearance-gradient-direction]");
+      const intensity = editor.querySelector("[data-appearance-gradient-intensity]");
+      const start = editor.querySelector('[data-appearance-gradient-color="start"]');
+      const middle = editor.querySelector('[data-appearance-gradient-color="middle"]');
+      const end = editor.querySelector('[data-appearance-gradient-color="end"]');
+
+      if (enabled instanceof HTMLInputElement) {
+        enabled.checked = gradient.enabled !== false;
+        enabled.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (direction instanceof HTMLInputElement && Number.isFinite(Number(gradient.direction))) {
+        direction.value = String(gradient.direction);
+        direction.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (intensity instanceof HTMLInputElement && Number.isFinite(Number(gradient.intensity))) {
+        intensity.value = String(gradient.intensity);
+        intensity.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      for (const [input, value, fallback] of [
+        [start, gradient.start, palette.background],
+        [middle, gradient.middle, palette.accent],
+        [end, gradient.end, palette.secondary]
+      ]) {
+        if (!(input instanceof HTMLInputElement)) continue;
+        const color = normalizeHex(value) || normalizeHex(fallback);
+        if (!color) continue;
+        input.value = color;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
     }
 
     toggle.addEventListener("click", () => {
@@ -217,7 +315,8 @@
     });
 
     exportButton?.addEventListener("click", () => {
-      const palette = activePalette();
+      const appearance = activeAppearance();
+      const palette = appearance?.palette || activePalette();
       if (!palette) {
         setStatus(portableStatus, "Impossible de lire le thème actuel.", "error");
         return;
@@ -225,11 +324,11 @@
 
       const payload = {
         format: "people-theme",
-        version: 1,
+        version: 2,
         name: "Thème personnalisé People",
         exportedAt: new Date().toISOString(),
         appearance: {
-          theme: "custom",
+          theme: appearance?.theme || "custom",
           palette
         }
       };

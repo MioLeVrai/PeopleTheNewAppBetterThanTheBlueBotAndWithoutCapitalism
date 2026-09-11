@@ -995,6 +995,10 @@
   --palette-secondary: #090811;
   --palette-text: #f2eff8;
   --palette-accent: #67589d;
+  --preview-gradient-main: var(--palette-background);
+  --preview-gradient-panel: var(--palette-panel);
+  --preview-gradient-panel-soft: var(--palette-panel);
+  --preview-gradient-secondary: var(--palette-secondary);
   --preview-input: color-mix(
     in srgb,
     var(--palette-background) 42%,
@@ -1034,7 +1038,7 @@
   border-radius: 13px;
   display: grid;
   grid-template-columns: 54px minmax(154px, 28%) minmax(0, 1fr);
-  background: var(--palette-background);
+  background: var(--preview-gradient-main, var(--palette-background));
   box-shadow:
     inset 0 1px rgba(255,255,255,.025),
     0 10px 28px rgba(0,0,0,.14);
@@ -1048,7 +1052,7 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  background: var(--palette-secondary);
+  background: var(--preview-gradient-secondary, var(--palette-secondary));
 }
 
 .people-settings-preview-rail-icon {
@@ -1092,7 +1096,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--palette-panel);
+  background: var(--preview-gradient-panel, var(--palette-panel));
   border-right: 1px solid var(--preview-border);
 }
 
@@ -1272,7 +1276,7 @@
   min-width: 0;
   display: grid;
   grid-template-rows: 54px minmax(0,1fr);
-  background: var(--palette-background);
+  background: var(--preview-gradient-main, var(--palette-background));
 }
 
 .people-settings-preview-topbar {
@@ -1281,7 +1285,7 @@
   display: flex;
   align-items: center;
   border-bottom: 2px solid var(--palette-accent);
-  background: var(--palette-panel);
+  background: var(--preview-gradient-panel, var(--palette-panel));
 }
 
 .people-settings-preview-topbar > span {
@@ -1294,14 +1298,14 @@
   min-height: 0;
   padding: 12px 14px;
   overflow: hidden;
-  background: var(--palette-background);
+  background: var(--preview-gradient-main, var(--palette-background));
 }
 
 .people-settings-preview-search-card {
   width: min(88%, 430px);
   padding: 11px;
   border-radius: 8px;
-  background: var(--palette-panel);
+  background: var(--preview-gradient-panel-soft, var(--palette-panel));
 }
 
 .people-settings-preview-search-card > i {
@@ -1395,7 +1399,7 @@
   grid-template-columns: 23px minmax(0,1fr) 31px 31px;
   align-items: center;
   gap: 6px;
-  background: var(--palette-panel);
+  background: var(--preview-gradient-panel-soft, var(--palette-panel));
 }
 
 .people-settings-preview-friend > i {

@@ -123,3 +123,156 @@
     flex: 1 1 0;
   }
 }
+
+
+/* === PEOPLE_GRADIENT_SETTINGS_V1_START === */
+.people-appearance-gradient {
+  padding: 14px;
+  border: 1px solid var(--people-border, #322b43);
+  border-radius: 12px;
+  display: grid;
+  gap: 13px;
+  background: color-mix(in srgb, var(--people-surface, #211d30) 74%, transparent);
+}
+
+.people-appearance-gradient-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.people-appearance-gradient-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.people-appearance-gradient-head strong {
+  color: var(--people-text, #f2eff8);
+  font-size: 12px;
+}
+
+.people-appearance-gradient-head span,
+.people-appearance-gradient-control > span {
+  color: var(--people-muted, #aea7bc);
+  font-size: 10px;
+}
+
+.people-appearance-gradient-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--people-text, #f2eff8);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.people-appearance-gradient-switch input {
+  accent-color: var(--people-accent, #67589d);
+}
+
+.people-appearance-gradient-preview {
+  min-height: 52px;
+  border: 1px solid var(--people-border, #322b43);
+  border-radius: 11px;
+  background: var(--people-gradient-main, linear-gradient(135deg, #100e1a, #181524));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.025);
+}
+
+.people-appearance-gradient-control {
+  display: grid;
+  gap: 7px;
+}
+
+.people-appearance-gradient-control > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.people-appearance-gradient-control b {
+  color: var(--people-text, #f2eff8);
+  font-weight: 850;
+}
+
+.people-appearance-gradient-control input[type="range"] {
+  width: 100%;
+  accent-color: var(--people-accent, #67589d);
+}
+/* === PEOPLE_GRADIENT_SETTINGS_V1_END === */
+
+
+/* === PEOPLE_GRADIENT_3_COLORS_V2_START === */
+.people-appearance-gradient-colors {
+  display: grid;
+  gap: 7px;
+}
+
+.people-appearance-gradient-colors-label {
+  color: var(--people-text, #f2eff8);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.people-appearance-gradient-colorbar {
+  position: relative;
+  min-height: 62px;
+  border: 1px solid var(--people-border, #322b43);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #5865F2 0%, #8B5CF6 50%, #EB459E 100%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.035);
+}
+
+.people-appearance-gradient-color {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.people-gradient-color-start { left: 10px; }
+.people-gradient-color-middle { left: 50%; transform: translate(-50%, -50%); }
+.people-gradient-color-end { right: 10px; }
+
+.people-appearance-gradient-color input[type="color"] {
+  width: 32px;
+  height: 32px;
+  padding: 3px;
+  border: 2px solid rgba(255,255,255,.92);
+  border-radius: 7px;
+  background: rgba(15,15,20,.42);
+  box-shadow: 0 2px 8px rgba(0,0,0,.30);
+  cursor: pointer;
+}
+
+.people-appearance-gradient-color input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.people-appearance-gradient-color input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 3px;
+}
+.people-appearance-gradient-color input[type="color"]::-moz-color-swatch {
+  border: 0;
+  border-radius: 3px;
+}
+
+.people-appearance-gradient-color span {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(0,0,0,.42);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.15;
+  pointer-events: none;
+}
+
+/* L'ancien aperçu simple est remplacé par la barre de couleurs Discord-like. */
+.people-appearance-gradient > .people-appearance-gradient-preview {
+  display: none;
+}
+/* === PEOPLE_GRADIENT_3_COLORS_V2_END === */

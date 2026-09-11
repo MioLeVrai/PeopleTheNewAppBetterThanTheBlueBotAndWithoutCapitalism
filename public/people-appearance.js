@@ -32,8 +32,20 @@
     })
   });
 
+  const DEFAULT_GRADIENT = Object.freeze({
+    enabled: true,
+    direction: 135,
+    intensity: 72,
+    start: "#5865F2",
+    middle: "#8B5CF6",
+    end: "#EB459E"
+  });
+
   const DEFAULT_CUSTOM_PALETTE = Object.freeze({
-    ...PRESET_PALETTES.dark
+    ...PRESET_PALETTES.dark,
+    gradient: Object.freeze({
+      ...DEFAULT_GRADIENT
+    })
   });
 
   const DEFAULT_APPEARANCE = Object.freeze({
@@ -63,7 +75,10 @@
     return {
       theme: value.theme,
       palette: {
-        ...value.palette
+        ...value.palette,
+        gradient: {
+          ...(value.palette?.gradient || DEFAULT_GRADIENT)
+        }
       },
       accent: value.palette.accent
     };
@@ -89,6 +104,44 @@
       : fallback;
   }
 
+  function normalizeGradient(value, fallbackColors = {}) {
+    const source =
+      value && typeof value === "object" && !Array.isArray(value)
+        ? value
+        : {};
+
+    const direction = Number(source.direction);
+    const intensity = Number(source.intensity);
+    const fallbackStart = normalizeHex(
+      fallbackColors.start,
+      DEFAULT_GRADIENT.start
+    );
+    const fallbackMiddle = normalizeHex(
+      fallbackColors.middle,
+      DEFAULT_GRADIENT.middle
+    );
+    const fallbackEnd = normalizeHex(
+      fallbackColors.end,
+      DEFAULT_GRADIENT.end
+    );
+
+    return {
+      enabled:
+        source.enabled == null
+          ? DEFAULT_GRADIENT.enabled
+          : source.enabled !== false,
+      direction: Number.isFinite(direction)
+        ? Math.max(0, Math.min(360, Math.round(direction)))
+        : DEFAULT_GRADIENT.direction,
+      intensity: Number.isFinite(intensity)
+        ? Math.max(0, Math.min(100, Math.round(intensity)))
+        : DEFAULT_GRADIENT.intensity,
+      start: normalizeHex(source.start, fallbackStart),
+      middle: normalizeHex(source.middle, fallbackMiddle),
+      end: normalizeHex(source.end, fallbackEnd)
+    };
+  }
+
   function normalizePalette(value, legacyAccent) {
     const source =
       value && typeof value === "object" && !Array.isArray(value)
@@ -102,7 +155,12 @@
       panel: normalizeHex(source.panel, base.panel),
       secondary: normalizeHex(source.secondary, base.secondary),
       text: normalizeHex(source.text, base.text),
-      accent: normalizeHex(source.accent || legacyAccent, base.accent)
+      accent: normalizeHex(source.accent || legacyAccent, base.accent),
+      gradient: normalizeGradient(source.gradient, {
+        start: source.background || base.background,
+        middle: source.accent || legacyAccent || base.accent,
+        end: source.secondary || base.secondary
+      })
     };
   }
 
@@ -129,7 +187,13 @@
       left.theme === right.theme &&
       PALETTE_KEYS.every(
         (key) => left.palette[key] === right.palette[key]
-      )
+      ) &&
+      left.palette.gradient.enabled === right.palette.gradient.enabled &&
+      left.palette.gradient.direction === right.palette.gradient.direction &&
+      left.palette.gradient.intensity === right.palette.gradient.intensity &&
+      left.palette.gradient.start === right.palette.gradient.start &&
+      left.palette.gradient.middle === right.palette.gradient.middle &&
+      left.palette.gradient.end === right.palette.gradient.end
     );
   }
 
@@ -284,6 +348,11 @@
 
     const resolved = resolvedTheme(active.theme);
     const palette = paletteFor(active);
+    const gradient = normalizeGradient(active.palette?.gradient, {
+      start: palette.background,
+      middle: palette.accent,
+      end: palette.secondary
+    });
     const root = document.documentElement;
     const lightSurface = luminance(palette.background) > 0.48;
 
@@ -347,6 +416,46 @@
       "#FFFFFF",
       lightSurface ? 0.08 : 0.24
     );
+
+    const gradientPower = gradient.enabled
+      ? gradient.intensity / 100
+      : 0;
+    const gradientDirection = `${gradient.direction}deg`;
+    const stopStart = gradient.start;
+    const stopMiddle = gradient.middle;
+    const stopEnd = gradient.end;
+
+    // Trois couleurs dédiées au dégradé : gauche / milieu / droite.
+    // L'intensité contrôle la quantité de couleur injectée dans chaque surface
+    // afin de garder les panneaux et le texte lisibles.
+    const mainGradient = gradient.enabled
+      ? `linear-gradient(${gradientDirection}, ` +
+        `${mix(palette.background, stopStart, gradientPower)} 0%, ` +
+        `${mix(palette.background, stopMiddle, gradientPower)} 50%, ` +
+        `${mix(palette.background, stopEnd, gradientPower)} 100%)`
+      : "none";
+    const panelGradient = gradient.enabled
+      ? `linear-gradient(${gradientDirection}, ` +
+        `${mix(palette.panel, stopStart, gradientPower * 0.78)} 0%, ` +
+        `${mix(palette.panel, stopMiddle, gradientPower * 0.78)} 50%, ` +
+        `${mix(palette.panel, stopEnd, gradientPower * 0.78)} 100%)`
+      : "none";
+    const railGradient = gradient.enabled
+      ? `linear-gradient(${gradientDirection}, ` +
+        `${mix(palette.secondary, stopStart, gradientPower * 0.62)} 0%, ` +
+        `${mix(palette.secondary, stopMiddle, gradientPower * 0.62)} 50%, ` +
+        `${mix(palette.secondary, stopEnd, gradientPower * 0.62)} 100%)`
+      : "none";
+
+    root.dataset.peopleGradient = gradient.enabled ? "on" : "off";
+    setRootToken("--people-gradient-direction", gradientDirection);
+    setRootToken("--people-gradient-intensity", String(gradient.intensity));
+    setRootToken("--people-gradient-start", stopStart);
+    setRootToken("--people-gradient-middle", stopMiddle);
+    setRootToken("--people-gradient-end", stopEnd);
+    setRootToken("--people-gradient-main", mainGradient);
+    setRootToken("--people-gradient-panel", panelGradient);
+    setRootToken("--people-gradient-rail", railGradient);
 
     setRootToken("--people-night", palette.background);
     setRootToken("--people-deep", palette.panel);
@@ -573,7 +682,10 @@
     defaults: {
       theme: DEFAULT_APPEARANCE.theme,
       palette: {
-        ...DEFAULT_APPEARANCE.palette
+        ...DEFAULT_APPEARANCE.palette,
+        gradient: {
+          ...DEFAULT_APPEARANCE.palette.gradient
+        }
       }
     },
     utils: {
