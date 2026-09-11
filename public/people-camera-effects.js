@@ -457,8 +457,8 @@
       // tout en restant séparées du nez sans partir trop loin sur les joues.
       const whiskersW = w * 0.355;
       const whiskersH = h * 0.44;
-      const whiskersY = -h * 0.065;
-      const whiskersInnerGap = w * 0.175;
+      const whiskersY = -h * 0.125;
+      const whiskersInnerGap = w * 0.105;
       context.drawImage(catAssets.leftWhiskers, -whiskersInnerGap - whiskersW, whiskersY, whiskersW, whiskersH);
       context.drawImage(catAssets.rightWhiskers, whiskersInnerGap, whiskersY, whiskersW, whiskersH);
 
