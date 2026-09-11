@@ -11,11 +11,11 @@
   // Dessins du filtre Chat fournis pour People. Chaque élément reste séparé
   // afin de suivre correctement la rotation et la taille du visage.
   const CAT_ASSET_URLS = Object.freeze({
-    leftEar: "assets/people-facefx/cat/ear-left.png?v=people-cat-fix-v4-20260911a",
-    rightEar: "assets/people-facefx/cat/ear-right.png?v=people-cat-fix-v4-20260911a",
-    leftWhiskers: "assets/people-facefx/cat/whiskers-left.png?v=people-cat-fix-v4-20260911a",
-    rightWhiskers: "assets/people-facefx/cat/whiskers-right.png?v=people-cat-fix-v4-20260911a",
-    nose: "assets/people-facefx/cat/nose.png?v=people-cat-fix-v4-20260911a"
+    leftEar: "assets/people-facefx/cat/ear-left.png?v=people-cat-fix-v5-20260911a",
+    rightEar: "assets/people-facefx/cat/ear-right.png?v=people-cat-fix-v5-20260911a",
+    leftWhiskers: "assets/people-facefx/cat/whiskers-left.png?v=people-cat-fix-v5-20260911a",
+    rightWhiskers: "assets/people-facefx/cat/whiskers-right.png?v=people-cat-fix-v5-20260911a",
+    nose: "assets/people-facefx/cat/nose.png?v=people-cat-fix-v5-20260911a"
   });
 
   const EFFECTS = Object.freeze([
@@ -446,13 +446,12 @@
 
       // Les proportions sont volontairement liées à la boîte du visage :
       // le dessin grandit/rétrécit avec la personne et suit l'inclinaison de la tête.
-      // V4 : on respecte davantage les proportions du dessin complet :
-      // oreilles plus présentes, et moustaches nettement séparées du nez.
-      const earW = w * 0.52;
-      const earH = w * 0.47;
-      const earY = -h * 0.76;
-      context.drawImage(catAssets.leftEar, -w * 0.56, earY, earW, earH);
-      context.drawImage(catAssets.rightEar, w * 0.56 - earW, earY, earW, earH);
+      // V5 : oreilles légèrement réduites, remontées et un peu plus écartées.
+      const earW = w * 0.47;
+      const earH = w * 0.425;
+      const earY = -h * 0.88;
+      context.drawImage(catAssets.leftEar, -w * 0.60, earY, earW, earH);
+      context.drawImage(catAssets.rightEar, w * 0.60 - earW, earY, earW, earH);
 
       const whiskersW = w * 0.41;
       const whiskersH = h * 0.25;
@@ -461,10 +460,10 @@
       context.drawImage(catAssets.leftWhiskers, -whiskersInnerGap - whiskersW, whiskersY, whiskersW, whiskersH);
       context.drawImage(catAssets.rightWhiskers, whiskersInnerGap, whiskersY, whiskersW, whiskersH);
 
-      // Le nez retrouve sa taille V2 : le problème venait surtout de l'écartement.
+      // Nez remonté pour mieux coller au dessin de référence.
       const noseW = w * 0.12;
       const noseH = h * 0.105;
-      const noseY = h * 0.085;
+      const noseY = h * 0.055;
       context.drawImage(catAssets.nose, -noseW / 2, noseY, noseW, noseH);
     });
   }
