@@ -4977,13 +4977,8 @@
 
     const callHere =
       currentDmMatchesCall();
-
-    // V2 : le mode Reduire appartient uniquement au MP actuellement ouvert.
-    // Si on va sur Amis / un serveur / un autre MP, on revient automatiquement
-    // a l'etat normal et aucune mini-fenetre ne suit l'utilisateur.
-    if (!callHere && pipForced) {
-      setManualMini(false);
-    }
+    // V2.2 : le mode Reduire reste visible partout dans People tant que l appel est actif.
+    // La fleche restaure le grand appel ; raccrocher supprime naturellement la mini-fenetre.
 
     if (
       remoteCamera &&
@@ -5020,7 +5015,6 @@
 
     const shouldShow =
       remoteCamera &&
-      callHere &&
       pipForced;
 
     pip.classList.toggle(
