@@ -19,7 +19,6 @@
   let menu = null;
   let activeDialog = null;
   let draggedChannelId = null;
-  let textPrefetchTimer = null;
 
   function closeMenu() {
     menu?.remove();
@@ -415,17 +414,7 @@
 
     if (channel.type === "text") {
       button.classList.toggle("active", String(state.activeTextChannelId || "") === String(channel.id));
-      button.addEventListener("pointerenter", () => {
-        clearTimeout(textPrefetchTimer);
-        textPrefetchTimer = setTimeout(() => {
-          void window.PeopleServerRuntime?.prefetchTextChannel?.(channel.id);
-        }, 120);
-      });
-      button.addEventListener("pointerleave", () => {
-        clearTimeout(textPrefetchTimer);
-      });
       button.addEventListener("click", async () => {
-        clearTimeout(textPrefetchTimer);
         const response = await window.PeopleServerRuntime?.selectTextChannel?.(channel.id);
         if (response?.ok === false) alert(response.error || "Impossible d'ouvrir ce salon.");
       });
@@ -609,20 +598,6 @@
   });
 
   void hydrateCurrentUser();
-
-  // === PEOPLE_SERVER_SETTINGS_V1_CHANNEL_API_START ===
-  window.PeopleServerChannels = {
-    async create(type, parentId = null) {
-      if (!canManage()) throw new Error("Seul le propriétaire peut gérer les salons pour le moment.");
-      if (!["category", "text", "voice"].includes(String(type || ""))) throw new Error("Type de salon invalide.");
-      return createItem(String(type), parentId || null);
-    },
-    canManage,
-    getState() {
-      return { ...state, channels: [...(state.channels || [])] };
-    }
-  };
-  // === PEOPLE_SERVER_SETTINGS_V1_CHANNEL_API_END ===
 
   window.addEventListener("people-server-channel-state", (event) => {
     const detail = event.detail || {};

@@ -9831,70 +9831,6 @@ app.post(
   }
 );
 
-// === PEOPLE_SERVER_SETTINGS_V1_RENAME_START ===
-app.patch(
-  "/api/servers/:id",
-  async (req, res) => {
-    try {
-      const session = peopleSessionForRequest(req, res);
-      if (!session) return;
-
-      const server = await peopleGetServer(req.params.id);
-      if (!server) {
-        return res.status(404).json({ ok: false, error: "Serveur introuvable." });
-      }
-
-      if (!server.ownerId || String(server.ownerId) !== String(session.id)) {
-        return res.status(403).json({
-          ok: false,
-          error: "Seul le propriétaire peut modifier les paramètres du serveur pour le moment."
-        });
-      }
-
-      const name = peopleServerName(req.body?.name);
-      if (!peopleValidServerName(name)) {
-        return res.status(400).json({
-          ok: false,
-          error: "Le nom du serveur doit faire entre 2 et 40 caractères."
-        });
-      }
-
-      let updated;
-      if (peoplePool) {
-        const result = await peoplePool.query(
-          "UPDATE people_servers SET name = $2 WHERE id = $1 " +
-          "RETURNING id, name, owner_id, invite_code, is_official, created_at",
-          [String(server.id), name]
-        );
-        const row = result.rows[0];
-        if (!row) return res.status(404).json({ ok: false, error: "Serveur introuvable." });
-        updated = {
-          id: String(row.id), name: row.name,
-          ownerId: row.owner_id ? String(row.owner_id) : null,
-          inviteCode: row.invite_code, official: Boolean(row.is_official),
-          createdAt: row.created_at
-        };
-      } else {
-        const data = peopleReadLocalServers();
-        const stored = data.servers.find(item => String(item.id) === String(server.id));
-        if (!stored) return res.status(404).json({ ok: false, error: "Serveur introuvable." });
-        // On change seulement le nom visible: inviteCode et id restent intacts.
-        stored.name = name;
-        peopleWriteLocalServers(data);
-        updated = { ...stored };
-      }
-
-      const publicServer = peopleServerPublic(updated);
-      io.to(peopleServerRoom(String(server.id))).emit("server-updated", { server: publicServer });
-      return res.json({ ok: true, server: publicServer, inviteUnchanged: true });
-    } catch (err) {
-      console.error("[People server/settings rename]", err);
-      return res.status(500).json({ ok: false, error: "Impossible de modifier le serveur." });
-    }
-  }
-);
-// === PEOPLE_SERVER_SETTINGS_V1_RENAME_END ===
-
 app.get(
   "/api/servers/invite/:code",
   async (req, res) => {
@@ -14070,31 +14006,6 @@ io.on("connection", (socket) => {
     }
   );
 
-  // === PEOPLE_TEXT_CHANNEL_INSTANT_V1_PREFETCH_START ===
-  // Lecture seule : contrairement a server-channel-select, ce prechargement
-  // ne change jamais le salon actif du socket.
-  socket.on(
-    "server-channel-prefetch",
-    async ({ serverId, channelId } = {}, ack = () => {}) => {
-      try {
-        const accountId = userIds.get(socket.id);
-        const sid = String(serverId || socketServerIds.get(socket.id) || "");
-        if (!accountId || !sid) return ack({ ok: false, error: "Session invalide." });
-        if (!(await peopleIsServerMember(accountId, sid))) {
-          return ack({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-        }
-        const channel = await peopleGetServerChannel(sid, channelId, "text");
-        if (!channel) return ack({ ok: false, error: "Salon textuel introuvable." });
-        const history = await peopleServerLoadMessages(sid, channel.id, 100);
-        ack({ ok: true, serverId: sid, activeChannelId: String(channel.id), history });
-      } catch (err) {
-        console.error("[People channel/prefetch]", err);
-        ack({ ok: false, error: "Impossible de precharger ce salon." });
-      }
-    }
-  );
-  // === PEOPLE_TEXT_CHANNEL_INSTANT_V1_PREFETCH_END ===
-
   // === PEOPLE_GENERAL_OPTIMISTIC_SERVER_V1_START ===
   socket.on(
     "chat-message",
@@ -14102,8 +14013,6 @@ io.on("connection", (socket) => {
       {
         text,
         imageId,
-        serverId: requestedServerId,
-        channelId: requestedChannelId,
         replyToId,
         clientId
       } = {},
@@ -14120,54 +14029,13 @@ io.on("connection", (socket) => {
       const senderId =
         userIds.get(socket.id);
 
-      let serverId =
+      const serverId =
         socketServerIds.get(socket.id);
 
-      let channelId =
+      const channelId =
         socketTextChannelIds.get(socket.id);
 
-      const explicitServerId = String(requestedServerId || "");
-      const explicitChannelId = String(requestedChannelId || "");
-
-      if (!username || !senderId) {
-        reply({ ok: false, error: "Session invalide." });
-        return;
-      }
-
-      if (explicitServerId && String(serverId || "") !== explicitServerId) {
-        try {
-          if (!(await peopleIsServerMember(senderId, explicitServerId))) {
-            reply({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-            return;
-          }
-          serverId = explicitServerId;
-          socketServerIds.set(socket.id, serverId);
-        } catch {
-          reply({ ok: false, error: "Impossible de verifier le serveur." });
-          return;
-        }
-      }
-
-      if (explicitChannelId && String(channelId || "") !== explicitChannelId) {
-        try {
-          const explicitChannel = await peopleGetServerChannel(
-            serverId,
-            explicitChannelId,
-            "text"
-          );
-          if (!explicitChannel) {
-            reply({ ok: false, error: "Salon textuel introuvable." });
-            return;
-          }
-          channelId = String(explicitChannel.id);
-          socketTextChannelIds.set(socket.id, channelId);
-        } catch {
-          reply({ ok: false, error: "Impossible de verifier le salon textuel." });
-          return;
-        }
-      }
-
-      if (!serverId || !channelId) {
+      if (!username || !senderId || !serverId || !channelId) {
         reply({
           ok: false,
           error: "Session ou serveur invalide."
@@ -14269,7 +14137,7 @@ io.on("connection", (socket) => {
   socket.on(
     "chat-message-delete",
     async (
-      { id, serverId: requestedServerId, channelId: requestedChannelId } = {},
+      { id } = {},
       ack = () => {}
     ) => {
       try {
@@ -14278,41 +14146,18 @@ io.on("connection", (socket) => {
             socket.id
           );
 
-        let serverId =
+        const serverId =
           socketServerIds.get(
             socket.id
           );
 
-        let channelId =
+        const channelId =
           socketTextChannelIds.get(
             socket.id
           );
 
-        const explicitServerId = String(requestedServerId || "");
-        const explicitChannelId = String(requestedChannelId || "");
-
-        if (!senderId) {
-          return ack({ ok: false, error: "Session invalide." });
-        }
-
-        if (explicitServerId && String(serverId || "") !== explicitServerId) {
-          if (!(await peopleIsServerMember(senderId, explicitServerId))) {
-            return ack({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-          }
-          serverId = explicitServerId;
-          socketServerIds.set(socket.id, serverId);
-        }
-
-        if (explicitChannelId && String(channelId || "") !== explicitChannelId) {
-          const explicitChannel = await peopleGetServerChannel(serverId, explicitChannelId, "text");
-          if (!explicitChannel) {
-            return ack({ ok: false, error: "Salon textuel introuvable." });
-          }
-          channelId = String(explicitChannel.id);
-          socketTextChannelIds.set(socket.id, channelId);
-        }
-
         if (
+          !senderId ||
           !serverId ||
           !channelId
         ) {
@@ -14518,13 +14363,16 @@ io.on("connection", (socket) => {
                 ).size
             });
           }
+
+          return ack({
+            ok: false,
+            code:
+              "VOICE_TAB_BUSY",
+            error:
+              "Tu es déjà dans un vocal. Quitte-le avant d'en rejoindre un autre."
+          });
         }
 
-        /*
-          On vérifie les autres sessions du compte AVANT de quitter le
-          vocal actuel. Ainsi, un changement refusé ne fait jamais perdre
-          la room dans laquelle l'utilisateur se trouvait déjà.
-        */
         if (
           peopleVoiceAccountInServer(
             aid,
@@ -14547,21 +14395,13 @@ io.on("connection", (socket) => {
             socket.id
           );
 
-        const reservedElsewhere =
-          currentRooms.size +
-          peopleAccountDmCallCount(
-            aid,
-            {
-              includeRinging:
-                true
-            }
-          );
-
         if (
           !currentRooms.has(
             sid
           ) &&
-          reservedElsewhere >=
+          peopleAccountReservedVoiceCount(
+            aid
+          ) >=
             PEOPLE_MAX_SIMULTANEOUS_VOICES
         ) {
           return ack({
@@ -14569,18 +14409,8 @@ io.on("connection", (socket) => {
             code:
               "VOICE_LIMIT",
             error:
-              "Tu es déjà dans un autre vocal ou un appel."
+              "Tu es déjà dans un vocal ou un appel. Quitte-en un avant d'en rejoindre un autre."
           });
-        }
-
-        /*
-          === PEOPLE_VOICE_AUTO_SWITCH_V1 ===
-          Si CE socket est déjà dans un autre vocal serveur, le nouveau
-          voice-join devient un déplacement atomique : on annonce le départ
-          à l'ancienne room puis on continue immédiatement vers la nouvelle.
-        */
-        if (currentVoice) {
-          leaveVoice(socket);
         }
 
         voiceUsers.set(

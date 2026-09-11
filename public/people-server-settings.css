@@ -1,0 +1,456 @@
+.people-server-settings-button svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  fill: currentColor;
+}
+
+body.people-server-settings-open {
+  overflow: hidden;
+}
+
+.people-server-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 16000;
+  background: var(--bg-primary, var(--bg, #15131f));
+  color: var(--text-primary, var(--text, #f2eff8));
+}
+
+.people-server-settings-shell {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(220px, 34vw) minmax(0, 1fr);
+}
+
+.people-server-settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 48px 18px 40px max(20px, calc((100vw - 1180px) / 2));
+  background: var(--bg-secondary, var(--panel, #1b1827));
+  border-right: 1px solid color-mix(in srgb, var(--text-primary, #fff) 7%, transparent);
+}
+
+.people-server-settings-sidebar > * {
+  width: min(240px, 100%);
+}
+
+.people-server-settings-server-label {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 0 8px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text-primary, #fff) 8%, transparent);
+  margin-bottom: 10px;
+}
+
+.people-server-settings-server-label .server-avatar,
+.people-server-settings-server-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: var(--accent, var(--brand, #67589d));
+  color: white;
+  font-weight: 850;
+}
+
+.people-server-settings-server-label .server-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
+}
+
+.people-server-settings-server-label strong,
+.people-server-settings-server-label small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-server-settings-server-label strong {
+  font-size: 13px;
+}
+
+.people-server-settings-server-label small {
+  margin-top: 3px;
+  color: var(--text-secondary, var(--muted, #aaa4b7));
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+.people-server-settings-nav {
+  display: grid;
+  gap: 2px;
+}
+
+.people-server-settings-nav-button {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--text-secondary, var(--muted, #aaa4b7));
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.people-server-settings-nav-button:hover {
+  background: color-mix(in srgb, var(--text-primary, #fff) 6%, transparent);
+  color: var(--text-primary, #fff);
+}
+
+.people-server-settings-nav-button.active {
+  background: color-mix(in srgb, var(--accent, #67589d) 30%, transparent);
+  color: var(--text-primary, #fff);
+}
+
+.people-server-settings-main {
+  position: relative;
+  min-width: 0;
+  overflow: auto;
+  padding: 52px max(72px, calc((100vw - 1180px) / 2)) 80px 44px;
+  background: var(--bg-primary, var(--bg, #15131f));
+}
+
+.people-server-settings-content {
+  width: min(740px, 100%);
+}
+
+.people-server-settings-close {
+  position: fixed;
+  top: 42px;
+  right: max(20px, calc((100vw - 1180px) / 2));
+  z-index: 1;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--text-primary, #fff) 18%, transparent);
+  background: transparent;
+  color: var(--text-secondary, #aaa4b7);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.people-server-settings-close:hover {
+  color: var(--text-primary, #fff);
+  border-color: color-mix(in srgb, var(--text-primary, #fff) 40%, transparent);
+}
+
+.people-server-settings-close span {
+  position: absolute;
+  top: 43px;
+  font-size: 9px;
+  color: var(--text-secondary, #aaa4b7);
+}
+
+.people-server-settings-section-head {
+  margin: 0 0 24px;
+}
+
+.people-server-settings-section-head h2 {
+  margin: 0 0 7px;
+  font-size: 24px;
+}
+
+.people-server-settings-section-head p {
+  margin: 0;
+  color: var(--text-secondary, var(--muted, #aaa4b7));
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.people-server-settings-card {
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #fff) 9%, transparent);
+  background: var(--bg-secondary, var(--panel, #1b1827));
+  margin-bottom: 18px;
+}
+
+.people-server-settings-overview-card {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.people-server-settings-server-icon {
+  width: 92px;
+  height: 92px;
+  border-radius: 28px;
+  font-size: 24px;
+}
+
+.people-server-settings-name-form label,
+.people-server-settings-invite-card label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-secondary, var(--muted, #aaa4b7));
+}
+
+.people-server-settings-name-form input,
+.people-server-settings-copy-row input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #fff) 9%, transparent);
+  border-radius: 7px;
+  padding: 11px 12px;
+  outline: none;
+  background: var(--bg-tertiary, var(--input, #12101b));
+  color: var(--text-primary, var(--text, #fff));
+  font: inherit;
+}
+
+.people-server-settings-name-form input:focus {
+  border-color: var(--accent, #67589d);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #67589d) 22%, transparent);
+}
+
+.people-server-settings-name-form input:disabled {
+  opacity: .65;
+}
+
+.people-server-settings-name-form p,
+.people-server-settings-note p,
+.people-server-settings-identity p,
+.people-server-settings-invite-card p {
+  margin: 8px 0 0;
+  color: var(--text-secondary, var(--muted, #aaa4b7));
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.people-server-settings-save-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.people-server-settings-save-state,
+.people-server-settings-inline-error {
+  min-height: 17px;
+  color: var(--text-secondary, #aaa4b7);
+  font-size: 11px;
+}
+
+.people-server-settings-save-state.error,
+.people-server-settings-inline-error:not(:empty),
+.people-server-settings-invite-state.error {
+  color: #ff777c;
+}
+
+.people-server-settings-save-state.success,
+.people-server-settings-invite-state.success {
+  color: #54c77a;
+}
+
+.people-server-settings-save-row button,
+.people-server-settings-copy-row button {
+  border: 0;
+  border-radius: 7px;
+  padding: 9px 14px;
+  background: var(--accent, var(--brand, #67589d));
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.people-server-settings-save-row button:disabled,
+.people-server-settings-copy-row button:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.people-server-settings-identity {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.people-server-settings-identity strong,
+.people-server-settings-note strong {
+  font-size: 13px;
+}
+
+.people-server-settings-identity code {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg-tertiary, #12101b);
+  color: var(--text-secondary, #aaa4b7);
+  font-size: 11px;
+}
+
+.people-server-settings-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.people-server-settings-action {
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--text-primary, #fff) 9%, transparent);
+  border-radius: 11px;
+  padding: 16px;
+  background: var(--bg-secondary, var(--panel, #1b1827));
+  color: var(--text-primary, #fff);
+  text-align: left;
+  cursor: pointer;
+}
+
+.people-server-settings-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent, #67589d) 65%, transparent);
+  background: color-mix(in srgb, var(--accent, #67589d) 12%, var(--bg-secondary, #1b1827));
+}
+
+.people-server-settings-action:disabled {
+  opacity: .48;
+  cursor: default;
+}
+
+.people-server-settings-action .icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent, #67589d) 25%, transparent);
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.people-server-settings-action strong {
+  font-size: 13px;
+}
+
+.people-server-settings-action small {
+  color: var(--text-secondary, #aaa4b7);
+  line-height: 1.4;
+  font-size: 11px;
+}
+
+.people-server-settings-copy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.people-server-settings-placeholder {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  text-align: center;
+  padding: 36px;
+  border: 1px dashed color-mix(in srgb, var(--text-primary, #fff) 13%, transparent);
+  border-radius: 14px;
+  color: var(--text-secondary, #aaa4b7);
+}
+
+.people-server-settings-placeholder-icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--accent, #67589d) 22%, transparent);
+  color: var(--accent, #8a79ca);
+}
+
+.people-server-settings-placeholder h3 {
+  margin: 0 0 7px;
+  color: var(--text-primary, #fff);
+}
+
+.people-server-settings-placeholder p {
+  max-width: 460px;
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.people-server-settings-placeholder span {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+@media (max-width: 760px) {
+  .people-server-settings-shell {
+    grid-template-columns: 132px minmax(0, 1fr);
+  }
+
+  .people-server-settings-sidebar {
+    padding: 24px 8px;
+  }
+
+  .people-server-settings-sidebar > * {
+    width: 100%;
+  }
+
+  .people-server-settings-server-label {
+    grid-template-columns: 1fr;
+    text-align: center;
+    justify-items: center;
+  }
+
+  .people-server-settings-main {
+    padding: 32px 18px 60px;
+  }
+
+  .people-server-settings-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+  }
+
+  .people-server-settings-close span {
+    display: none;
+  }
+
+  .people-server-settings-section-head {
+    padding-right: 48px;
+  }
+
+  .people-server-settings-overview-card {
+    grid-template-columns: 1fr;
+  }
+
+  .people-server-settings-server-icon {
+    width: 68px;
+    height: 68px;
+    border-radius: 20px;
+  }
+
+  .people-server-settings-action-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="people-image-viewer.css?v=people-image-viewer-v1-20260911a" />
   <link rel="stylesheet" href="people-server-voice-ui.css?v=people-server-voice-ui-v1-20260911a">
   <link rel="stylesheet" href="people-server-channels.css?v=people-server-channels-v2">
+  <link rel="stylesheet" href="people-server-settings.css?v=people-server-settings-v1">
       <link rel="stylesheet" href="people-appearance-settings-v2.css?v=people-appearance-settings-v2-3-20260911a" />
 </head>
 <body>
@@ -31,124 +32,19 @@
       <p id="authSubtitle">Connecte-toi avec ton pseudo.</p>
 
       <div class="auth-tabs">
-        <button id="loginTab" class="auth-tab active" type="button">
-          Connexion
-        </button>
-        <button id="registerTab" class="auth-tab" type="button">
-          Creer un compte
-        </button>
-      </div>
-
-      <form id="joinForm">
-        <input
-          id="usernameInput"
-          maxlength="24"
-          placeholder="Pseudo"
-          autocomplete="username"
-          required
-        />
-        <input
-          id="passwordInput"
-          type="password"
-          maxlength="128"
-          placeholder="Mot de passe"
-          autocomplete="current-password"
-          required
-        />
-        <div id="authError" class="auth-error" role="status"></div>
-        <button id="authSubmit" type="submit">
-          Se connecter
-        </button>
-      </form>
-
-      <p class="auth-note">
-        Pas d'e-mail pour l'instant. Garde bien ton mot de passe.
-      </p>
-    </div>
-  </div>
-
-  <div id="peopleAppShell" class="app people-server-mode">
-    <nav class="server-rail" aria-label="Navigation principale">
-      <button
-        id="homeRailButton"
-        class="rail-button rail-home"
-        type="button"
-        title="Accueil et messages privés"
-        aria-label="Accueil et messages privés"
-      >
-        🏠
-        <span id="homeUnreadBadge" class="rail-badge hidden">0</span>
-      </button>
-
-      <div class="rail-separator"></div>
-
-      <div
-        id="serverRailList"
-        class="server-rail-list"
-        aria-label="Tes serveurs"
-      ></div>
-
-      <button
-        id="createServerRailButton"
-        class="rail-button server-create-button"
-        type="button"
-        title="Créer un serveur"
-        aria-label="Créer un serveur"
-      >
-        +
-      </button>
-    </nav>
-
-    <aside class="sidebar">
-      <section id="homeSidebar" class="sidebar-mode hidden">
-        <div class="server-title home-title">
-          <div class="server-icon">🏠</div>
-          <div>
-            <strong>Accueil</strong>
-            <span>Amis et messages privés</span>
-          </div>
-        </div>
-
-        <div class="channel-group">
-          <button id="friendsNavButton" class="channel active">
-            👥 Amis
-          </button>
-        </div>
-
-        <div class="channel-group dm-sidebar-group">
-          <div class="group-label">MESSAGES PRIVÉS</div>
-          <div id="dmConversationList" class="dm-conversation-list">
-            <div class="dm-sidebar-empty">Aucun MP pour l'instant</div>
-          </div>
-        </div>
-      </section>
-
-      <section id="peopleSidebar" class="sidebar-mode">
-        <div class="server-title">
-          <div
-            id="activeServerIcon"
-            class="server-icon"
-          >?</div>
-
-          <div>
-            <strong id="activeServerName">
-              Serveur
-            </strong>
-            <span>
-              <b id="userCount">0</b> en ligne
-            </span>
-          </div>
-
-          <div class="server-title-actions">
+            <!-- PEOPLE_SERVER_SETTINGS_V1_BUTTON_START -->
             <button
-              id="serverChannelCreateButton"
-              class="server-invite-button"
+              id="serverSettingsButton"
+              class="server-invite-button people-server-settings-button"
               type="button"
-              title="Créer une catégorie ou un salon"
-              aria-label="Créer une catégorie ou un salon"
+              title="Paramètres du serveur"
+              aria-label="Paramètres du serveur"
             >
-              ＋
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M19.14 12.94a7.6 7.6 0 0 0 .05-.94 7.6 7.6 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.4 7.4 0 0 0-1.63-.95L14.38 2.8a.5.5 0 0 0-.5-.4h-3.76a.5.5 0 0 0-.5.4l-.36 2.51c-.58.25-1.12.57-1.63.95L5.24 5.3a.5.5 0 0 0-.61.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.6 7.6 0 0 0-.05.94c0 .32.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96c.51.39 1.05.71 1.63.95l.36 2.51a.5.5 0 0 0 .5.4h3.76a.5.5 0 0 0 .5-.4l.36-2.51c.58-.24 1.12-.56 1.63-.95l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/>
+              </svg>
             </button>
+            <!-- PEOPLE_SERVER_SETTINGS_V1_BUTTON_END -->
             <button
               id="serverInviteButton"
               class="server-invite-button"
@@ -657,6 +553,7 @@
   <script src="people-social.js"></script>
   <script src="people-servers.js"></script>
   <script src="people-server-channels.js?v=people-server-channels-v2"></script>
+  <script src="people-server-settings.js?v=people-server-settings-v1"></script>
   <script src="people-local-controls.js?v=people-server-voice-ui-v1-20260911a"></script>
   <script src="people-page-title.js"></script>
   <script src="people-mobile.js"></script>

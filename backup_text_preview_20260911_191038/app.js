@@ -80,7 +80,11 @@ function peopleDeleteGeneralMessageFromServer(
     (resolve, reject) => {
       socket.emit(
         "chat-message-delete",
-        { id },
+        {
+          id,
+          serverId: peopleActiveServerId,
+          channelId: peopleActiveTextChannelId
+        },
         (response) => {
           if (!response?.ok) {
             reject(
@@ -741,6 +745,14 @@ function peopleFailPendingGeneralMessage(
 function peopleHandleIncomingGeneralMessage(
   data
 ) {
+  if (
+    data?.channelId &&
+    peopleActiveTextChannelId &&
+    String(data.channelId) !== String(peopleActiveTextChannelId)
+  ) {
+    return;
+  }
+
   const clientId =
     String(
       data?.clientId || ""
@@ -1172,6 +1184,16 @@ function peopleHandleVoiceState(
             : []
         );
 
+  const activeChannelRoster =
+    activeVoiceChannelId
+      ? roster.filter((user) => String(user?.channelId || "") === String(activeVoiceChannelId))
+      : roster;
+
+  if (peopleActiveServerId && peopleVoiceSameServer(serverId, peopleActiveServerId)) {
+    lastVoiceRoster = roster;
+    peopleDispatchServerChannelState({ voice: roster });
+  }
+
   if (
     activeVoiceServerId &&
     peopleVoiceSameServer(
@@ -1233,7 +1255,7 @@ function peopleHandleVoiceState(
 
     const nextRemoteIds =
       new Set(
-        roster
+        activeChannelRoster
           .filter(
             isRemoteVoiceUser
           )
@@ -1263,7 +1285,7 @@ function peopleHandleVoiceState(
     // === PEOPLE_REMOTE_VOICE_SOUNDS_V5_END ===
 
     peopleSetActiveVoiceRoster(
-      roster
+      activeChannelRoster
     );
 
     if (someoneJoined) {
@@ -1284,9 +1306,8 @@ function peopleHandleVoiceState(
       peopleActiveServerId
     )
   ) {
-    renderVoiceUsers(
-      roster
-    );
+    lastVoiceRoster = roster;
+    peopleDispatchServerChannelState({ voice: roster });
   }
 }
 
@@ -1331,7 +1352,8 @@ async function peopleReconnectVoiceSession() {
 
   const response =
     await peopleVoiceJoinRequest(
-      activeVoiceServerId
+      activeVoiceServerId,
+      activeVoiceChannelId
     );
 
   if (
@@ -1356,6 +1378,8 @@ async function peopleReconnectVoiceSession() {
       response.serverId ||
       activeVoiceServerId
     );
+  activeVoiceChannelId =
+    String(response.channelId || activeVoiceChannelId || "") || null;
 
   peopleSetActiveVoiceRoster(
     response.roster ||
@@ -1771,6 +1795,40 @@ function attachRemoteMedia(peerId, stream) {
 
 // === PEOPLE_SERVER_RUNTIME_V1_START ===
 let peopleActiveServerId = null;
+let peopleActiveTextChannelId = null;
+let peopleServerChannels = [];
+let activeVoiceChannelId = null;
+let peopleRequestedVoiceChannelId = null;
+
+
+function peopleServerChannelById(channelId) {
+  const wanted = String(channelId || "");
+  return peopleServerChannels.find((item) => String(item?.id || "") === wanted) || null;
+}
+
+function peopleDispatchServerChannelState(extra = {}) {
+  window.dispatchEvent(new CustomEvent("people-server-channel-state", {
+    detail: {
+      serverId: peopleActiveServerId,
+      activeTextChannelId: peopleActiveTextChannelId,
+      activeVoiceServerId,
+      activeVoiceChannelId,
+      channels: Array.isArray(peopleServerChannels) ? peopleServerChannels : [],
+      voice: Array.isArray(lastVoiceRoster) ? lastVoiceRoster : [],
+      ...extra
+    }
+  }));
+}
+
+function peopleSetServerChannels(channels, activeChannelId = peopleActiveTextChannelId) {
+  peopleServerChannels = Array.isArray(channels) ? channels : [];
+  const wanted = String(activeChannelId || "");
+  const text = peopleServerChannels.find((item) =>
+    item?.type === "text" && String(item.id) === wanted
+  ) || peopleServerChannels.find((item) => item?.type === "text") || null;
+  peopleActiveTextChannelId = text ? String(text.id) : null;
+  peopleDispatchServerChannelState();
+}
 
 // === PEOPLE_SERVER_INSTANT_OPEN_V2_START ===
 // Les derniers payloads de serveurs visités restent en RAM afin que le
@@ -1789,7 +1847,8 @@ function peopleRememberServerPayload(serverId, payload) {
     ...payload,
     history: Array.isArray(payload.history) ? payload.history : [],
     online: Array.isArray(payload.online) ? payload.online : [],
-    voice: Array.isArray(payload.voice) ? payload.voice : []
+    voice: Array.isArray(payload.voice) ? payload.voice : [],
+    channels: Array.isArray(payload.channels) ? payload.channels : []
   });
 
   while (peopleServerViewCache.size > PEOPLE_SERVER_VIEW_CACHE_MAX) {
@@ -1810,9 +1869,109 @@ function peopleCachedServerPayload(serverId) {
 }
 // === PEOPLE_SERVER_INSTANT_OPEN_V2_END ===
 
+// === PEOPLE_TEXT_CHANNEL_INSTANT_V1_START ===
+// Cache par salon, comme pour les MP : l'interface peut afficher le dernier
+// contenu connu immediatement pendant que le serveur renvoie l'etat frais.
+const PEOPLE_TEXT_CHANNEL_VIEW_CACHE_MAX = 12;
+const PEOPLE_TEXT_CHANNEL_HISTORY_CACHE_MAX = 120;
+const PEOPLE_TEXT_CHANNEL_PREFETCH_MAX_AGE_MS = 30000;
+const peopleTextChannelViewCache = new Map();
+const peopleTextChannelPrefetchPromises = new Map();
+let peopleTextChannelSelectRequestVersion = 0;
+
+function peopleTextChannelCacheKey(serverId, channelId) {
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  return sid && cid ? sid + "\u001f" + cid : "";
+}
+
+function peopleRememberTextChannelView(serverId, channelId, history) {
+  const key = peopleTextChannelCacheKey(serverId, channelId);
+  if (!key) return null;
+
+  const value = {
+    serverId: String(serverId),
+    channelId: String(channelId),
+    history: Array.isArray(history)
+      ? history.slice(-PEOPLE_TEXT_CHANNEL_HISTORY_CACHE_MAX)
+      : [],
+    updatedAt: Date.now()
+  };
+
+  peopleTextChannelViewCache.delete(key);
+  peopleTextChannelViewCache.set(key, value);
+
+  while (peopleTextChannelViewCache.size > PEOPLE_TEXT_CHANNEL_VIEW_CACHE_MAX) {
+    const first = peopleTextChannelViewCache.keys().next().value;
+    if (first === undefined) break;
+    peopleTextChannelViewCache.delete(first);
+  }
+
+  return value;
+}
+
+function peopleCachedTextChannelView(serverId, channelId) {
+  const key = peopleTextChannelCacheKey(serverId, channelId);
+  if (!key) return null;
+  const cached = peopleTextChannelViewCache.get(key);
+  if (!cached) return null;
+  peopleTextChannelViewCache.delete(key);
+  peopleTextChannelViewCache.set(key, cached);
+  return cached;
+}
+
+function peoplePrefetchTextChannel(serverId, channelId) {
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  const key = peopleTextChannelCacheKey(sid, cid);
+  if (!key) return Promise.resolve(null);
+
+  const cached = peopleTextChannelViewCache.get(key);
+  if (
+    cached &&
+    Date.now() - Number(cached.updatedAt || 0) < PEOPLE_TEXT_CHANNEL_PREFETCH_MAX_AGE_MS
+  ) {
+    return Promise.resolve(cached);
+  }
+
+  if (peopleTextChannelPrefetchPromises.has(key)) {
+    return peopleTextChannelPrefetchPromises.get(key);
+  }
+
+  const promise = new Promise((resolve) => {
+    socket.emit(
+      "server-channel-prefetch",
+      { serverId: sid, channelId: cid },
+      (response) => {
+        if (!response?.ok) return resolve(null);
+        resolve(peopleRememberTextChannelView(sid, cid, response.history || []));
+      }
+    );
+  }).finally(() => {
+    peopleTextChannelPrefetchPromises.delete(key);
+  });
+
+  peopleTextChannelPrefetchPromises.set(key, promise);
+  return promise;
+}
+// === PEOPLE_TEXT_CHANNEL_INSTANT_V1_END ===
+
 function peopleApplySelectedServerPayload(
   payload
 ) {
+  peopleSetServerChannels(
+    payload?.channels || peopleServerChannels,
+    payload?.activeChannelId || peopleActiveTextChannelId
+  );
+
+  if (peopleActiveServerId && peopleActiveTextChannelId) {
+    peopleRememberTextChannelView(
+      peopleActiveServerId,
+      peopleActiveTextChannelId,
+      payload?.history || []
+    );
+  }
+
   renderChatHistory(
     payload?.history || []
   );
@@ -1833,13 +1992,13 @@ function peopleApplySelectedServerPayload(
       ).length
     );
 
-  renderVoiceUsers(
-    payload?.voice || []
-  );
+  lastVoiceRoster = Array.isArray(payload?.voice) ? payload.voice : [];
+  peopleDispatchServerChannelState({ voice: lastVoiceRoster });
 }
 
 function peopleSelectServerSocket(
-  serverId
+  serverId,
+  channelId = null
 ) {
   return new Promise(
     (resolve) => {
@@ -1847,7 +2006,9 @@ function peopleSelectServerSocket(
         "server-select",
         {
           serverId:
-            String(serverId)
+            String(serverId),
+          channelId:
+            channelId ? String(channelId) : null
         },
         (response) => {
           resolve(
@@ -1870,12 +2031,16 @@ window.PeopleServerRuntime = {
       sur le vocal WebRTC actif.
     */
     peopleActiveServerId = null;
+    peopleActiveTextChannelId = null;
+    peopleServerChannels = [];
     peopleServerSelectRequestVersion += 1;
+    peopleTextChannelSelectRequestVersion += 1;
 
     renderChatHistory([]);
     peopleRenderOnlineUsers([]);
     userCount.textContent = "0";
-    renderVoiceUsers([]);
+    lastVoiceRoster = [];
+    peopleDispatchServerChannelState({ voice: [] });
     peopleSyncVoiceUiContext();
   },
 
@@ -1891,6 +2056,7 @@ window.PeopleServerRuntime = {
     const previousId = peopleActiveServerId;
     const previousPayload = peopleCachedServerPayload(previousId);
     const requestVersion = ++peopleServerSelectRequestVersion;
+    peopleTextChannelSelectRequestVersion += 1;
 
     /*
       L'état visuel change immédiatement. Si le serveur a déjà été visité,
@@ -1903,11 +2069,11 @@ window.PeopleServerRuntime = {
 
     const cached = peopleCachedServerPayload(serverId);
     peopleApplySelectedServerPayload(
-      cached || { history: [], online: [], voice: [] }
+      cached || { history: [], online: [], voice: [], channels: [] }
     );
     peopleSyncVoiceUiContext();
 
-    const response = await peopleSelectServerSocket(serverId);
+    const response = await peopleSelectServerSocket(serverId, peopleActiveTextChannelId);
 
     if (!response?.ok) {
       if (
@@ -1916,7 +2082,7 @@ window.PeopleServerRuntime = {
       ) {
         peopleActiveServerId = previousId || null;
         peopleApplySelectedServerPayload(
-          previousPayload || { history: [], online: [], voice: [] }
+          previousPayload || { history: [], online: [], voice: [], channels: [] }
         );
         peopleSyncVoiceUiContext();
       }
@@ -1943,7 +2109,7 @@ window.PeopleServerRuntime = {
 
     const serverId = String(peopleActiveServerId);
     const requestVersion = ++peopleServerSelectRequestVersion;
-    const response = await peopleSelectServerSocket(serverId);
+    const response = await peopleSelectServerSocket(serverId, peopleActiveTextChannelId);
 
     if (!response?.ok) {
       if (
@@ -1972,6 +2138,154 @@ window.PeopleServerRuntime = {
       */
       peopleSyncVoiceUiContext();
     }
+  },
+
+  async selectTextChannel(channelId) {
+    const sid = String(peopleActiveServerId || "");
+    const cid = String(channelId || "");
+    if (!sid || !cid) return { ok: false, error: "Salon invalide." };
+
+    if (String(peopleActiveTextChannelId || "") === cid) {
+      return { ok: true, serverId: sid, activeChannelId: cid, cached: true };
+    }
+
+    const previousChannelId = String(peopleActiveTextChannelId || "");
+    const previousView = previousChannelId
+      ? peopleCachedTextChannelView(sid, previousChannelId)
+      : null;
+    const requestVersion = ++peopleTextChannelSelectRequestVersion;
+    const cachedView = peopleCachedTextChannelView(sid, cid);
+
+    // Le salon devient actif AVANT l'aller-retour reseau.
+    peopleActiveTextChannelId = cid;
+    peopleGeneralReplyController?.clear();
+    peopleGeneralImagePicker?.clear();
+    renderChatHistory(cachedView?.history || []);
+
+    const oldServerCache = peopleCachedServerPayload(sid) || {};
+    peopleRememberServerPayload(sid, {
+      ...oldServerCache,
+      ok: true,
+      channels: peopleServerChannels,
+      activeChannelId: cid,
+      history: cachedView?.history || []
+    });
+    peopleDispatchServerChannelState();
+
+    // Si le survol avait deja commence un prechargement, on profite de son
+    // resultat des qu'il arrive sans attendre la selection complete.
+    const prefetchKey = peopleTextChannelCacheKey(sid, cid);
+    const pendingPrefetch = peopleTextChannelPrefetchPromises.get(prefetchKey);
+    if (pendingPrefetch) {
+      void pendingPrefetch.then((view) => {
+        if (
+          view &&
+          requestVersion === peopleTextChannelSelectRequestVersion &&
+          String(peopleActiveServerId || "") === sid &&
+          String(peopleActiveTextChannelId || "") === cid
+        ) {
+          renderChatHistory(view.history || []);
+        }
+      });
+    }
+
+    const response = await new Promise((resolve) => {
+      socket.emit("server-channel-select", { serverId: sid, channelId: cid }, (value) => {
+        resolve(value || { ok: false, error: "Le serveur n'a pas répondu." });
+      });
+    });
+
+    if (!response?.ok) {
+      if (
+        requestVersion === peopleTextChannelSelectRequestVersion &&
+        String(peopleActiveServerId || "") === sid &&
+        String(peopleActiveTextChannelId || "") === cid
+      ) {
+        const fallback = previousChannelId && peopleServerChannelById(previousChannelId)?.type === "text"
+          ? previousChannelId
+          : null;
+        peopleActiveTextChannelId = fallback;
+        renderChatHistory(previousView?.history || []);
+        peopleDispatchServerChannelState();
+      }
+      return response;
+    }
+
+    const confirmedId = String(response.activeChannelId || cid);
+    const freshView = peopleRememberTextChannelView(sid, confirmedId, response.history || []);
+
+    // Une reponse lente d'un ancien clic ne doit jamais remplacer le salon
+    // sur lequel l'utilisateur est passe entre-temps.
+    if (
+      requestVersion === peopleTextChannelSelectRequestVersion &&
+      String(peopleActiveServerId || "") === sid &&
+      String(peopleActiveTextChannelId || "") === cid
+    ) {
+      peopleActiveTextChannelId = confirmedId;
+      renderChatHistory(freshView?.history || []);
+
+      const cachedServer = peopleCachedServerPayload(sid) || {};
+      peopleRememberServerPayload(sid, {
+        ...cachedServer,
+        ok: true,
+        channels: peopleServerChannels,
+        activeChannelId: confirmedId,
+        history: freshView?.history || []
+      });
+
+      peopleDispatchServerChannelState();
+    }
+
+    return response;
+  },
+
+  prefetchTextChannel(channelId) {
+    const sid = String(peopleActiveServerId || "");
+    const cid = String(channelId || "");
+    if (!sid || !cid || String(peopleActiveTextChannelId || "") === cid) {
+      return Promise.resolve(null);
+    }
+    return peoplePrefetchTextChannel(sid, cid);
+  },
+
+  async joinVoiceChannel(channelId) {
+    const cid = String(channelId || "");
+    if (!cid) return false;
+    peopleRequestedVoiceChannelId = cid;
+
+    if (voiceJoined) {
+      if (
+        peopleVoiceSameServer(activeVoiceServerId, peopleActiveServerId) &&
+        String(activeVoiceChannelId || "") === cid
+      ) {
+        leaveVoice();
+        return true;
+      }
+
+      return await peopleSwitchVoiceChannel(cid);
+    }
+
+    return await joinVoice(cid);
+  },
+
+  leaveVoiceChannel() {
+    if (voiceJoined) leaveVoice();
+  },
+
+  getChannels() {
+    return Array.isArray(peopleServerChannels) ? [...peopleServerChannels] : [];
+  },
+
+  getActiveTextChannelId() {
+    return peopleActiveTextChannelId;
+  },
+
+  getActiveVoiceChannelId() {
+    return activeVoiceChannelId;
+  },
+
+  getActiveVoiceServerId() {
+    return activeVoiceServerId;
   },
 
   getActiveServerId() {
@@ -2259,6 +2573,7 @@ messageForm.addEventListener(
         peopleNewGeneralClientId();
 
       addChatMessage({
+        channelId: peopleActiveTextChannelId,
         username,
         text,
         imageId,
@@ -2301,6 +2616,8 @@ messageForm.addEventListener(
         {
           text,
           imageId,
+          serverId: peopleActiveServerId,
+          channelId: peopleActiveTextChannelId,
           replyToId:
             reply?.id ||
             null,
@@ -2412,6 +2729,22 @@ socket.on("disconnect", () => {
   closeAllPeers();
 });
 
+socket.on("server-channels-updated", ({ serverId, channels } = {}) => {
+  if (String(serverId || "") !== String(peopleActiveServerId || "")) return;
+  const previous = peopleActiveTextChannelId;
+  peopleSetServerChannels(channels || [], previous);
+  if (previous && !peopleServerChannelById(previous) && peopleActiveTextChannelId) {
+    void window.PeopleServerRuntime?.selectTextChannel?.(peopleActiveTextChannelId);
+  }
+});
+
+// === PEOPLE_SERVER_SETTINGS_V1_SOCKET_START ===
+socket.on("server-updated", ({ server } = {}) => {
+  if (!server?.id) return;
+  window.dispatchEvent(new CustomEvent("people-server-updated", { detail: { server } }));
+});
+// === PEOPLE_SERVER_SETTINGS_V1_SOCKET_END ===
+
 socket.on("chat-history", renderChatHistory);
 socket.on(
   "profile-avatar-updated",
@@ -2427,7 +2760,8 @@ socket.on(
 // === PEOPLE_GENERAL_DELETE_CLIENT_V1_START ===
 socket.on(
   "chat-message-deleted",
-  ({ id } = {}) => {
+  ({ id, channelId } = {}) => {
+    if (channelId && peopleActiveTextChannelId && String(channelId) !== String(peopleActiveTextChannelId)) return;
     if (id) {
       peopleRemoveGeneralMessageFromDom(
         id
@@ -2441,7 +2775,10 @@ socket.on(
   "chat-message",
   peopleHandleIncomingGeneralMessage
 );
-socket.on("system-message", addSystemMessage);
+socket.on("system-message", (data) => {
+  if (data?.channelId && peopleActiveTextChannelId && String(data.channelId) !== String(peopleActiveTextChannelId)) return;
+  addSystemMessage(data);
+});
 socket.on("user-count", count => userCount.textContent = count);
 socket.on(
   "voice-state",
@@ -2855,7 +3192,10 @@ function updateScreenUi() {
 function peopleVoiceJoinRequest(
   serverId =
     activeVoiceServerId ||
-    peopleActiveServerId
+    peopleActiveServerId,
+  channelId =
+    activeVoiceChannelId ||
+    peopleRequestedVoiceChannelId
 ) {
   return new Promise(
     (resolve) => {
@@ -2904,6 +3244,8 @@ function peopleVoiceJoinRequest(
               serverId ||
               ""
             ),
+          channelId:
+            channelId ? String(channelId) : null,
           muted:
             micMuted,
           camera:
@@ -2992,7 +3334,7 @@ function peopleVoiceRejectJoin(
   syncVideoStageVisibility();
 }
 
-async function joinVoice() {
+async function joinVoice(channelId = peopleRequestedVoiceChannelId) {
   if (voiceJoined) return true;
 
   try {
@@ -3013,7 +3355,8 @@ async function joinVoice() {
 
     const response =
       await peopleVoiceJoinRequest(
-        targetVoiceServerId
+        targetVoiceServerId,
+        channelId
       );
 
     if (
@@ -3037,6 +3380,10 @@ async function joinVoice() {
         response.serverId ||
         targetVoiceServerId
       );
+
+    activeVoiceChannelId =
+      String(response.channelId || channelId || "") || null;
+    peopleRequestedVoiceChannelId = activeVoiceChannelId;
 
     peopleSetActiveVoiceRoster(
       response.roster ||
@@ -3070,6 +3417,84 @@ async function joinVoice() {
     return false;
   }
 }
+
+// === PEOPLE_VOICE_AUTO_SWITCH_V1_START ===
+let peopleVoiceSwitchInProgress = false;
+
+async function peopleSwitchVoiceChannel(channelId) {
+  const targetChannelId = String(channelId || "");
+  const targetServerId = String(peopleActiveServerId || "");
+
+  if (!voiceJoined) {
+    return await joinVoice(targetChannelId);
+  }
+
+  if (!targetServerId || !targetChannelId) {
+    voiceStatus.textContent = "Salon vocal invalide";
+    return false;
+  }
+
+  if (peopleVoiceSwitchInProgress) {
+    return false;
+  }
+
+  const previousRequestedChannelId = peopleRequestedVoiceChannelId;
+  peopleVoiceSwitchInProgress = true;
+  peopleRequestedVoiceChannelId = targetChannelId;
+  voiceStatus.textContent = "Changement de vocal...";
+
+  try {
+    /*
+      Le serveur déplace directement ce socket de l'ancienne room vers
+      la nouvelle. On garde donc le MediaStream local vivant : micro,
+      caméra, partage d'écran et état muet ne sont pas recréés.
+    */
+    const response = await peopleVoiceJoinRequest(
+      targetServerId,
+      targetChannelId
+    );
+
+    if (!response?.ok) {
+      peopleRequestedVoiceChannelId = previousRequestedChannelId;
+      voiceStatus.textContent = response?.error || "Impossible de changer de vocal.";
+      peopleSyncVoiceUiContext();
+      return false;
+    }
+
+    peopleSetActiveVoiceRoster([]);
+    closeAllPeers();
+
+    activeVoiceServerId = String(response.serverId || targetServerId);
+    activeVoiceChannelId = String(response.channelId || targetChannelId) || null;
+    peopleRequestedVoiceChannelId = activeVoiceChannelId;
+    voiceJoined = true;
+
+    peopleSetActiveVoiceRoster(response.roster || []);
+
+    if (leaveVoiceQuickButton) {
+      leaveVoiceQuickButton.disabled = false;
+    }
+
+    peoplePlayCallEventSound("join");
+    updateMicUi();
+    updateCameraUi();
+    updateScreenUi();
+    peopleSyncVoiceUiContext();
+    peopleDispatchServerChannelState();
+
+    await peopleConnectActiveVoicePeers();
+    return true;
+  } catch (err) {
+    console.error("[People changement vocal]", err);
+    peopleRequestedVoiceChannelId = previousRequestedChannelId;
+    voiceStatus.textContent = "Impossible de changer de vocal.";
+    peopleSyncVoiceUiContext();
+    return false;
+  } finally {
+    peopleVoiceSwitchInProgress = false;
+  }
+}
+// === PEOPLE_VOICE_AUTO_SWITCH_V1_END ===
 
 async function enableCamera() {
   if (cameraEnabled) return;
@@ -3401,6 +3826,8 @@ function leaveVoice() {
 
   activeVoiceServerId =
     null;
+  activeVoiceChannelId = null;
+  peopleRequestedVoiceChannelId = null;
 
   activeVoiceRoster =
     [];
@@ -3439,13 +3866,16 @@ function leaveVoice() {
   updateCameraUi();
   updateScreenUi();
   syncVideoStageVisibility();
+  peopleDispatchServerChannelState();
 }
 
 voiceButton.addEventListener(
   "click",
   () => {
     if (!voiceJoined) {
-      void joinVoice();
+      const fallbackVoice = peopleServerChannels.find((item) => item?.type === "voice");
+      peopleRequestedVoiceChannelId = fallbackVoice ? String(fallbackVoice.id) : null;
+      void joinVoice(peopleRequestedVoiceChannelId);
       return;
     }
 
@@ -3459,8 +3889,14 @@ voiceButton.addEventListener(
       return;
     }
 
-    voiceStatus.textContent =
-      "Tu es déjà dans un vocal. Quitte-le avant d'en rejoindre un autre.";
+    const fallbackVoice = peopleServerChannels.find((item) => item?.type === "voice");
+    if (!fallbackVoice) {
+      voiceStatus.textContent = "Aucun salon vocal sur ce serveur";
+      return;
+    }
+
+    peopleRequestedVoiceChannelId = String(fallbackVoice.id);
+    void peopleSwitchVoiceChannel(peopleRequestedVoiceChannelId);
   }
 );
 
