@@ -38,8 +38,7 @@
     intensity: 72,
     start: "#5865F2",
     middle: "#8B5CF6",
-    end: "#EB459E",
-    colors: Object.freeze(["#5865F2", "#8B5CF6", "#EB459E"])
+    end: "#EB459E"
   });
 
   const DEFAULT_CUSTOM_PALETTE = Object.freeze({
@@ -113,21 +112,18 @@
 
     const direction = Number(source.direction);
     const intensity = Number(source.intensity);
-    const fallbackStart = normalizeHex(fallbackColors.start, DEFAULT_GRADIENT.start);
-    const fallbackMiddle = normalizeHex(fallbackColors.middle, DEFAULT_GRADIENT.middle);
-    const fallbackEnd = normalizeHex(fallbackColors.end, DEFAULT_GRADIENT.end);
-    const legacy = [
-      normalizeHex(source.start, fallbackStart),
-      normalizeHex(source.middle, fallbackMiddle),
-      normalizeHex(source.end, fallbackEnd)
-    ];
-
-    let colors = Array.isArray(source.colors)
-      ? source.colors.map((color) => normalizeHex(color, null)).filter(Boolean).slice(0, 7)
-      : legacy;
-
-    if (colors.length < 3) colors = legacy;
-    const middleIndex = Math.floor((colors.length - 1) / 2);
+    const fallbackStart = normalizeHex(
+      fallbackColors.start,
+      DEFAULT_GRADIENT.start
+    );
+    const fallbackMiddle = normalizeHex(
+      fallbackColors.middle,
+      DEFAULT_GRADIENT.middle
+    );
+    const fallbackEnd = normalizeHex(
+      fallbackColors.end,
+      DEFAULT_GRADIENT.end
+    );
 
     return {
       enabled:
@@ -140,10 +136,9 @@
       intensity: Number.isFinite(intensity)
         ? Math.max(0, Math.min(100, Math.round(intensity)))
         : DEFAULT_GRADIENT.intensity,
-      colors,
-      start: colors[0],
-      middle: colors[middleIndex],
-      end: colors[colors.length - 1]
+      start: normalizeHex(source.start, fallbackStart),
+      middle: normalizeHex(source.middle, fallbackMiddle),
+      end: normalizeHex(source.end, fallbackEnd)
     };
   }
 
@@ -187,17 +182,18 @@
   function equal(a, b) {
     const left = normalize(a);
     const right = normalize(b);
-    const leftGradient = left.palette.gradient;
-    const rightGradient = right.palette.gradient;
 
     return (
       left.theme === right.theme &&
-      PALETTE_KEYS.every((key) => left.palette[key] === right.palette[key]) &&
-      leftGradient.enabled === rightGradient.enabled &&
-      leftGradient.direction === rightGradient.direction &&
-      leftGradient.intensity === rightGradient.intensity &&
-      leftGradient.colors.length === rightGradient.colors.length &&
-      leftGradient.colors.every((color, index) => color === rightGradient.colors[index])
+      PALETTE_KEYS.every(
+        (key) => left.palette[key] === right.palette[key]
+      ) &&
+      left.palette.gradient.enabled === right.palette.gradient.enabled &&
+      left.palette.gradient.direction === right.palette.gradient.direction &&
+      left.palette.gradient.intensity === right.palette.gradient.intensity &&
+      left.palette.gradient.start === right.palette.gradient.start &&
+      left.palette.gradient.middle === right.palette.gradient.middle &&
+      left.palette.gradient.end === right.palette.gradient.end
     );
   }
 

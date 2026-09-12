@@ -2198,23 +2198,20 @@
   function appearanceEqual(left, right) {
     const a = cloneAppearance(left);
     const b = cloneAppearance(right);
-    const aGradient = a.palette.gradient || {};
-    const bGradient = b.palette.gradient || {};
-    const aColors = Array.isArray(aGradient.colors)
-      ? aGradient.colors
-      : [aGradient.start, aGradient.middle, aGradient.end];
-    const bColors = Array.isArray(bGradient.colors)
-      ? bGradient.colors
-      : [bGradient.start, bGradient.middle, bGradient.end];
 
     return (
       a.theme === b.theme &&
-      PEOPLE_SETTINGS_PALETTE_KEYS.every((key) => a.palette[key] === b.palette[key]) &&
-      aGradient.enabled === bGradient.enabled &&
-      Number(aGradient.direction) === Number(bGradient.direction) &&
-      Number(aGradient.intensity) === Number(bGradient.intensity) &&
-      aColors.length === bColors.length &&
-      aColors.every((color, index) => color === bColors[index])
+      PEOPLE_SETTINGS_PALETTE_KEYS.every(
+        (key) =>
+          a.palette[key] ===
+          b.palette[key]
+      ) &&
+      a.palette.gradient.enabled === b.palette.gradient.enabled &&
+      a.palette.gradient.direction === b.palette.gradient.direction &&
+      a.palette.gradient.intensity === b.palette.gradient.intensity &&
+      a.palette.gradient.start === b.palette.gradient.start &&
+      a.palette.gradient.middle === b.palette.gradient.middle &&
+      a.palette.gradient.end === b.palette.gradient.end
     );
   }
 
@@ -2994,22 +2991,6 @@
       updateAppearanceControls();
     }
   );
-
-  // === PEOPLE_THEME_STUDIO_BRIDGE_V1_START ===
-  window.addEventListener(
-    "people-theme-studio-draft",
-    (event) => {
-      const incoming = event?.detail?.appearance;
-      if (!incoming?.palette) return;
-      appearanceDraft = cloneAppearance(incoming);
-      updateAppearanceControls({ skipInputs: true });
-      setAppearanceButtons();
-      if (event?.detail?.status) {
-        setAppearanceStatus(String(event.detail.status));
-      }
-    }
-  );
-  // === PEOPLE_THEME_STUDIO_BRIDGE_V1_END ===
 
   function activateTab(
     name

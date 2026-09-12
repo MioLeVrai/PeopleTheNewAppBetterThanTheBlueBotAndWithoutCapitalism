@@ -71,32 +71,27 @@
     const normalized = {};
     for (const key of PALETTE_KEYS) {
       const color = normalizeHex(palette[key]);
-      if (!color) throw new Error(`Couleur invalide ou manquante : ${key}.`);
+      if (!color) {
+        throw new Error(`Couleur invalide ou manquante : ${key}.`);
+      }
       normalized[key] = color;
     }
 
     const rawGradient = palette.gradient || source?.gradient || {};
     const direction = Number(rawGradient.direction);
     const intensity = Number(rawGradient.intensity);
-    const legacy = [
-      normalizeHex(rawGradient.start) || normalized.background,
-      normalizeHex(rawGradient.middle) || normalized.accent,
-      normalizeHex(rawGradient.end) || normalized.secondary
-    ];
-    let colors = Array.isArray(rawGradient.colors)
-      ? rawGradient.colors.map(normalizeHex).filter(Boolean).slice(0, 7)
-      : legacy;
-    if (colors.length < 3) colors = legacy;
-    const middleIndex = Math.floor((colors.length - 1) / 2);
 
     normalized.gradient = {
       enabled: rawGradient.enabled !== false,
-      direction: Number.isFinite(direction) ? Math.max(0, Math.min(360, Math.round(direction))) : 135,
-      intensity: Number.isFinite(intensity) ? Math.max(0, Math.min(100, Math.round(intensity))) : 72,
-      colors,
-      start: colors[0],
-      middle: colors[middleIndex],
-      end: colors[colors.length - 1]
+      direction: Number.isFinite(direction)
+        ? Math.max(0, Math.min(360, Math.round(direction)))
+        : 135,
+      intensity: Number.isFinite(intensity)
+        ? Math.max(0, Math.min(100, Math.round(intensity)))
+        : 72,
+      start: normalizeHex(rawGradient.start) || normalized.background,
+      middle: normalizeHex(rawGradient.middle) || normalized.accent,
+      end: normalizeHex(rawGradient.end) || normalized.secondary
     };
 
     return {
@@ -291,10 +286,6 @@
         input.value = color;
         input.dispatchEvent(new Event("input", { bubbles: true }));
       }
-
-      window.dispatchEvent(new CustomEvent("people-theme-studio-import", {
-        detail: { palette }
-      }));
     }
 
     toggle.addEventListener("click", () => {

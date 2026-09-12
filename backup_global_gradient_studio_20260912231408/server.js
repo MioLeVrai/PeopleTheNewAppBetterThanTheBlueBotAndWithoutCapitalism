@@ -1793,8 +1793,7 @@ const PEOPLE_DEFAULT_APPEARANCE_GRADIENT = Object.freeze({
   intensity: 72,
   start: "#5865F2",
   middle: "#8B5CF6",
-  end: "#EB459E",
-  colors: Object.freeze(["#5865F2", "#8B5CF6", "#EB459E"])
+  end: "#EB459E"
 });
 
 const PEOPLE_APPEARANCE_PALETTE_KEYS = Object.freeze([
@@ -1865,33 +1864,6 @@ function peopleNormalizeAppearanceGradient(value, fallbackColors = {}) {
 
   const direction = Number(source.direction);
   const intensity = Number(source.intensity);
-  const fallbackStart = peopleNormalizeAppearanceHex(
-    fallbackColors.start,
-    PEOPLE_DEFAULT_APPEARANCE_GRADIENT.start
-  );
-  const fallbackMiddle = peopleNormalizeAppearanceHex(
-    fallbackColors.middle,
-    PEOPLE_DEFAULT_APPEARANCE_GRADIENT.middle
-  );
-  const fallbackEnd = peopleNormalizeAppearanceHex(
-    fallbackColors.end,
-    PEOPLE_DEFAULT_APPEARANCE_GRADIENT.end
-  );
-  const legacy = [
-    peopleNormalizeAppearanceHex(source.start, fallbackStart),
-    peopleNormalizeAppearanceHex(source.middle, fallbackMiddle),
-    peopleNormalizeAppearanceHex(source.end, fallbackEnd)
-  ];
-
-  let colors = Array.isArray(source.colors)
-    ? source.colors
-        .map((color) => peopleNormalizeAppearanceHex(color, null))
-        .filter(Boolean)
-        .slice(0, 7)
-    : legacy;
-
-  if (colors.length < 3) colors = legacy;
-  const middleIndex = Math.floor((colors.length - 1) / 2);
 
   return {
     enabled:
@@ -1904,10 +1876,18 @@ function peopleNormalizeAppearanceGradient(value, fallbackColors = {}) {
     intensity: Number.isFinite(intensity)
       ? Math.max(0, Math.min(100, Math.round(intensity)))
       : PEOPLE_DEFAULT_APPEARANCE_GRADIENT.intensity,
-    colors,
-    start: colors[0],
-    middle: colors[middleIndex],
-    end: colors[colors.length - 1]
+    start: peopleNormalizeAppearanceHex(
+      source.start,
+      peopleNormalizeAppearanceHex(fallbackColors.start, PEOPLE_DEFAULT_APPEARANCE_GRADIENT.start)
+    ),
+    middle: peopleNormalizeAppearanceHex(
+      source.middle,
+      peopleNormalizeAppearanceHex(fallbackColors.middle, PEOPLE_DEFAULT_APPEARANCE_GRADIENT.middle)
+    ),
+    end: peopleNormalizeAppearanceHex(
+      source.end,
+      peopleNormalizeAppearanceHex(fallbackColors.end, PEOPLE_DEFAULT_APPEARANCE_GRADIENT.end)
+    )
   };
 }
 
