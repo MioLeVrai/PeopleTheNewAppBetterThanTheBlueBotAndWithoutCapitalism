@@ -10551,53 +10551,6 @@ app.delete(
 );
 // === PEOPLE_SERVER_LEAVE_V1_END ===
 
-// === PEOPLE_SERVER_SETTINGS_V2_MEMBERS_ROUTE_START ===
-app.get(
-  "/api/servers/:id/members",
-  async (req, res) => {
-    try {
-      const session = peopleSessionForRequest(req, res);
-      if (!session) return;
-
-      const server = await peopleGetServer(req.params.id);
-      if (!server) {
-        return res.status(404).json({ ok: false, error: "Serveur introuvable." });
-      }
-
-      const member = await peopleIsServerMember(session.id, server.id);
-      if (!member) {
-        return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-      }
-
-      const roster = await peopleServerPresenceRoster(server.id);
-      const ownerId = server.ownerId ? String(server.ownerId) : null;
-      const members = roster.map((entry) => {
-        const id = String(entry.accountId || entry.id || "");
-        return {
-          id,
-          accountId: id,
-          username: entry.username || "Membre",
-          online: Boolean(entry.online),
-          connections: Number(entry.connections || 0),
-          owner: Boolean(ownerId && id === ownerId)
-        };
-      });
-
-      return res.json({
-        ok: true,
-        serverId: String(server.id),
-        count: members.length,
-        onlineCount: members.filter(item => item.online).length,
-        members
-      });
-    } catch (err) {
-      console.error("[People server/settings members]", err);
-      return res.status(500).json({ ok: false, error: "Impossible de charger les membres." });
-    }
-  }
-);
-// === PEOPLE_SERVER_SETTINGS_V2_MEMBERS_ROUTE_END ===
-
 app.get(
   "/api/servers/:id/invite",
   async (req, res) => {

@@ -1,13 +1,10 @@
 (() => {
   "use strict";
 
-  // PEOPLE_SERVER_SETTINGS_V2_CLIENT
-  // === PEOPLE_SERVER_SETTINGS_GEAR_FIX_V1_START ===
-  let settingsButton = document.getElementById("serverSettingsButton");
-  // Le bouton peut etre absent d'anciennes installations. On le cree plus bas.
-  // === PEOPLE_SERVER_SETTINGS_GEAR_FIX_V1_TOP_END ===
+  const settingsButton = document.getElementById("serverSettingsButton");
+  if (!settingsButton) return;
 
-let currentUserId = null;
+  let currentUserId = null;
   let overlay = null;
   let activeSection = "overview";
   let serverSnapshot = null;
@@ -15,8 +12,8 @@ let currentUserId = null;
   const SECTIONS = [
     { id: "overview", label: "Vue d’ensemble" },
     { id: "channels", label: "Salons" },
-    { id: "members", label: "Membres" },
     { id: "invites", label: "Invitations" },
+    { id: "members", label: "Membres" },
     { id: "roles", label: "Rôles et permissions" },
     { id: "moderation", label: "Modération" }
   ];
@@ -289,109 +286,9 @@ let currentUserId = null;
     }
   }
 
-  async function renderMembers(content) {
-    content.appendChild(sectionHeader(
-      "Membres",
-      "Consulte les membres du serveur et leur état de connexion. Les actions de modération arriveront dans la section dédiée."
-    ));
-
-    const card = document.createElement("section");
-    card.className = "people-server-settings-card people-server-settings-members-card";
-    card.innerHTML = `
-      <div class="people-server-settings-members-toolbar">
-        <div>
-          <strong class="people-server-settings-members-count">Membres</strong>
-          <small class="people-server-settings-members-online"></small>
-        </div>
-        <input class="people-server-settings-members-search" type="search" placeholder="Rechercher un membre" autocomplete="off" />
-      </div>
-      <div class="people-server-settings-members-list" aria-live="polite"></div>
-    `;
-    content.appendChild(card);
-
-    const list = card.querySelector(".people-server-settings-members-list");
-    const search = card.querySelector(".people-server-settings-members-search");
-    const count = card.querySelector(".people-server-settings-members-count");
-    const online = card.querySelector(".people-server-settings-members-online");
-
-    list.appendChild(statusBox("Chargement des membres…"));
-
-    let members = [];
-    try {
-      const result = await api(`/api/servers/${encodeURIComponent(serverSnapshot.id)}/members`);
-      members = Array.isArray(result.members) ? result.members : [];
-      const onlineCount = members.filter((member) => member.online).length;
-      count.textContent = `${members.length} membre${members.length > 1 ? "s" : ""}`;
-      online.textContent = `${onlineCount} en ligne`;
-    } catch (err) {
-      list.replaceChildren(statusBox(err?.message || "Impossible de charger les membres.", "error"));
-      search.disabled = true;
-      return;
-    }
-
-    function draw() {
-      const q = String(search.value || "").trim().toLocaleLowerCase("fr-FR");
-      const filtered = members.filter((member) =>
-        !q || String(member.username || "").toLocaleLowerCase("fr-FR").includes(q)
-      );
-
-      list.replaceChildren();
-      if (!filtered.length) {
-        list.appendChild(statusBox(q ? "Aucun membre ne correspond à cette recherche." : "Aucun membre."));
-        return;
-      }
-
-      for (const member of filtered) {
-        const row = document.createElement("div");
-        row.className = "people-server-settings-member-row";
-        if (member.online) row.classList.add("online");
-
-        const avatar = document.createElement("div");
-        avatar.className = "people-server-settings-member-avatar";
-        avatar.textContent = initials(member.username);
-
-        const identity = document.createElement("div");
-        identity.className = "people-server-settings-member-identity";
-        const name = document.createElement("strong");
-        name.textContent = member.username || "Membre";
-        const state = document.createElement("span");
-        state.textContent = member.online ? "En ligne" : "Hors ligne";
-        identity.append(name, state);
-
-        const badges = document.createElement("div");
-        badges.className = "people-server-settings-member-badges";
-        if (member.owner) {
-          const owner = document.createElement("span");
-          owner.className = "people-server-settings-member-badge owner";
-          owner.textContent = "Propriétaire";
-          badges.appendChild(owner);
-        }
-        if (String(member.id || member.accountId || "") === String(currentUserId || "")) {
-          const you = document.createElement("span");
-          you.className = "people-server-settings-member-badge";
-          you.textContent = "Toi";
-          badges.appendChild(you);
-        }
-
-        row.append(avatar, identity, badges);
-        list.appendChild(row);
-      }
-    }
-
-    search.addEventListener("input", draw);
-    draw();
-
-    const note = document.createElement("section");
-    note.className = "people-server-settings-card people-server-settings-note";
-    note.innerHTML = `
-      <strong>Gestion des membres</strong>
-      <p>Les exclusions, bannissements et changements de rôles seront ajoutés ici quand le système de permissions sera prêt.</p>
-    `;
-    content.appendChild(note);
-  }
-
   function renderPlaceholderSection(content, id) {
     const definitions = {
+      members: ["Membres", "Gestion des membres, exclusions et informations de présence."],
       roles: ["Rôles et permissions", "Rôles personnalisés et permissions globales ou propres à chaque salon."],
       moderation: ["Modération", "Outils de sécurité, journal d’actions et paramètres de modération."]
     };
@@ -412,7 +309,6 @@ let currentUserId = null;
 
     if (id === "overview") await renderOverview(content);
     else if (id === "channels") renderChannels(content);
-    else if (id === "members") await renderMembers(content);
     else if (id === "invites") await renderInvites(content);
     else renderPlaceholderSection(content, id);
   }
@@ -474,7 +370,8 @@ let currentUserId = null;
     document.body.classList.add("people-server-settings-open");
     void renderSection(activeSection || "overview");
   }
-  // Branchement gere par le correctif dynamique plus bas.
+
+  settingsButton.addEventListener("click", () => void openSettings());
 
   window.addEventListener("people-authenticated", (event) => {
     currentUserId = event.detail?.id ? String(event.detail.id) : currentUserId;
@@ -499,133 +396,4 @@ let currentUserId = null;
       closeSettings();
     }
   });
-
-
-  // === PEOPLE_SERVER_SETTINGS_GEAR_FIX_V1_RUNTIME_START ===
-  function buildSettingsGearButton() {
-    const existing = document.getElementById("serverSettingsButton");
-    if (existing) return existing;
-
-    const oldCreateButton = document.getElementById("serverChannelCreateButton");
-    const inviteButton =
-      document.getElementById("serverInviteButton") ||
-      document.querySelector('[data-action="server-invite"]') ||
-      document.querySelector('button[aria-label*="invitation" i]') ||
-      document.querySelector('button[title*="invitation" i]') ||
-      document.querySelector('button[aria-label*="invite" i]') ||
-      document.querySelector('button[title*="invite" i]');
-
-    const host =
-      oldCreateButton?.parentElement ||
-      inviteButton?.parentElement ||
-      document.querySelector(".server-header-actions") ||
-      document.querySelector(".server-title-actions") ||
-      document.querySelector(".server-actions");
-
-    if (!host) return null;
-
-    const button = document.createElement("button");
-    button.id = "serverSettingsButton";
-    button.type = "button";
-    button.className = "server-invite-button people-server-settings-button";
-    button.title = "Parametres du serveur";
-    button.setAttribute("aria-label", "Parametres du serveur");
-    button.innerHTML = [
-      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
-      '<path d="M19.14 12.94a7.6 7.6 0 0 0 .05-.94 7.6 7.6 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.4 7.4 0 0 0-1.63-.95L14.38 2.8a.5.5 0 0 0-.5-.4h-3.76a.5.5 0 0 0-.5.4l-.36 2.51c-.58.25-1.12.57-1.63.95L5.24 5.3a.5.5 0 0 0-.61.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.6 7.6 0 0 0-.05.94c0 .32.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96c.51.39 1.05.71 1.63.95l.36 2.51a.5.5 0 0 0 .5.4h3.76a.5.5 0 0 0 .5-.4l.36-2.51c.58-.24 1.12-.56 1.63-.95l2.39.96a.5.5 0 0 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/>',
-      '</svg>'
-    ].join("");
-
-    if (oldCreateButton?.parentElement) {
-      // Comportement demande: la roue remplace l'ancien +.
-      oldCreateButton.replaceWith(button);
-    } else if (inviteButton?.parentElement === host) {
-      // Sinon elle apparait juste a gauche du bouton d'invitation.
-      host.insertBefore(button, inviteButton);
-    } else {
-      host.appendChild(button);
-    }
-
-    return button;
-  }
-
-  function bindSettingsGearButton() {
-    const button = buildSettingsGearButton();
-    if (!button) return false;
-    settingsButton = button;
-    if (button.dataset.peopleServerSettingsBound === "1") return true;
-    button.dataset.peopleServerSettingsBound = "1";
-    button.addEventListener("click", () => void openSettings());
-    return true;
-  }
-
-  bindSettingsGearButton();
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bindSettingsGearButton, { once: true });
-  }
-
-  // Certaines vues People sont reconstruites dynamiquement: si l'en-tete revient,
-  // la roue revient aussi sans recharger toute l'application.
-  const gearObserver = new MutationObserver(() => {
-    bindSettingsGearButton();
-  });
-  if (document.body) {
-    gearObserver.observe(document.body, { childList: true, subtree: true });
-  }
-  // === PEOPLE_SERVER_SETTINGS_GEAR_FIX_V1_RUNTIME_END ===
 })();
-
-/* people-server-wheel-align-v2-start */
-(function ensureServerHeaderActionAlignmentV2(){
-  function apply(){
-    try {
-      const settingsBtn = document.getElementById('serverSettingsButton');
-      if (!settingsBtn) return;
-      const parent = settingsBtn.parentElement;
-      if (parent) {
-        parent.style.display = 'flex';
-        parent.style.alignItems = 'center';
-        parent.style.justifyContent = 'flex-end';
-        parent.style.gap = '8px';
-      }
-
-      const inviteBtn = document.getElementById('serverInviteButton')
-        || (parent ? parent.querySelector('[data-server-invite], .server-invite-button, .invite-button, button[title*="invitation" i], button[aria-label*="invitation" i]') : null);
-
-      for (const btn of [settingsBtn, inviteBtn]) {
-        if (!btn) continue;
-        Object.assign(btn.style, {
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '34px',
-          height: '34px',
-          minWidth: '34px',
-          minHeight: '34px',
-          padding: '0',
-          margin: '0',
-          top: 'auto',
-          bottom: 'auto',
-          left: 'auto',
-          right: 'auto',
-          transform: 'none',
-          verticalAlign: 'middle',
-          lineHeight: '1',
-          position: 'relative',
-          alignSelf: 'center'
-        });
-      }
-    } catch (_) {}
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', apply, { once: true });
-  } else {
-    apply();
-  }
-  window.addEventListener('resize', apply);
-  const observer = new MutationObserver(apply);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-})();
-/* people-server-wheel-align-v2-end */
