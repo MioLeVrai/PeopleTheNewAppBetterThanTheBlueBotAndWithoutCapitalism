@@ -19,7 +19,8 @@ const fsAccounts = require("fs");
 const pathAccounts = require("path");
 const cryptoAccounts = require("crypto");
 
-app.use(express.json({ limit: "32kb" }));
+/* PEOPLE_SERVER_ICON_V1_JSON_LIMIT */
+app.use(express.json({ limit: "512kb" }));
 
 const PEOPLE_COOKIE = "people_session";
 const PEOPLE_DB_URL = String(process.env.DATABASE_URL || "").trim();
@@ -7705,28 +7706,24 @@ function peopleWriteLocalServers(data) {
   );
 }
 
+// === PEOPLE_SERVER_ICON_V1_PUBLIC ===
 function peopleServerPublic(server) {
   if (!server) return null;
 
-  return {
-    id:
-      String(server.id),
-    name:
-      server.name,
-    ownerId:
-      server.ownerId ??
-      server.owner_id ??
-      null,
-    official:
-      Boolean(
-        server.official ??
-        server.is_official
-      ),
-    createdAt:
-      server.createdAt ??
-      server.created_at ??
-      null
+  const output = {
+    id: String(server.id),
+    name: server.name,
+    ownerId: server.ownerId ?? server.owner_id ?? null,
+    official: Boolean(server.official ?? server.is_official),
+    createdAt: server.createdAt ?? server.created_at ?? null
   };
+
+  const iconData = server.iconData ?? server.icon_data;
+  // Important: si une ancienne route ne connait pas encore l'icone, on n'envoie
+  // pas iconData=null afin de ne pas effacer une icone deja en cache cote client.
+  if (iconData !== undefined) output.iconData = iconData || null;
+
+  return output;
 }
 
 async function peopleGetServer(serverId) {
@@ -7742,7 +7739,7 @@ async function peopleGetServer(serverId) {
 
     const result =
       await peoplePool.query(
-        "SELECT id, name, owner_id, invite_code, is_official, created_at " +
+        "SELECT id, name, owner_id, invite_code, is_official, icon_data, created_at " +
         "FROM people_servers WHERE id = $1 LIMIT 1",
         [id]
       );
@@ -7763,8 +7760,8 @@ async function peopleGetServer(serverId) {
           : null,
       inviteCode:
         row.invite_code,
-      official:
-        Boolean(row.is_official),
+      official: Boolean(row.is_official),
+      iconData: row.icon_data || null,
       createdAt:
         row.created_at
     };
@@ -7792,7 +7789,7 @@ async function peopleGetServerByInvite(code) {
   if (peoplePool) {
     const result =
       await peoplePool.query(
-        "SELECT id, name, owner_id, invite_code, is_official, created_at " +
+        "SELECT id, name, owner_id, invite_code, is_official, icon_data, created_at " +
         "FROM people_servers WHERE invite_code = $1 LIMIT 1",
         [invite]
       );
@@ -7813,8 +7810,8 @@ async function peopleGetServerByInvite(code) {
           : null,
       inviteCode:
         row.invite_code,
-      official:
-        Boolean(row.is_official),
+      official: Boolean(row.is_official),
+      iconData: row.icon_data || null,
       createdAt:
         row.created_at
     };
@@ -8370,7 +8367,7 @@ async function peopleListServersForUser(
   if (peoplePool) {
     const result =
       await peoplePool.query(
-        "SELECT s.id, s.name, s.owner_id, s.is_official, s.created_at " +
+        "SELECT s.id, s.name, s.owner_id, s.is_official, s.icon_data, s.created_at " +
         "FROM people_servers s " +
         "JOIN people_server_members m ON m.server_id = s.id " +
         "WHERE m.user_id = $1 " +
@@ -8388,8 +8385,8 @@ async function peopleListServersForUser(
           row.owner_id
             ? String(row.owner_id)
             : null,
-        official:
-          Boolean(row.is_official),
+        official: Boolean(row.is_official),
+        iconData: row.icon_data || null,
         createdAt:
           row.created_at
       })
@@ -9216,6 +9213,11 @@ async function peopleInitServersV1() {
       "ADD COLUMN IF NOT EXISTS legacy_seeded BOOLEAN NOT NULL DEFAULT FALSE"
     );
 
+    // === PEOPLE_SERVER_ICON_V1_DB_COLUMN ===
+    await peoplePool.query(
+      "ALTER TABLE people_servers ADD COLUMN IF NOT EXISTS icon_data TEXT NULL"
+    );
+
     await peoplePool.query(
       "CREATE TABLE IF NOT EXISTS people_server_members (" +
       "server_id BIGINT NOT NULL REFERENCES people_servers(id) ON DELETE CASCADE, " +
@@ -9997,6 +9999,72 @@ app.patch(
   }
 );
 // === PEOPLE_SERVER_SETTINGS_V1_RENAME_END ===
+
+// === PEOPLE_SERVER_ICON_V1_ROUTE_START ===
+app.patch(
+  "/api/servers/:id/icon",
+  async (req, res) => {
+    try {
+      const session = peopleSessionForRequest(req, res);
+      if (!session) return;
+
+      const current = await peopleGetServer(req.params.id);
+      if (!current) {
+        return res.status(404).json({ ok: false, error: "Serveur introuvable." });
+      }
+      if (!current.ownerId || String(current.ownerId) !== String(session.id)) {
+        return res.status(403).json({ ok: false, error: "Seul le propriétaire peut modifier l'image du serveur." });
+      }
+
+      const raw = req.body?.iconData;
+      let iconData = null;
+
+      if (raw !== null && raw !== undefined && String(raw).trim() !== "") {
+        const value = String(raw);
+        const match = value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/i);
+        if (!match) {
+          return res.status(400).json({ ok: false, error: "Format d'image invalide. Utilise PNG, JPEG ou WebP." });
+        }
+
+        let decoded;
+        try { decoded = Buffer.from(match[2], "base64"); }
+        catch { decoded = null; }
+        if (!decoded || !decoded.length || decoded.length > 384 * 1024) {
+          return res.status(400).json({ ok: false, error: "L'image du serveur est trop lourde." });
+        }
+        iconData = value;
+      }
+
+      if (peoplePool) {
+        await peoplePool.query(
+          "UPDATE people_servers SET icon_data = $2 WHERE id = $1",
+          [String(current.id), iconData]
+        );
+      } else {
+        const data = peopleReadLocalServers();
+        const stored = data.servers.find(item => String(item.id) === String(current.id));
+        if (!stored) return res.status(404).json({ ok: false, error: "Serveur introuvable." });
+        stored.iconData = iconData;
+        peopleWriteLocalServers(data);
+      }
+
+      const updated = { ...current, iconData };
+      const publicServer = peopleServerPublic(updated);
+      io.to(peopleServerRoom(String(current.id))).emit("server-updated", { server: publicServer });
+
+      return res.json({
+        ok: true,
+        server: publicServer,
+        idUnchanged: true,
+        inviteUnchanged: true
+      });
+    } catch (err) {
+      console.error("[People server/icon]", err);
+      return res.status(500).json({ ok: false, error: "Impossible de modifier l'image du serveur." });
+    }
+  }
+);
+// === PEOPLE_SERVER_ICON_V1_ROUTE_END ===
 
 app.get(
   "/api/servers/invite/:code",

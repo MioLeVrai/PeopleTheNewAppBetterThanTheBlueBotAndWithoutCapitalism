@@ -120,6 +120,30 @@
     );
   }
 
+  // === PEOPLE_SERVER_ICON_V1_CLIENT ===
+  function renderPeopleServerIcon(target, server) {
+    if (!target) return;
+    target.replaceChildren();
+
+    const iconData = server?.iconData;
+    if (typeof iconData === "string" && iconData.startsWith("data:image/")) {
+      const image = document.createElement("img");
+      image.src = iconData;
+      image.alt = "";
+      image.draggable = false;
+      image.style.width = "100%";
+      image.style.height = "100%";
+      image.style.display = "block";
+      image.style.objectFit = "cover";
+      image.style.borderRadius = "inherit";
+      image.style.pointerEvents = "none";
+      target.appendChild(image);
+      return;
+    }
+
+    target.textContent = initials(server?.name);
+  }
+
   async function api(
     url,
     options = {}
@@ -495,10 +519,7 @@
       button.dataset.serverId =
         String(server.id);
 
-      button.textContent =
-        initials(
-          server.name
-        );
+      renderPeopleServerIcon(button, server);
 
       button.title =
         server.name;
@@ -610,8 +631,7 @@
     }
 
     if (serverIcon) {
-      serverIcon.textContent =
-        initials(server.name);
+      renderPeopleServerIcon(serverIcon, server);
     }
 
     if (subtitle) {
@@ -816,10 +836,7 @@
       invitePreview =
         data.server;
 
-      inviteIcon.textContent =
-        initials(
-          invitePreview.name
-        );
+      renderPeopleServerIcon(inviteIcon, invitePreview);
 
       inviteName.textContent =
         invitePreview.name;

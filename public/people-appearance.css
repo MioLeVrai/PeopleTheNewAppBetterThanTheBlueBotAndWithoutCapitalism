@@ -402,3 +402,18 @@
   background-image: var(--people-gradient-main) !important;
 }
 /* === PEOPLE_GRADIENT_THEMES_V1_END === */
+
+/* === PEOPLE_FRIENDS_FOLLOW_THEME_V1_START === */
+:root[data-people-theme] #friendsNavButton {
+  background: transparent !important;
+  color: var(--people-text) !important;
+  border-color: transparent !important;
+}
+
+:root[data-people-theme] #friendsNavButton.active,
+:root[data-people-theme] #friendsNavButton:hover,
+:root[data-people-theme] #friendsNavButton.active:hover {
+  background: var(--people-hover) !important;
+  color: var(--people-text) !important;
+}
+/* === PEOPLE_FRIENDS_FOLLOW_THEME_V1_END === */

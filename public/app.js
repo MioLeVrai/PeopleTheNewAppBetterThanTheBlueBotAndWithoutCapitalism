@@ -4533,3 +4533,113 @@ try {
 
 peopleSetOnlinePanel(peopleOnlineOpenByDefault);
 // === PEOPLE_ONLINE_PANEL_V1_END ===
+
+
+/* people-double-topbar-align-v4 */
+;(function(){
+  if (window.__peopleDoubleTopbarAlignV4) return;
+  window.__peopleDoubleTopbarAlignV4 = true;
+  var STYLE_ID = 'people-double-topbar-align-v4-style';
+  var selectors = [
+    '#titlebar', '.titlebar', '.window-titlebar', '.desktop-titlebar', '.custom-titlebar', '[data-role="titlebar"]',
+    '#appTopbar', '#app-topbar', '.app-topbar', '.topbar', '.top-bar', '.main-header', '.header-bar', '.content-header', '.section-header', '[data-role="topbar"]'
+  ];
+
+  function visible(el) {
+    if (!el || !el.getBoundingClientRect) return false;
+    var r = el.getBoundingClientRect();
+    var cs = getComputedStyle(el);
+    return r.width > 150 && r.height > 10 && r.height < 100 && r.top < 100 && cs.display !== 'none' && cs.visibility !== 'hidden';
+  }
+
+  function collect() {
+    var out = [];
+    selectors.forEach(function(sel) {
+      try {
+        document.querySelectorAll(sel).forEach(function(el) {
+          if (visible(el) && out.indexOf(el) === -1) out.push(el);
+        });
+      } catch (_) {}
+    });
+    if (out.length < 2) {
+      document.querySelectorAll('body *').forEach(function(el) {
+        if (!visible(el) || out.indexOf(el) !== -1) return;
+        var r = el.getBoundingClientRect();
+        if (r.top < 90 && r.left < 100 && r.width > window.innerWidth * 0.4) out.push(el);
+      });
+    }
+    out.sort(function(a,b) {
+      var ra = a.getBoundingClientRect();
+      var rb = b.getBoundingClientRect();
+      if (Math.abs(ra.top - rb.top) > 2) return ra.top - rb.top;
+      return rb.width - ra.width;
+    });
+    return out;
+  }
+
+  function selectorFor(el, key) {
+    if (el.id && window.CSS && CSS.escape) return '#' + CSS.escape(el.id);
+    if (el.classList && el.classList.length) {
+      var arr = Array.prototype.slice.call(el.classList).filter(Boolean).slice(0,2);
+      if (arr.length) {
+        return arr.map(function(c){
+          var safe = (window.CSS && CSS.escape) ? CSS.escape(c) : c.replace(/[^a-zA-Z0-9_-]/g, '');
+          return '.' + safe;
+        }).join('');
+      }
+    }
+    el.setAttribute('data-people-topbar-align-v4', key);
+    return '[data-people-topbar-align-v4="' + key + '"]';
+  }
+
+  function apply() {
+    var list = collect();
+    if (list.length < 2) return;
+    var first = list[0];
+    var second = null;
+    var r1 = first.getBoundingClientRect();
+    for (var i = 1; i < list.length; i++) {
+      var r = list[i].getBoundingClientRect();
+      if (r.top < 100 && Math.abs(r.left - r1.left) < window.innerWidth * 0.75) {
+        second = list[i];
+        break;
+      }
+    }
+    if (!second) return;
+    var r2 = second.getBoundingClientRect();
+    var target = Math.max(32, Math.round(Math.max(r1.height, r2.height)));
+    var s1 = selectorFor(first, 'a');
+    var s2 = selectorFor(second, 'b');
+    var style = document.getElementById(STYLE_ID);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = STYLE_ID;
+      document.head.appendChild(style);
+    }
+    var rule = s1 + ', ' + s2 + ' {' +
+      'height:' + target + 'px !important;' +
+      'min-height:' + target + 'px !important;' +
+      'max-height:' + target + 'px !important;' +
+      'box-sizing:border-box !important;' +
+      'padding-top:0 !important;' +
+      'padding-bottom:0 !important;' +
+      'display:flex !important;' +
+      'align-items:center !important;' +
+      '}' + s1 + ' > *, ' + s2 + ' > * {align-self:center !important;}';
+    style.textContent = rule;
+  }
+
+  function schedule() {
+    setTimeout(apply, 0);
+    setTimeout(apply, 120);
+    setTimeout(apply, 500);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', schedule, { once:true });
+  else schedule();
+  window.addEventListener('resize', function(){ setTimeout(apply, 50); });
+  try {
+    new MutationObserver(function(){ setTimeout(apply, 20); }).observe(document.documentElement, { childList:true, subtree:true });
+  } catch (_) {}
+})();
+/* /people-double-topbar-align-v4 */

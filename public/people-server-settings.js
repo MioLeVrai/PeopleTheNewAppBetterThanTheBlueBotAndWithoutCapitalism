@@ -53,6 +53,68 @@ let currentUserId = null;
     return String(value || "?").trim().slice(0, 2).toUpperCase() || "?";
   }
 
+  // === PEOPLE_SERVER_ICON_V1_SETTINGS ===
+  function renderSettingsServerIcon(target, server) {
+    if (!target) return;
+    target.replaceChildren();
+    const iconData = server?.iconData;
+    if (typeof iconData === "string" && iconData.startsWith("data:image/")) {
+      const image = document.createElement("img");
+      image.src = iconData;
+      image.alt = "";
+      image.draggable = false;
+      target.appendChild(image);
+      return;
+    }
+    target.textContent = initials(server?.name);
+  }
+
+  function readImageFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Impossible de lire cette image."));
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Image illisible."));
+      image.src = src;
+    });
+  }
+
+  async function prepareServerIcon(file) {
+    if (!file || !/^image\/(png|jpeg|webp)$/i.test(file.type || "")) {
+      throw new Error("Choisis une image PNG, JPEG ou WebP.");
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error("Choisis une image de moins de 10 Mo.");
+    }
+
+    const source = await readImageFile(file);
+    const image = await loadImage(source);
+    const size = 256;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) throw new Error("Impossible de préparer l'image.");
+
+    const sourceSize = Math.min(image.naturalWidth || image.width, image.naturalHeight || image.height);
+    const sx = ((image.naturalWidth || image.width) - sourceSize) / 2;
+    const sy = ((image.naturalHeight || image.height) - sourceSize) / 2;
+    ctx.clearRect(0, 0, size, size);
+    ctx.drawImage(image, sx, sy, sourceSize, sourceSize, 0, 0, size, size);
+
+    let result = canvas.toDataURL("image/webp", 0.86);
+    if (!result.startsWith("data:image/webp")) result = canvas.toDataURL("image/jpeg", 0.88);
+    return result;
+  }
+
   function closeSettings() {
     if (!overlay) return;
     overlay.remove();
@@ -97,23 +159,102 @@ let currentUserId = null;
     const server = serverSnapshot;
     content.appendChild(sectionHeader(
       "Vue d’ensemble",
-      "Modifie l’identité visible du serveur sans toucher à son identité technique ni à son invitation."
+      "Modifie le nom et l’image visibles du serveur sans toucher à son identité technique ni à son invitation."
     ));
 
     const owner = isOwner(server);
     const card = document.createElement("section");
     card.className = "people-server-settings-card people-server-settings-overview-card";
 
-    const avatar = document.createElement("div");
+    const iconColumn = document.createElement("div");
+    iconColumn.className = "people-server-settings-icon-column";
+
+    const avatar = document.createElement("button");
+    avatar.type = "button";
     avatar.className = "people-server-settings-server-icon";
-    avatar.textContent = initials(server?.name);
+    avatar.title = owner ? "Changer l’image du serveur" : "Image du serveur";
+    avatar.disabled = !owner;
+    renderSettingsServerIcon(avatar, server);
+
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/png,image/jpeg,image/webp";
+    fileInput.hidden = true;
+    fileInput.disabled = !owner;
+
+    const iconActions = document.createElement("div");
+    iconActions.className = "people-server-settings-icon-actions";
+    const changeIcon = document.createElement("button");
+    changeIcon.type = "button";
+    changeIcon.textContent = server?.iconData ? "Changer" : "Ajouter une image";
+    changeIcon.disabled = !owner;
+    const removeIcon = document.createElement("button");
+    removeIcon.type = "button";
+    removeIcon.className = "danger-ghost";
+    removeIcon.textContent = "Retirer";
+    removeIcon.hidden = !server?.iconData;
+    removeIcon.disabled = !owner;
+    iconActions.append(changeIcon, removeIcon);
+
+    const iconState = document.createElement("small");
+    iconState.className = "people-server-settings-icon-state";
+    iconState.textContent = owner ? "PNG, JPEG ou WebP. Recadrée automatiquement en carré." : "Seul le propriétaire peut changer l’image.";
+
+    iconColumn.append(avatar, fileInput, iconActions, iconState);
+
+    async function saveIcon(iconData) {
+      if (!owner || !server?.id) return;
+      changeIcon.disabled = true;
+      removeIcon.disabled = true;
+      avatar.disabled = true;
+      iconState.classList.remove("error", "success");
+      iconState.textContent = "Enregistrement…";
+      try {
+        const result = await api(`/api/servers/${encodeURIComponent(server.id)}/icon`, {
+          method: "PATCH",
+          body: JSON.stringify({ iconData })
+        });
+        serverSnapshot = result.server || { ...serverSnapshot, iconData };
+        renderSettingsServerIcon(avatar, serverSnapshot);
+        changeIcon.textContent = serverSnapshot.iconData ? "Changer" : "Ajouter une image";
+        removeIcon.hidden = !serverSnapshot.iconData;
+        iconState.textContent = serverSnapshot.iconData ? "Image enregistrée." : "Image retirée.";
+        iconState.classList.add("success");
+        window.dispatchEvent(new CustomEvent("people-server-updated", { detail: { server: serverSnapshot } }));
+      } catch (err) {
+        iconState.textContent = err?.message || "Impossible d’enregistrer l’image.";
+        iconState.classList.add("error");
+      } finally {
+        changeIcon.disabled = !owner;
+        removeIcon.disabled = !owner;
+        avatar.disabled = !owner;
+      }
+    }
+
+    avatar.addEventListener("click", () => { if (owner) fileInput.click(); });
+    changeIcon.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files?.[0];
+      fileInput.value = "";
+      if (!file) return;
+      try {
+        iconState.classList.remove("error", "success");
+        iconState.textContent = "Préparation de l’image…";
+        const iconData = await prepareServerIcon(file);
+        await saveIcon(iconData);
+      } catch (err) {
+        iconState.textContent = err?.message || "Image invalide.";
+        iconState.classList.add("error");
+      }
+    });
+    removeIcon.addEventListener("click", () => void saveIcon(null));
 
     const form = document.createElement("form");
     form.className = "people-server-settings-name-form";
     form.innerHTML = `
       <label>Nom du serveur</label>
       <input maxlength="40" autocomplete="off" />
-      <p>Le nom est uniquement ce qui est affiché dans People. Le lien d’invitation et l’identifiant du serveur restent inchangés.</p>
+      <p>Le nom et l’image sont uniquement l’identité affichée dans People. Le lien d’invitation et l’identifiant du serveur restent inchangés.</p>
       <div class="people-server-settings-save-row">
         <span class="people-server-settings-save-state"></span>
         <button type="submit">Enregistrer</button>
@@ -127,40 +268,31 @@ let currentUserId = null;
     input.disabled = !owner;
     saveButton.hidden = !owner;
 
-    if (!owner) {
-      saveState.textContent = "Seul le propriétaire peut modifier le nom pour le moment.";
-    }
+    if (!owner) saveState.textContent = "Seul le propriétaire peut modifier le serveur pour le moment.";
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!owner || !server?.id) return;
-
       const name = String(input.value || "").trim().replace(/\s+/g, " ");
       if (name.length < 2 || name.length > 40) {
         saveState.textContent = "Le nom doit faire entre 2 et 40 caractères.";
         saveState.classList.add("error");
         return;
       }
-
       saveButton.disabled = true;
       saveState.classList.remove("error", "success");
       saveState.textContent = "Enregistrement…";
-
       try {
         const result = await api(`/api/servers/${encodeURIComponent(server.id)}`, {
           method: "PATCH",
           body: JSON.stringify({ name })
         });
-
-        serverSnapshot = result.server || { ...serverSnapshot, name };
+        serverSnapshot = { ...serverSnapshot, ...(result.server || { name }) };
         input.value = serverSnapshot.name;
-        avatar.textContent = initials(serverSnapshot.name);
+        renderSettingsServerIcon(avatar, serverSnapshot);
         saveState.textContent = "Nom enregistré. L’invitation n’a pas changé.";
         saveState.classList.add("success");
-
-        window.dispatchEvent(new CustomEvent("people-server-updated", {
-          detail: { server: serverSnapshot }
-        }));
+        window.dispatchEvent(new CustomEvent("people-server-updated", { detail: { server: serverSnapshot } }));
       } catch (err) {
         saveState.textContent = err?.message || "Impossible d’enregistrer le nom.";
         saveState.classList.add("error");
@@ -169,7 +301,7 @@ let currentUserId = null;
       }
     });
 
-    card.append(avatar, form);
+    card.append(iconColumn, form);
     content.appendChild(card);
 
     const identity = document.createElement("section");
@@ -177,7 +309,7 @@ let currentUserId = null;
     identity.innerHTML = `
       <div>
         <strong>Identité technique</strong>
-        <p>Cette valeur identifie le serveur en interne et ne dépend jamais de son nom.</p>
+        <p>Cette valeur identifie le serveur en interne et ne dépend jamais de son nom ou de son image.</p>
       </div>
       <code></code>
     `;
@@ -451,7 +583,7 @@ let currentUserId = null;
     `;
 
     const label = overlay.querySelector(".people-server-settings-server-label");
-    label.querySelector(".server-avatar").textContent = initials(server.name);
+    renderSettingsServerIcon(label.querySelector(".server-avatar"), server);
     label.querySelector("strong").textContent = server.name;
 
     const nav = overlay.querySelector(".people-server-settings-nav");
@@ -488,7 +620,7 @@ let currentUserId = null;
     if (overlay) {
       const label = overlay.querySelector(".people-server-settings-server-label");
       if (label) {
-        label.querySelector(".server-avatar").textContent = initials(serverSnapshot.name);
+        renderSettingsServerIcon(label.querySelector(".server-avatar"), serverSnapshot);
         label.querySelector("strong").textContent = serverSnapshot.name;
       }
     }
