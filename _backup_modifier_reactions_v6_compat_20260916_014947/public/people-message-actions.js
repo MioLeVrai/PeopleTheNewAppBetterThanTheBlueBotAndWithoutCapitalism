@@ -1,21 +1,4 @@
 (() => {
-  // === PEOPLE_MESSAGE_EDIT_V6_START ===
-  const editStyle = document.createElement("style");
-  editStyle.textContent = `
-    .people-message-inline-edit{display:flex;flex-direction:column;gap:7px;margin-top:4px;max-width:min(720px,100%)}
-    .people-message-inline-edit textarea{width:100%;min-height:74px;max-height:220px;resize:vertical;box-sizing:border-box;border:1px solid rgba(151,128,255,.55);border-radius:9px;background:#17141f;color:#f2eef8;padding:10px 11px;font:inherit;line-height:1.35;outline:none}
-    .people-message-inline-edit textarea:focus{border-color:#9f88ff;box-shadow:0 0 0 2px rgba(126,98,255,.16)}
-    .people-message-inline-edit-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-    .people-message-inline-edit-actions button{border:0;border-radius:7px;padding:5px 9px;font:inherit;font-size:12px;font-weight:750;cursor:pointer;background:#6f5bd3;color:white}
-    .people-message-inline-edit-actions button.people-message-edit-cancel{background:#2b2733;color:#d9d2e1}
-    .people-message-inline-edit-hint{font-size:11px;color:#8f8899}
-    .people-message-edited-label{display:inline-block;margin:3px 0 0 6px;font-size:10px;line-height:1;color:#8d8697;vertical-align:middle;user-select:none}
-    .people-message-menu-item.edit{color:#e8e0ff}
-    .people-message-edit-hidden{display:none!important}
-  `;
-  document.head.appendChild(editStyle);
-  // === PEOPLE_MESSAGE_EDIT_V6_END ===
-
   let menu = null;
   const contextBindings = new WeakMap();
   const WHITESPACE_RE = /\s+/g;
@@ -100,10 +83,8 @@
     event,
     {
       message,
-      canEdit = false,
       canDelete = false,
       onReply,
-      onEdit,
       onDelete
     } = {}
   ) {
@@ -130,16 +111,6 @@
         onReply
       )
     );
-
-    if (canEdit) {
-      menu.appendChild(
-        makeMenuButton(
-          "✏ Modifier",
-          "edit",
-          onEdit
-        )
-      );
-    }
 
     if (canDelete) {
       menu.appendChild(
@@ -344,282 +315,6 @@
         }
 
         box.disabled = true;
-      });
-  }
-
-  // === PEOPLE_INLINE_EDIT_V6_START ===
-  function setEditedLabel(
-    unit,
-    editedAt = null
-  ) {
-    if (!unit) return;
-
-    let label =
-      unit.querySelector(
-        ":scope > .people-message-edited-label"
-      );
-
-    if (!editedAt) {
-      label?.remove();
-      return;
-    }
-
-    if (!label) {
-      label =
-        document.createElement("span");
-
-      label.className =
-        "people-message-edited-label";
-
-      const text =
-        unit.querySelector(
-          ":scope > .message-text"
-        );
-
-      if (text) {
-        text.insertAdjacentElement(
-          "afterend",
-          label
-        );
-      } else {
-        unit.appendChild(label);
-      }
-    }
-
-    label.textContent = "modifié";
-
-    const date =
-      new Date(editedAt);
-
-    label.title =
-      Number.isNaN(date.getTime())
-        ? "Message modifié"
-        : "Modifié le " +
-          date.toLocaleString("fr-FR");
-  }
-
-  function startInlineEdit(
-    unit,
-    {
-      initialText = "",
-      maxLength = 2000,
-      allowEmpty = false,
-      onSave
-    } = {}
-  ) {
-    if (!unit) return;
-
-    const current =
-      unit.querySelector(
-        ":scope > .people-message-inline-edit"
-      );
-
-    if (current) {
-      current.querySelector("textarea")?.focus();
-      return;
-    }
-
-    const textElement =
-      unit.querySelector(
-        ":scope > .message-text"
-      );
-
-    if (!textElement) return;
-
-    const editor =
-      document.createElement("div");
-
-    editor.className =
-      "people-message-inline-edit";
-
-    const textarea =
-      document.createElement("textarea");
-
-    textarea.value =
-      String(initialText || "");
-
-    textarea.maxLength =
-      Math.max(1, Number(maxLength) || 2000);
-
-    textarea.setAttribute(
-      "aria-label",
-      "Modifier le message"
-    );
-
-    const actions =
-      document.createElement("div");
-
-    actions.className =
-      "people-message-inline-edit-actions";
-
-    const save =
-      document.createElement("button");
-
-    save.type = "button";
-    save.textContent = "Enregistrer";
-
-    const cancel =
-      document.createElement("button");
-
-    cancel.type = "button";
-    cancel.className =
-      "people-message-edit-cancel";
-    cancel.textContent = "Annuler";
-
-    const hint =
-      document.createElement("span");
-
-    hint.className =
-      "people-message-inline-edit-hint";
-    hint.textContent =
-      "Entrée : enregistrer · Maj+Entrée : nouvelle ligne · Échap : annuler";
-
-    actions.append(
-      save,
-      cancel,
-      hint
-    );
-
-    editor.append(
-      textarea,
-      actions
-    );
-
-    textElement.classList.add(
-      "people-message-edit-hidden"
-    );
-
-    const editedLabel =
-      unit.querySelector(
-        ":scope > .people-message-edited-label"
-      );
-
-    editedLabel?.classList.add(
-      "people-message-edit-hidden"
-    );
-
-    textElement.insertAdjacentElement(
-      "afterend",
-      editor
-    );
-
-    let busy = false;
-
-    function close() {
-      editor.remove();
-
-      textElement.classList.remove(
-        "people-message-edit-hidden"
-      );
-
-      editedLabel?.classList.remove(
-        "people-message-edit-hidden"
-      );
-    }
-
-    async function commit() {
-      if (busy) return;
-
-      const next =
-        String(textarea.value || "").trim();
-
-      if (!next && !allowEmpty) {
-        alert(
-          "Un message sans pièce jointe ne peut pas être vide."
-        );
-        return;
-      }
-
-      busy = true;
-      textarea.disabled = true;
-      save.disabled = true;
-      cancel.disabled = true;
-
-      try {
-        await onSave?.(next);
-        close();
-      } catch (err) {
-        busy = false;
-        textarea.disabled = false;
-        save.disabled = false;
-        cancel.disabled = false;
-        textarea.focus();
-
-        throw err;
-      }
-    }
-
-    save.addEventListener(
-      "click",
-      () => {
-        void commit().catch((err) => {
-          alert(
-            err?.message ||
-            "Modification impossible."
-          );
-        });
-      }
-    );
-
-    cancel.addEventListener(
-      "click",
-      close
-    );
-
-    textarea.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          close();
-          return;
-        }
-
-        if (
-          event.key === "Enter" &&
-          !event.shiftKey
-        ) {
-          event.preventDefault();
-
-          void commit().catch((err) => {
-            alert(
-              err?.message ||
-              "Modification impossible."
-            );
-          });
-        }
-      }
-    );
-
-    requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(
-        textarea.value.length,
-        textarea.value.length
-      );
-    });
-  }
-  // === PEOPLE_INLINE_EDIT_V6_END ===
-
-  function updateReplyPreview(
-    id,
-    message = {}
-  ) {
-    const wanted = String(id || "");
-    if (!wanted) return;
-
-    document
-      .querySelectorAll(
-        `.people-message-reply-preview[data-reply-target-id="${escapeAttributeValue(
-          wanted
-        )}"]`
-      )
-      .forEach((box) => {
-        if (box.disabled) return;
-        const text = box.querySelector("span");
-        if (text) {
-          text.textContent = summary(message);
-        }
       });
   }
 
@@ -852,9 +547,6 @@
     createReplyController,
     scrollToMessage,
     markDeleted,
-    summary,
-    startInlineEdit,
-    setEditedLabel,
-    updateReplyPreview
+    summary
   };
 })();

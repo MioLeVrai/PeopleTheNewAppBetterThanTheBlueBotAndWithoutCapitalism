@@ -91,71 +91,6 @@
       }
     );
   }
-  // === PEOPLE_DM_EDIT_V6_START ===
-  async function peopleEditDmMessage(
-    id,
-    plainText
-  ) {
-    const targetUsername =
-      String(
-        activeDmUser?.username || ""
-      ).trim();
-
-    if (!targetUsername) {
-      throw new Error(
-        "Conversation privée introuvable."
-      );
-    }
-
-    const clean =
-      String(plainText || "").trim();
-
-    const encryptedBody =
-      clean
-        ? await peopleDmE2eeEncryptText(
-            clean,
-            targetUsername
-          )
-        : "";
-
-    return api(
-      "/api/dm/message/" +
-        encodeURIComponent(id),
-      {
-        method: "PATCH",
-        body: JSON.stringify({
-          body: encryptedBody
-        })
-      }
-    );
-  }
-
-  function peopleStartDmMessageEdit(
-    unit,
-    id
-  ) {
-    window.PeopleMessageActions
-      ?.startInlineEdit(
-        unit,
-        {
-          initialText:
-            unit?.dataset?.peoplePlainText || "",
-          maxLength: 2000,
-          allowEmpty:
-            Boolean(
-              unit?.dataset?.peopleImageId
-            ),
-          onSave:
-            (nextText) =>
-              peopleEditDmMessage(
-                id,
-                nextText
-              )
-        }
-      );
-  }
-  // === PEOPLE_DM_EDIT_V6_END ===
-
   // === PEOPLE_DM_MESSAGE_ACTIONS_V1_END ===
 
   const profileModal = document.getElementById("profileModal");
@@ -3627,14 +3562,6 @@ function dmTextLine(
         messageId;
     }
 
-    unit.dataset.peoplePlainText =
-      String(message?.body || "");
-
-    if (message?.imageId) {
-      unit.dataset.peopleImageId =
-        String(message.imageId);
-    }
-
     const replyPreview =
       window.PeopleMessageActions
         ?.createReplyPreview(
@@ -3682,12 +3609,6 @@ function dmTextLine(
 
     unit.appendChild(text);
 
-    window.PeopleMessageActions
-      ?.setEditedLabel(
-        unit,
-        message?.editedAt || null
-      );
-
     const mine =
       me &&
       String(message.senderId) ===
@@ -3714,8 +3635,6 @@ function dmTextLine(
               imageId:
                 message.imageId
             },
-            canEdit:
-              Boolean(mine),
             canDelete:
               Boolean(mine),
             onReply:
@@ -3728,16 +3647,10 @@ function dmTextLine(
                       author?.username ||
                       "Utilisateur",
                     body:
-                      unit.dataset.peoplePlainText || "",
+                      message.body,
                     imageId:
-                      unit.dataset.peopleImageId || null
+                      message.imageId
                   }),
-            onEdit:
-              () =>
-                peopleStartDmMessageEdit(
-                  unit,
-                  messageId
-                ),
             onDelete:
               () =>
                 peopleDeleteDmMessage(
@@ -6112,32 +6025,6 @@ function dmTextLine(
     { passive: true }
   );
   // === PEOPLE_DM_MENTION_PING_V2_END ===
-
-// === PEOPLE_DM_EDIT_CLIENT_V6_START ===
-  socket.on(
-    "dm-message-edited",
-    async (payload) => {
-      if (!socialReady || !me) {
-        return;
-      }
-
-      const ids = [
-        String(payload?.senderId || ""),
-        String(payload?.recipientId || "")
-      ];
-
-      if (
-        activeDmUser &&
-        ids.includes(String(me.id)) &&
-        ids.includes(String(activeDmUser.id))
-      ) {
-        await loadActiveDm();
-      }
-
-      await refreshConversations();
-    }
-  );
-  // === PEOPLE_DM_EDIT_CLIENT_V6_END ===
 
 // === PEOPLE_DM_DELETE_CLIENT_V1_START ===
   socket.on(
