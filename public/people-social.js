@@ -6042,14 +6042,23 @@ function dmTextLine(
     } catch {}
   }
 
-  function peopleDmPlayPing() {
-    // === PEOPLE_SETTINGS_DM_SOUND_HOOK_V1 ===
+  function peopleDmPlayPing(forcedSound = "") {
+    // === PEOPLE_NOTIFICATION_PREFS_V1_SOUND_START ===
+    if (forcedSound === "silent") {
+      return;
+    }
+
     if (
       window.PeopleSounds
-        ?.playNotification?.()
+        ?.playNotification?.(
+          forcedSound === "inherit"
+            ? ""
+            : forcedSound
+        )
     ) {
       return;
     }
+    // === PEOPLE_NOTIFICATION_PREFS_V1_SOUND_END ===
 
     try {
       peopleDmUnlockPingAudio();
@@ -6234,32 +6243,57 @@ function dmTextLine(
   }
 
   function peopleDmHandleIncomingNotification(payload) {
-    /*
-      Si le MP contient un vrai @ping,
-      le comportement de ping existant est utilisé
-      et on évite un double son / double toast.
-    */
-    if (
-      peopleDmHandleMention(
-        payload
-      )
-    ) {
-      return;
-    }
+    const mentioned =
+      peopleDmMentionsMe(
+        payload?.body
+      );
 
     const sender =
       payload?.sender?.username ||
       "Quelqu'un";
 
-    peopleDmPlayPing();
+    const decision =
+      window.PeopleNotificationPrefs
+        ?.decide?.({
+          kind: "dm",
+          username: sender,
+          mentioned
+        }) || {
+          allowed: true,
+          sound: "inherit"
+        };
 
-    peopleDmShowMessageToast(
-      sender,
-      payload?.body,
-      Boolean(
-        payload?.imageId
-      )
+    if (!decision.allowed) {
+      return {
+        allowed: false,
+        mentioned
+      };
+    }
+
+    peopleDmPlayPing(
+      decision.sound
     );
+
+    if (mentioned) {
+      peopleDmShowPingToast(
+        sender,
+        payload?.body
+      );
+    } else {
+      peopleDmShowMessageToast(
+        sender,
+        payload?.body,
+        Boolean(
+          payload?.imageId
+        )
+      );
+    }
+
+    return {
+      allowed: true,
+      mentioned,
+      sound: decision.sound
+    };
   }
   // === PEOPLE_DM_NOTIFICATION_V1_END ===
 
@@ -6353,9 +6387,10 @@ function dmTextLine(
         payload
       );
 
-    peopleDmHandleIncomingNotification(
-      notificationPayload
-    );
+    const peopleDmNotificationDecision =
+      peopleDmHandleIncomingNotification(
+        notificationPayload
+      );
 
     if (
       activeDmUser &&
@@ -6369,6 +6404,7 @@ function dmTextLine(
 
     try {
       if (
+        peopleDmNotificationDecision?.allowed !== false &&
         "Notification" in window &&
         Notification.permission === "granted"
       ) {
@@ -6389,7 +6425,8 @@ function dmTextLine(
               ),
             tag:
               "people-dm-" +
-              senderName
+              senderName,
+            silent: true
           }
         );
       }

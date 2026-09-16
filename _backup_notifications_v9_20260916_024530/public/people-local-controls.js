@@ -415,16 +415,8 @@ peopleSocket.on("voice-state", (payload) => {
     } catch {}
   }
 
-  function playPingSound(forcedSound = "") {
-    if (forcedSound === "silent") return;
-    if (
-      window.PeopleSounds
-        ?.playNotification?.(
-          forcedSound === "inherit"
-            ? ""
-            : forcedSound
-        )
-    ) return;
+  function playPingSound() {
+    if (window.PeopleSounds?.playNotification?.()) return;
 
     try {
       ensurePingAudio();
@@ -458,7 +450,7 @@ peopleSocket.on("voice-state", (payload) => {
     }
   }
 
-  function showToast(sender, text, mentioned = true) {
+  function showToast(sender, text) {
     let host = document.getElementById("peoplePingToasts");
 
     if (!host) {
@@ -472,9 +464,7 @@ peopleSocket.on("voice-state", (payload) => {
     toast.className = "people-ping-toast";
 
     const title = document.createElement("strong");
-    title.textContent = mentioned
-      ? `@ Ping de ${sender}`
-      : `Message de ${sender}`;
+    title.textContent = `@ Ping de ${sender}`;
 
     const body = document.createElement("span");
     body.textContent = String(text).slice(0, 180);
@@ -720,13 +710,11 @@ peopleSocket.on("voice-state", (payload) => {
     }
   }
 
-  async function showSystemNotification(sender, text, mentioned = true, forcedSound = "") {
+  async function showSystemNotification(sender, text) {
     if (window.PeopleDesktopNotifications?.show) {
       try {
         window.PeopleDesktopNotifications.show({
-          title: mentioned
-            ? `People — ${sender} t'a ping`
-            : `People — message de ${sender}`,
+          title: `People — ${sender} t'a ping`,
           body: String(text).slice(0, 220),
           silent: true
         });
@@ -775,13 +763,10 @@ peopleSocket.on("voice-state", (payload) => {
     );
 
     return showBrowserNotification(
-      mentioned
-        ? `People — ${sender} t'a ping`
-        : `People — message de ${sender}`,
+      `People — ${sender} t'a ping`,
       browserNotificationOptions(text, {
         tag: notificationTag,
         renotify: true,
-        silent: true,
         data: { url: window.location.href }
       })
     );
@@ -805,44 +790,11 @@ peopleSocket.on("voice-state", (payload) => {
   peopleSocket.on("chat-message", (data) => {
     const me = currentUsername();
     if (!me || !data || data.username === me) return;
+    if (!isMentionForMe(data.text)) return;
 
-    const mentioned =
-      isMentionForMe(data.text);
-
-    const decision =
-      window.PeopleNotificationPrefs
-        ?.decide?.({
-          kind: "channel",
-          serverId:
-            data.serverId ||
-            window.PeopleServerRuntime
-              ?.getActiveServerId?.() ||
-            "",
-          channelId:
-            data.channelId ||
-            "",
-          mentioned
-        }) || {
-          allowed: mentioned,
-          sound: "inherit"
-        };
-
-    if (!decision.allowed) return;
-
-    playPingSound(decision.sound);
-    showToast(
-      data.username || "Quelqu'un",
-      data.text || "",
-      mentioned
-    );
-    void showSystemNotification(
-      data.username || "Quelqu'un",
-      data.text || "",
-      mentioned,
-      decision.sound
-    );
-
-    if (!mentioned) return;
+    playPingSound();
+    showToast(data.username || "Quelqu'un", data.text || "");
+    void showSystemNotification(data.username || "Quelqu'un", data.text || "");
 
     // app.js a déjà ajouté le message : accès direct au dernier enfant,
     // sans scanner tout l'historique.

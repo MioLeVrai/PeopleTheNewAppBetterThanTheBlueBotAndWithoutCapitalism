@@ -14172,6 +14172,68 @@ function leaveVoice(socket) {
   }
 }
 
+
+// === PEOPLE_OFFLINE_SERVER_SEND_V1_START ===
+app.post(
+  "/api/servers/:serverId/channels/:channelId/messages",
+  async (req, res) => {
+    try {
+      const session = peopleSessionForRequest(req, res);
+      if (!session) return;
+
+      const serverId = String(req.params.serverId || "").trim();
+      const channelId = String(req.params.channelId || "").trim();
+
+      if (!serverId || !channelId) {
+        return res.status(400).json({ ok: false, error: "Salon invalide." });
+      }
+
+      if (!(await peopleIsServerMember(session.id, serverId))) {
+        return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
+      }
+
+      const channel = await peopleGetServerChannel(serverId, channelId, "text");
+      if (!channel) {
+        return res.status(404).json({ ok: false, error: "Salon textuel introuvable." });
+      }
+
+      const text = String(req.body?.text || "").trim().slice(0, 1000);
+      const replyToId = peopleReplyId(req.body?.replyToId);
+      const clientId = String(req.body?.clientId || "").trim().slice(0, 120);
+
+      if (!text) {
+        return res.status(400).json({ ok: false, error: "Message vide." });
+      }
+
+      const saved = await peopleServerSaveMessage(
+        serverId,
+        channelId,
+        session.id,
+        session.username,
+        text,
+        null,
+        replyToId
+      );
+
+      if (!saved) {
+        return res.status(500).json({ ok: false, error: "Impossible d'enregistrer le message." });
+      }
+
+      const payload = clientId ? { ...saved, clientId } : saved;
+      io.to(peopleServerRoom(serverId)).emit("chat-message", payload);
+
+      return res.json({ ok: true, message: payload });
+    } catch (err) {
+      console.error("[People offline server send]", err);
+      const error = err?.code === "REPLY_INVALID"
+        ? "Le message auquel tu réponds n'est plus disponible."
+        : "Le message en attente n'a pas pu être envoyé.";
+      return res.status(500).json({ ok: false, error });
+    }
+  }
+);
+// === PEOPLE_OFFLINE_SERVER_SEND_V1_END ===
+
 io.on("connection", (socket) => {
   socket.on(
     "keepalive",

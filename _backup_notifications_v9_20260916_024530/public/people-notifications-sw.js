@@ -1,7 +1,7 @@
 "use strict";
 
-const PEOPLE_NOTIFICATIONS_SW_VERSION = "20260916-notification-prefs-v1";
-const PEOPLE_SHELL_CACHE = "people-shell-20260916-notification-prefs-v1";
+const PEOPLE_NOTIFICATIONS_SW_VERSION = "20260916-offline-1";
+const PEOPLE_SHELL_CACHE = "people-shell-20260916-offline-1";
 const PEOPLE_SHELL_ASSETS = [
   "/",
   "/index.html",
@@ -17,7 +17,6 @@ const PEOPLE_SHELL_ASSETS = [
   "/people-avatar-cropper.js",
   "/people-avatar-ultra.js",
   "/people-settings.js",
-  "/people-notification-prefs.js",
   "/people-social.js",
   "/people-message-reactions.js",
   "/people-servers.js",
@@ -35,7 +34,6 @@ const PEOPLE_SHELL_ASSETS = [
   "/people-unread.js",
   "/people-appearance.css",
   "/people-settings.css",
-  "/people-notification-prefs.css",
   "/people-server-channels.css",
   "/people-server-settings.css",
   "/people-dm-calls.css",

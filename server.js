@@ -8187,6 +8187,267 @@ app.post(
 );
 // === PEOPLE_UNREAD_V1_END ===
 
+// === PEOPLE_NOTIFICATION_PREFS_V1_START ===
+const PEOPLE_LOCAL_NOTIFICATION_PREFS = pathAccounts.join(
+  __dirname,
+  "people-notification-prefs.local.json"
+);
+
+const PEOPLE_NOTIFICATION_MODES = new Set([
+  "inherit",
+  "all",
+  "mentions",
+  "none"
+]);
+
+const PEOPLE_NOTIFICATION_SOUNDS = new Set([
+  "inherit",
+  "classic",
+  "soft",
+  "digital",
+  "pop",
+  "silent"
+]);
+
+let peopleNotificationPrefsTablePromise = null;
+
+function peopleNotificationMode(value, fallback = "inherit") {
+  const mode = String(value || "").trim().toLowerCase();
+  return PEOPLE_NOTIFICATION_MODES.has(mode) ? mode : fallback;
+}
+
+function peopleNotificationSound(value, fallback = "inherit") {
+  const sound = String(value || "").trim().toLowerCase();
+  return PEOPLE_NOTIFICATION_SOUNDS.has(sound) ? sound : fallback;
+}
+
+function peopleNotificationMuteUntil(value) {
+  if (value == null || value === "") return null;
+
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp)) return null;
+
+  const now = Date.now();
+  const max = now + 31 * 24 * 60 * 60 * 1000;
+  if (timestamp <= now) return null;
+  return Math.min(Math.round(timestamp), max);
+}
+
+function peopleNotificationOverride(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+
+  return {
+    mode: peopleNotificationMode(source.mode, "inherit"),
+    sound: peopleNotificationSound(source.sound, "inherit"),
+    mutedUntil: peopleNotificationMuteUntil(source.mutedUntil)
+  };
+}
+
+function peopleNotificationMap(value, limit) {
+  const source = value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+
+  const out = {};
+  let count = 0;
+
+  for (const [rawKey, rawValue] of Object.entries(source)) {
+    if (count >= limit) break;
+
+    const key = String(rawKey || "").trim();
+    if (!key || key.length > 120 || /[\r\n\t]/.test(key)) continue;
+
+    out[key] = peopleNotificationOverride(rawValue);
+    count += 1;
+  }
+
+  return out;
+}
+
+function peopleNormalizeNotificationPrefs(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+
+  const defaults = source.defaults && typeof source.defaults === "object"
+    ? source.defaults
+    : {};
+
+  const dmDefaults = defaults.dm && typeof defaults.dm === "object"
+    ? defaults.dm
+    : {};
+
+  const serverDefaults = defaults.server && typeof defaults.server === "object"
+    ? defaults.server
+    : {};
+
+  const dmMode = peopleNotificationMode(dmDefaults.mode, "all");
+  const serverMode = peopleNotificationMode(serverDefaults.mode, "mentions");
+
+  return {
+    version: 1,
+    defaults: {
+      dm: {
+        mode: dmMode === "inherit" ? "all" : dmMode,
+        sound: peopleNotificationSound(dmDefaults.sound, "inherit")
+      },
+      server: {
+        mode: serverMode === "inherit" ? "mentions" : serverMode,
+        sound: peopleNotificationSound(serverDefaults.sound, "inherit")
+      }
+    },
+    dms: peopleNotificationMap(source.dms, 300),
+    servers: peopleNotificationMap(source.servers, 300),
+    channels: peopleNotificationMap(source.channels, 1200)
+  };
+}
+
+function peopleReadLocalNotificationPrefs() {
+  try {
+    if (!fsAccounts.existsSync(PEOPLE_LOCAL_NOTIFICATION_PREFS)) return {};
+    const raw = JSON.parse(
+      fsAccounts.readFileSync(PEOPLE_LOCAL_NOTIFICATION_PREFS, "utf8")
+    );
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+function peopleWriteLocalNotificationPrefs(value) {
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_NOTIFICATION_PREFS,
+    JSON.stringify(value && typeof value === "object" ? value : {}, null, 2) + "\n",
+    "utf8"
+  );
+}
+
+async function peopleEnsureNotificationPrefsTable() {
+  if (!peoplePool) return;
+
+  if (!peopleNotificationPrefsTablePromise) {
+    peopleNotificationPrefsTablePromise = peoplePool
+      .query(
+        "CREATE TABLE IF NOT EXISTS people_notification_preferences (" +
+        "account_id TEXT PRIMARY KEY, " +
+        "prefs_json TEXT NOT NULL, " +
+        "updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()" +
+        ")"
+      )
+      .catch((err) => {
+        peopleNotificationPrefsTablePromise = null;
+        throw err;
+      });
+  }
+
+  await peopleNotificationPrefsTablePromise;
+}
+
+async function peopleGetNotificationPrefs(accountId) {
+  const key = String(accountId || "");
+  if (!key) return peopleNormalizeNotificationPrefs(null);
+
+  if (peoplePool) {
+    await peopleEnsureNotificationPrefsTable();
+    const result = await peoplePool.query(
+      "SELECT prefs_json FROM people_notification_preferences WHERE account_id = $1 LIMIT 1",
+      [key]
+    );
+
+    if (!result.rows[0]) return peopleNormalizeNotificationPrefs(null);
+
+    try {
+      return peopleNormalizeNotificationPrefs(
+        JSON.parse(String(result.rows[0].prefs_json || "{}"))
+      );
+    } catch {
+      return peopleNormalizeNotificationPrefs(null);
+    }
+  }
+
+  const store = peopleReadLocalNotificationPrefs();
+  return peopleNormalizeNotificationPrefs(store[key]);
+}
+
+async function peopleSetNotificationPrefs(accountId, value) {
+  const key = String(accountId || "");
+  if (!key) throw new Error("NOTIFICATION_ACCOUNT_INVALID");
+
+  const prefs = peopleNormalizeNotificationPrefs(value);
+
+  if (peoplePool) {
+    await peopleEnsureNotificationPrefsTable();
+    await peoplePool.query(
+      "INSERT INTO people_notification_preferences (account_id, prefs_json, updated_at) " +
+      "VALUES ($1, $2, NOW()) " +
+      "ON CONFLICT (account_id) DO UPDATE " +
+      "SET prefs_json = EXCLUDED.prefs_json, updated_at = NOW()",
+      [key, JSON.stringify(prefs)]
+    );
+    return prefs;
+  }
+
+  const store = peopleReadLocalNotificationPrefs();
+  store[key] = prefs;
+  peopleWriteLocalNotificationPrefs(store);
+  return prefs;
+}
+
+app.get("/api/notification-preferences", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    return res.json({
+      ok: true,
+      prefs: await peopleGetNotificationPrefs(session.id)
+    });
+  } catch (err) {
+    console.error("[People notification preferences/get]", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Impossible de charger les réglages de notifications."
+    });
+  }
+});
+
+app.put("/api/notification-preferences", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const body = req.body?.prefs;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return res.status(400).json({
+        ok: false,
+        error: "Réglages de notifications invalides."
+      });
+    }
+
+    const serialized = JSON.stringify(body);
+    if (serialized.length > 160000) {
+      return res.status(413).json({
+        ok: false,
+        error: "Trop de réglages de notifications."
+      });
+    }
+
+    return res.json({
+      ok: true,
+      prefs: await peopleSetNotificationPrefs(session.id, body)
+    });
+  } catch (err) {
+    console.error("[People notification preferences/set]", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Impossible d'enregistrer les réglages de notifications."
+    });
+  }
+});
+// === PEOPLE_NOTIFICATION_PREFS_V1_END ===
+
 // === PEOPLE_MESSAGE_REACTIONS_V1_START ===
 const PEOPLE_LOCAL_REACTIONS = pathAccounts.join(
   __dirname,
