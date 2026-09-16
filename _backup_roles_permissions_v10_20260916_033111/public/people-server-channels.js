@@ -13,8 +13,7 @@
     activeVoiceServerId: null,
     activeVoiceChannelId: null,
     channels: [],
-    voice: [],
-    serverPermissions: { mask: 0, names: [] }
+    voice: []
   };
   let currentUserId = null;
   let menu = null;
@@ -30,23 +29,12 @@
     return window.PeopleServers?.getActiveServer?.() || null;
   }
 
-  function permissionNames(value) {
-    return new Set(Array.isArray(value?.names) ? value.names.map(String) : []);
-  }
-
-  function canServer(permission) {
-    const server = activeServer();
-    if (server?.ownerId && currentUserId && String(server.ownerId) === String(currentUserId)) return true;
-    return permissionNames(state.serverPermissions).has(String(permission));
-  }
-
-  function canChannel(channel, permission) {
-    const names = new Set(Array.isArray(channel?.permissions) ? channel.permissions.map(String) : []);
-    return names.has(String(permission)) || canServer("ADMINISTRATOR");
-  }
-
   function canManage() {
-    return canServer("MANAGE_CHANNELS");
+    const server = activeServer();
+    return Boolean(
+      server?.ownerId && currentUserId &&
+      String(server.ownerId) === String(currentUserId)
+    );
   }
 
   async function api(path, options = {}) {
@@ -172,7 +160,6 @@
     const result = await api(`/api/servers/${encodeURIComponent(sid)}/channels`);
     if (String(state.serverId || "") !== sid) return false;
     state.channels = Array.isArray(result.channels) ? result.channels : [];
-    if (result.permissions) state.serverPermissions = result.permissions;
     render();
     return true;
   }
@@ -344,7 +331,7 @@
   }
 
   function openContextMenu(event, channel) {
-    if (!canChannel(channel, "MANAGE_CHANNELS")) return;
+    if (!canManage()) return;
     event.preventDefault();
     const box = document.createElement("div");
     box.className = "people-channel-context-menu";
@@ -415,7 +402,7 @@
     button.type = "button";
     button.className = "people-server-channel";
     button.dataset.channelId = String(channel.id);
-    button.draggable = canChannel(channel, "MANAGE_CHANNELS") && channel.type !== "category";
+    button.draggable = canManage() && channel.type !== "category";
 
     const icon = document.createElement("span");
     icon.className = "people-server-channel-icon";
@@ -443,13 +430,7 @@
         String(state.activeVoiceServerId || "") === String(state.serverId || "") &&
         String(state.activeVoiceChannelId || "") === String(channel.id);
       button.classList.toggle("joined-voice", joined);
-      const canConnect = canChannel(channel, "CONNECT");
-      button.classList.toggle("people-channel-no-connect", !canConnect);
       button.addEventListener("click", async () => {
-        if (!canConnect) {
-          alert("Tu n'as pas la permission de rejoindre ce vocal.");
-          return;
-        }
         await window.PeopleServerRuntime?.joinVoiceChannel?.(channel.id);
       });
     }
@@ -494,7 +475,7 @@
     name.textContent = category.name;
     header.append(toggle, name);
 
-    if (canChannel(category, "MANAGE_CHANNELS")) {
+    if (canManage()) {
       const add = document.createElement("button");
       add.type = "button";
       add.className = "people-channel-category-add";
@@ -522,7 +503,7 @@
     for (const child of children) body.appendChild(channelButton(child));
 
     body.addEventListener("dragover", (event) => {
-      if (!draggedChannelId || !canChannel(category, "MANAGE_CHANNELS")) return;
+      if (!draggedChannelId || !canManage()) return;
       event.preventDefault();
       body.classList.add("drag-over");
     });
@@ -545,13 +526,7 @@
     if (titleName) titleName.textContent = `# ${active.name}`;
     if (subtitle) subtitle.textContent = `Salon textuel • ${active.name}`;
     if (welcome) welcome.textContent = `Début du salon #${active.name}.`;
-    if (messageInput) {
-      const canSend = canChannel(active, "SEND_MESSAGES");
-      messageInput.disabled = !canSend;
-      messageInput.placeholder = canSend
-        ? `Message dans #${active.name}`
-        : `Tu n'as pas la permission d'écrire dans #${active.name}`;
-    }
+    if (messageInput) messageInput.placeholder = `Message dans #${active.name}`;
     const h2 = document.querySelector("#messages .welcome h2");
     if (h2) h2.textContent = `Bienvenue dans # ${active.name}`;
   }

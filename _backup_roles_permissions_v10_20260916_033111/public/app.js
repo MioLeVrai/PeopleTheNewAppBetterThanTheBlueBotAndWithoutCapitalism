@@ -1973,7 +1973,6 @@ function attachRemoteMedia(peerId, stream) {
 let peopleActiveServerId = null;
 let peopleActiveTextChannelId = null;
 let peopleServerChannels = [];
-let peopleServerPermissions = { mask: 0, names: [], owner: false, highestRolePosition: 0 };
 let activeVoiceChannelId = null;
 let peopleRequestedVoiceChannelId = null;
 
@@ -1991,7 +1990,6 @@ function peopleDispatchServerChannelState(extra = {}) {
       activeVoiceServerId,
       activeVoiceChannelId,
       channels: Array.isArray(peopleServerChannels) ? peopleServerChannels : [],
-      serverPermissions: peopleServerPermissions,
       voice: Array.isArray(lastVoiceRoster) ? lastVoiceRoster : [],
       ...extra
     }
@@ -2052,7 +2050,6 @@ function peopleCachedServerPayload(serverId) {
 function peopleApplySelectedServerPayload(
   payload
 ) {
-  peopleServerPermissions = payload?.permissions || peopleServerPermissions || { mask: 0, names: [] };
   peopleSetServerChannels(
     payload?.channels || peopleServerChannels,
     payload?.activeChannelId || peopleActiveTextChannelId
@@ -2119,7 +2116,6 @@ window.PeopleServerRuntime = {
     peopleActiveServerId = null;
     peopleActiveTextChannelId = null;
     peopleServerChannels = [];
-    peopleServerPermissions = { mask: 0, names: [], owner: false, highestRolePosition: 0 };
     peopleServerSelectRequestVersion += 1;
 
     renderChatHistory([]);
@@ -2838,12 +2834,6 @@ socket.on("server-channels-updated", ({ serverId, channels } = {}) => {
   if (previous && !peopleServerChannelById(previous) && peopleActiveTextChannelId) {
     void window.PeopleServerRuntime?.selectTextChannel?.(peopleActiveTextChannelId);
   }
-});
-
-socket.on("server-permissions-updated", ({ serverId, permissions } = {}) => {
-  if (String(serverId || "") !== String(peopleActiveServerId || "")) return;
-  peopleServerPermissions = permissions || { mask: 0, names: [], owner: false, highestRolePosition: 0 };
-  peopleDispatchServerChannelState({ serverPermissions: peopleServerPermissions });
 });
 
 // === PEOPLE_SERVER_SETTINGS_V1_SOCKET_START ===

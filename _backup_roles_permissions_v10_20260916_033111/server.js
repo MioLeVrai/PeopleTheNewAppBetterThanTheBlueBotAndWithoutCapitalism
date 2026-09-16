@@ -7832,7 +7832,7 @@ app.get(
         if (!/^\d+$/.test(imageId)) return res.status(404).end();
         const result = await peoplePool.query(
           "SELECT i.owner_id, i.mime_type, i.data, i.general_message_id, i.dm_message_id, " +
-          "dm.sender_id, dm.recipient_id, gm.server_id AS general_server_id, gm.channel_id AS general_channel_id " +
+          "dm.sender_id, dm.recipient_id, gm.server_id AS general_server_id " +
           "FROM people_message_images i " +
           "LEFT JOIN people_direct_messages dm ON dm.id = i.dm_message_id " +
           "LEFT JOIN people_general_messages gm ON gm.id = i.general_message_id " +
@@ -7842,8 +7842,8 @@ app.get(
         const row = result.rows[0];
         if (!row) return res.status(404).end();
         const me = String(session.id);
-        const generalAllowed = row.general_message_id && row.general_server_id && row.general_channel_id &&
-          await peopleCanServerPermission(me, row.general_server_id, "VIEW_CHANNEL", row.general_channel_id);
+        const generalAllowed = row.general_message_id && row.general_server_id &&
+          await peopleIsServerMember(me, row.general_server_id);
         const allowed = Boolean(generalAllowed) || String(row.owner_id) === me ||
           (row.dm_message_id && (String(row.sender_id) === me || String(row.recipient_id) === me));
         if (!allowed) return res.status(403).end();
@@ -7867,8 +7867,8 @@ app.get(
       const generalMessage = item.scope === "general"
         ? peopleReadLocalGeneral().find((message) => String(message.id) === String(item.messageId))
         : null;
-      const generalAllowed = generalMessage?.serverId && generalMessage?.channelId
-        ? await peopleCanServerPermission(me, generalMessage.serverId, "VIEW_CHANNEL", generalMessage.channelId)
+      const generalAllowed = generalMessage?.serverId
+        ? await peopleIsServerMember(me, generalMessage.serverId)
         : false;
       const allowed = Boolean(generalAllowed) || String(item.ownerId) === me ||
         (item.scope === "dm" && (String(item.senderId) === me || String(item.recipientId) === me));
@@ -8082,7 +8082,7 @@ async function peopleUnreadChannelInfo(accountId, serverId, channelId) {
 
 async function peopleUnreadServerSummary(accountId, serverId) {
   const sid = String(serverId || "");
-  const channels = (await peopleListVisibleServerChannels(accountId, sid))
+  const channels = (await peopleListServerChannels(sid))
     .filter((channel) => channel?.type === "text");
 
   const infos = [];
@@ -8163,10 +8163,6 @@ app.post(
           ok: false,
           error: "Salon textuel introuvable."
         });
-      }
-
-      if (!(await peopleCanServerPermission(session.id, sid, "VIEW_CHANNEL", cid))) {
-        return res.status(403).json({ ok: false, error: "Tu n'as pas accès à ce salon." });
       }
 
       await peopleUnreadMarkRead(
@@ -8563,10 +8559,7 @@ async function peopleReactionMessageContext(scope, messageId, accountId) {
     if (!row) return null;
     const serverId = row.server_id ? String(row.server_id) : "";
     const channelId = row.channel_id ? String(row.channel_id) : "";
-    if (serverId) {
-      if (!(await peopleIsServerMember(me, serverId))) return null;
-      if (channelId && !(await peopleCanServerPermission(me, serverId, "VIEW_CHANNEL", channelId))) return null;
-    }
+    if (serverId && !(await peopleIsServerMember(me, serverId))) return null;
     return { scope: kind, messageId: id, serverId, channelId };
   }
 
@@ -8574,10 +8567,7 @@ async function peopleReactionMessageContext(scope, messageId, accountId) {
   if (!message) return null;
   const serverId = message.serverId ? String(message.serverId) : "";
   const channelId = message.channelId ? String(message.channelId) : "";
-  if (serverId) {
-    if (!(await peopleIsServerMember(me, serverId))) return null;
-    if (channelId && !(await peopleCanServerPermission(me, serverId, "VIEW_CHANNEL", channelId))) return null;
-  }
+  if (serverId && !(await peopleIsServerMember(me, serverId))) return null;
   return { scope: kind, messageId: id, serverId, channelId };
 }
 
@@ -8717,12 +8707,7 @@ async function peopleBroadcastReactionUpdate(context) {
   if (context.serverId) {
     payload.serverId = context.serverId;
     payload.channelId = context.channelId || "";
-    await peopleEmitServerChannelEvent(
-      context.serverId,
-      context.channelId || "",
-      "message-reaction-updated",
-      payload
-    );
+    io.to(peopleServerRoom(context.serverId)).emit("message-reaction-updated", payload);
     return;
   }
 
@@ -8765,15 +8750,6 @@ app.post("/api/message-reactions/:scope/:id/toggle", async (req, res) => {
 
     if (!context) {
       return res.status(404).json({ ok: false, error: "Message introuvable." });
-    }
-
-    if (
-      context.scope === "general" &&
-      context.serverId &&
-      context.channelId &&
-      !(await peopleCanServerPermission(session.id, context.serverId, "ADD_REACTIONS", context.channelId))
-    ) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission d'ajouter des réactions dans ce salon." });
     }
 
     const emoji = peopleReactionEmoji(req.body?.emoji);
@@ -8845,11 +8821,7 @@ function peopleReadLocalServers() {
       return {
         servers: [],
         members: [],
-        channels: [],
-        roles: [],
-        memberRoles: [],
-        permissionOverrides: [],
-        bans: []
+        channels: []
       };
     }
 
@@ -8873,33 +8845,13 @@ function peopleReadLocalServers() {
       channels:
         Array.isArray(raw?.channels)
           ? raw.channels
-          : [],
-      roles:
-        Array.isArray(raw?.roles)
-          ? raw.roles
-          : [],
-      memberRoles:
-        Array.isArray(raw?.memberRoles)
-          ? raw.memberRoles
-          : [],
-      permissionOverrides:
-        Array.isArray(raw?.permissionOverrides)
-          ? raw.permissionOverrides
-          : [],
-      bans:
-        Array.isArray(raw?.bans)
-          ? raw.bans
           : []
     };
   } catch {
     return {
       servers: [],
       members: [],
-      channels: [],
-      roles: [],
-      memberRoles: [],
-      permissionOverrides: [],
-      bans: []
+      channels: []
     };
   }
 }
@@ -8920,22 +8872,6 @@ function peopleWriteLocalServers(data) {
         channels:
           Array.isArray(data?.channels)
             ? data.channels
-            : [],
-        roles:
-          Array.isArray(data?.roles)
-            ? data.roles
-            : [],
-        memberRoles:
-          Array.isArray(data?.memberRoles)
-            ? data.memberRoles
-            : [],
-        permissionOverrides:
-          Array.isArray(data?.permissionOverrides)
-            ? data.permissionOverrides
-            : [],
-        bans:
-          Array.isArray(data?.bans)
-            ? data.bans
             : []
       },
       null,
@@ -9393,16 +9329,6 @@ async function peopleDeleteServerIfEmpty(
             ""
           ) !== id
       );
-
-    data.roles = (data.roles || []).filter(
-      (role) => String(role.serverId ?? role.server_id ?? "") !== id
-    );
-    data.memberRoles = (data.memberRoles || []).filter(
-      (item) => String(item.serverId ?? item.server_id ?? "") !== id
-    );
-    data.permissionOverrides = (data.permissionOverrides || []).filter(
-      (item) => String(item.serverId ?? item.server_id ?? "") !== id
-    );
 
     peopleWriteLocalServers(
       data
@@ -10374,47 +10300,80 @@ async function peopleServerDeleteMessage(
   channelId,
   messageId
 ) {
-  const actor = String(accountId || "");
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  const id = peopleReplyId(messageId);
+  const owner =
+    String(accountId);
 
-  if (!actor || !sid || !cid || !id) return false;
+  const sid =
+    String(serverId);
 
-  if (peoplePool) {
-    if (!/^\d+$/.test(id) || !/^\d+$/.test(sid)) return false;
-    const found = await peoplePool.query(
-      "SELECT sender_id FROM people_general_messages " +
-      "WHERE id = $1 AND server_id = $2 AND channel_id = $3 LIMIT 1",
-      [id, sid, cid]
-    );
-    const row = found.rows[0];
-    if (!row) return false;
-    const own = String(row.sender_id) === actor;
-    const moderator = own ? false : await peopleCanServerPermission(actor, sid, "MANAGE_MESSAGES", cid);
-    if (!own && !moderator) return false;
-    const result = await peoplePool.query(
-      "DELETE FROM people_general_messages WHERE id = $1 AND server_id = $2 AND channel_id = $3 RETURNING id",
-      [id, sid, cid]
-    );
-    return Boolean(result.rows[0]);
+  const cid =
+    String(channelId || "");
+
+  const id =
+    peopleReplyId(messageId);
+
+  if (
+    !owner ||
+    !sid ||
+    !cid ||
+    !id
+  ) {
+    return false;
   }
 
-  const messages = peopleReadLocalGeneral();
-  const index = messages.findIndex((item) =>
-    String(item.id) === id &&
-    String(item.serverId) === sid &&
-    String(item.channelId || "") === cid
-  );
-  if (index < 0) return false;
+  if (peoplePool) {
+    if (
+      !/^\d+$/.test(id) ||
+      !/^\d+$/.test(sid)
+    ) {
+      return false;
+    }
 
-  const own = String(messages[index].senderId || "") === actor;
-  const moderator = own ? false : await peopleCanServerPermission(actor, sid, "MANAGE_MESSAGES", cid);
-  if (!own && !moderator) return false;
+    const result =
+      await peoplePool.query(
+        "DELETE FROM people_general_messages " +
+        "WHERE id = $1 AND sender_id = $2 AND server_id = $3 AND channel_id = $4 " +
+        "RETURNING id",
+        [
+          id,
+          owner,
+          sid,
+          cid
+        ]
+      );
+
+    return Boolean(
+      result.rows[0]
+    );
+  }
+
+  const messages =
+    peopleReadLocalGeneral();
+
+  const index =
+    messages.findIndex(
+      (item) =>
+        String(item.id) === id &&
+        String(item.senderId) === owner &&
+        String(item.serverId) === sid &&
+        String(item.channelId || "") === cid
+    );
+
+  if (index < 0) {
+    return false;
+  }
 
   messages.splice(index, 1);
-  peopleWriteLocalGeneral(messages);
-  peopleDeleteLocalBoundMessageImage("general", id);
+
+  peopleWriteLocalGeneral(
+    messages
+  );
+
+  peopleDeleteLocalBoundMessageImage(
+    "general",
+    id
+  );
+
   return true;
 }
 
@@ -10732,36 +10691,23 @@ async function peopleDefaultServerChannel(serverId, type = "text") {
   return channels.find((item) => item.type === wanted) || null;
 }
 
-async function peopleCanManageServerChannels(accountId, serverId, channelId = null) {
-  return peopleCanServerPermission(
-    accountId,
-    serverId,
-    "MANAGE_CHANNELS",
-    channelId
+async function peopleCanManageServerChannels(accountId, serverId) {
+  const server = await peopleGetServer(serverId);
+  return Boolean(
+    server &&
+    server.ownerId &&
+    String(server.ownerId) === String(accountId)
   );
 }
 
 async function peopleBroadcastServerChannels(serverId) {
   const sid = String(serverId || "");
   if (!sid) return;
-
-  const room = io.sockets.adapter.rooms.get(peopleServerRoom(sid));
-  if (!room) return;
-
-  const cache = new Map();
-  for (const socketId of room) {
-    const accountId = String(userIds.get(socketId) || "");
-    if (!accountId) continue;
-    let channels = cache.get(accountId);
-    if (!channels) {
-      channels = await peopleListVisibleServerChannels(accountId, sid);
-      cache.set(accountId, channels);
-    }
-    io.to(socketId).emit("server-channels-updated", {
-      serverId: sid,
-      channels
-    });
-  }
+  const channels = await peopleListServerChannels(sid);
+  io.to(peopleServerRoom(sid)).emit("server-channels-updated", {
+    serverId: sid,
+    channels
+  });
 }
 
 async function peopleCreateServerChannel(serverId, rawType, rawName, rawParentId = null) {
@@ -10921,9 +10867,6 @@ async function peopleDeleteServerChannel(serverId, channelId) {
       }
     }
     data.channels = (data.channels || []).filter((item) => String(item.id) !== cid);
-    data.permissionOverrides = (data.permissionOverrides || []).filter(
-      (item) => String(item.channelId ?? item.channel_id ?? "") !== cid
-    );
     peopleWriteLocalServers(data);
 
     if (current.type === "text") {
@@ -11023,11 +10966,7 @@ app.get("/api/servers/:id/channels", async (req, res) => {
     if (!session) return;
     const member = await peopleIsServerMember(session.id, req.params.id);
     if (!member) return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-    const [channels, permissions] = await Promise.all([
-      peopleListVisibleServerChannels(session.id, req.params.id),
-      peoplePermissionSnapshot(session.id, req.params.id)
-    ]);
-    res.json({ ok: true, channels, permissions });
+    res.json({ ok: true, channels: await peopleListServerChannels(req.params.id) });
   } catch (err) {
     console.error("[People channels/list]", err);
     res.status(500).json({ ok: false, error: "Impossible de charger les salons." });
@@ -11039,7 +10978,7 @@ app.post("/api/servers/:id/channels", async (req, res) => {
     const session = peopleSessionForRequest(req, res);
     if (!session) return;
     if (!(await peopleCanManageServerChannels(session.id, req.params.id))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les salons." });
+      return res.status(403).json({ ok: false, error: "Seul le propriétaire peut gérer les salons pour le moment." });
     }
     const channel = await peopleCreateServerChannel(req.params.id, req.body?.type, req.body?.name, req.body?.parentId);
     await peopleBroadcastServerChannels(req.params.id);
@@ -11054,8 +10993,8 @@ app.patch("/api/servers/:id/channels/:channelId", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res);
     if (!session) return;
-    if (!(await peopleCanManageServerChannels(session.id, req.params.id, req.params.channelId))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer ce salon." });
+    if (!(await peopleCanManageServerChannels(session.id, req.params.id))) {
+      return res.status(403).json({ ok: false, error: "Seul le propriétaire peut gérer les salons pour le moment." });
     }
     const channel = await peopleUpdateServerChannel(req.params.id, req.params.channelId, req.body || {});
     if (!channel) return res.status(404).json({ ok: false, error: "Salon introuvable." });
@@ -11071,8 +11010,8 @@ app.delete("/api/servers/:id/channels/:channelId", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res);
     if (!session) return;
-    if (!(await peopleCanManageServerChannels(session.id, req.params.id, req.params.channelId))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer ce salon." });
+    if (!(await peopleCanManageServerChannels(session.id, req.params.id))) {
+      return res.status(403).json({ ok: false, error: "Seul le propriétaire peut gérer les salons pour le moment." });
     }
     const result = await peopleDeleteServerChannel(req.params.id, req.params.channelId);
     if (!result.ok && result.code === "LAST_TEXT") {
@@ -11087,1048 +11026,6 @@ app.delete("/api/servers/:id/channels/:channelId", async (req, res) => {
   }
 });
 // === PEOPLE_SERVER_CHANNELS_V2_END ===
-
-// === PEOPLE_ROLES_PERMISSIONS_V1_START ===
-const PEOPLE_PERMISSION_DEFINITIONS = Object.freeze([
-  { key: "VIEW_CHANNEL", bit: 1 << 0, label: "Voir les salons", group: "Salons" },
-  { key: "SEND_MESSAGES", bit: 1 << 1, label: "Envoyer des messages", group: "Texte" },
-  { key: "ATTACH_FILES", bit: 1 << 2, label: "Joindre des fichiers", group: "Texte" },
-  { key: "ADD_REACTIONS", bit: 1 << 3, label: "Ajouter des réactions", group: "Texte" },
-  { key: "CONNECT", bit: 1 << 4, label: "Rejoindre les vocaux", group: "Vocal" },
-  { key: "SPEAK", bit: 1 << 5, label: "Parler", group: "Vocal" },
-  { key: "STREAM", bit: 1 << 6, label: "Caméra et partage d'écran", group: "Vocal" },
-  { key: "CREATE_INVITE", bit: 1 << 7, label: "Créer / copier des invitations", group: "Serveur" },
-  { key: "MANAGE_MESSAGES", bit: 1 << 8, label: "Gérer les messages", group: "Modération" },
-  { key: "MANAGE_CHANNELS", bit: 1 << 9, label: "Gérer les salons", group: "Serveur" },
-  { key: "MANAGE_ROLES", bit: 1 << 10, label: "Gérer les rôles", group: "Serveur" },
-  { key: "KICK_MEMBERS", bit: 1 << 11, label: "Exclure des membres", group: "Modération" },
-  { key: "BAN_MEMBERS", bit: 1 << 12, label: "Bannir des membres", group: "Modération" },
-  { key: "MANAGE_SERVER", bit: 1 << 13, label: "Gérer le serveur", group: "Serveur" },
-  { key: "ADMINISTRATOR", bit: 1 << 14, label: "Administrateur", group: "Avancé" }
-]);
-
-const PEOPLE_PERMISSION_BY_KEY = new Map(
-  PEOPLE_PERMISSION_DEFINITIONS.map((item) => [item.key, item])
-);
-const PEOPLE_PERMISSION_ALL_MASK = PEOPLE_PERMISSION_DEFINITIONS.reduce(
-  (mask, item) => mask | item.bit,
-  0
-);
-const PEOPLE_PERMISSION_EVERYONE_DEFAULT = [
-  "VIEW_CHANNEL",
-  "SEND_MESSAGES",
-  "ATTACH_FILES",
-  "ADD_REACTIONS",
-  "CONNECT",
-  "SPEAK",
-  "STREAM",
-  "CREATE_INVITE"
-].reduce((mask, key) => mask | PEOPLE_PERMISSION_BY_KEY.get(key).bit, 0);
-
-function peoplePermissionMask(value) {
-  if (Array.isArray(value)) {
-    return value.reduce((mask, key) => {
-      const item = PEOPLE_PERMISSION_BY_KEY.get(String(key || "").trim().toUpperCase());
-      return item ? (mask | item.bit) : mask;
-    }, 0) & PEOPLE_PERMISSION_ALL_MASK;
-  }
-  const number = Number(value);
-  if (!Number.isFinite(number)) return 0;
-  return (Math.max(0, Math.floor(number)) & PEOPLE_PERMISSION_ALL_MASK);
-}
-
-function peoplePermissionNames(mask) {
-  const value = peoplePermissionMask(mask);
-  return PEOPLE_PERMISSION_DEFINITIONS
-    .filter((item) => (value & item.bit) === item.bit)
-    .map((item) => item.key);
-}
-
-function peoplePermissionHas(mask, key) {
-  const item = PEOPLE_PERMISSION_BY_KEY.get(String(key || "").trim().toUpperCase());
-  if (!item) return false;
-  const value = peoplePermissionMask(mask);
-  return (value & PEOPLE_PERMISSION_BY_KEY.get("ADMINISTRATOR").bit) !== 0 ||
-    (value & item.bit) === item.bit;
-}
-
-function peopleRoleName(value) {
-  return String(value || "")
-    .normalize("NFKC")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, 32);
-}
-
-function peopleRoleColor(value) {
-  const clean = String(value || "").trim().toUpperCase();
-  return /^#[0-9A-F]{6}$/.test(clean) ? clean : "#99AAB5";
-}
-
-function peopleRolePublic(role) {
-  if (!role) return null;
-  return {
-    id: String(role.id),
-    serverId: String(role.serverId ?? role.server_id ?? ""),
-    name: String(role.name || "Rôle"),
-    color: peopleRoleColor(role.color || "#99AAB5"),
-    position: Number(role.position || 0),
-    everyone: Boolean(role.everyone ?? role.is_everyone),
-    permissions: peoplePermissionNames(role.permissions ?? role.permission_mask ?? 0),
-    permissionMask: peoplePermissionMask(role.permissions ?? role.permission_mask ?? 0),
-    createdAt: role.createdAt ?? role.created_at ?? null
-  };
-}
-
-async function peopleEnsureServerEveryoneRole(serverId) {
-  const sid = String(serverId || "").trim();
-  if (!sid) return null;
-
-  if (peoplePool) {
-    const existing = await peoplePool.query(
-      "SELECT id, server_id, name, color, permissions, position, is_everyone, created_at " +
-      "FROM people_server_roles WHERE server_id = $1 AND is_everyone = TRUE LIMIT 1",
-      [sid]
-    );
-    if (existing.rows[0]) return peopleRolePublic(existing.rows[0]);
-
-    const inserted = await peoplePool.query(
-      "INSERT INTO people_server_roles " +
-      "(server_id, name, color, permissions, position, is_everyone) " +
-      "VALUES ($1, '@everyone', '#99AAB5', $2, 0, TRUE) " +
-      "RETURNING id, server_id, name, color, permissions, position, is_everyone, created_at",
-      [sid, PEOPLE_PERMISSION_EVERYONE_DEFAULT]
-    );
-    return peopleRolePublic(inserted.rows[0]);
-  }
-
-  const data = peopleReadLocalServers();
-  data.roles = Array.isArray(data.roles) ? data.roles : [];
-  let role = data.roles.find((item) =>
-    String(item.serverId ?? item.server_id ?? "") === sid && Boolean(item.everyone ?? item.is_everyone)
-  );
-  if (!role) {
-    role = {
-      id: cryptoAccounts.randomUUID(),
-      serverId: sid,
-      name: "@everyone",
-      color: "#99AAB5",
-      permissions: PEOPLE_PERMISSION_EVERYONE_DEFAULT,
-      position: 0,
-      everyone: true,
-      createdAt: new Date().toISOString()
-    };
-    data.roles.push(role);
-    peopleWriteLocalServers(data);
-  }
-  return peopleRolePublic(role);
-}
-
-async function peopleListServerRoles(serverId) {
-  const sid = String(serverId || "").trim();
-  if (!sid) return [];
-  await peopleEnsureServerEveryoneRole(sid);
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT id, server_id, name, color, permissions, position, is_everyone, created_at " +
-      "FROM people_server_roles WHERE server_id = $1 ORDER BY position DESC, id ASC",
-      [sid]
-    );
-    return result.rows.map(peopleRolePublic);
-  }
-
-  return peopleReadLocalServers().roles
-    .filter((role) => String(role.serverId ?? role.server_id ?? "") === sid)
-    .map(peopleRolePublic)
-    .sort((a, b) => (b.position - a.position) || a.name.localeCompare(b.name, "fr"));
-}
-
-async function peopleGetServerRole(serverId, roleId) {
-  const sid = String(serverId || "").trim();
-  const rid = String(roleId || "").trim();
-  if (!sid || !rid) return null;
-  const roles = await peopleListServerRoles(sid);
-  return roles.find((role) => String(role.id) === rid) || null;
-}
-
-async function peopleMemberRoleIds(serverId, accountId) {
-  const sid = String(serverId || "");
-  const uid = String(accountId || "");
-  if (!sid || !uid) return [];
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT role_id FROM people_server_member_roles WHERE server_id = $1 AND user_id = $2",
-      [sid, uid]
-    );
-    return result.rows.map((row) => String(row.role_id));
-  }
-
-  return peopleReadLocalServers().memberRoles
-    .filter((item) =>
-      String(item.serverId ?? item.server_id ?? "") === sid &&
-      String(item.userId ?? item.user_id ?? "") === uid
-    )
-    .map((item) => String(item.roleId ?? item.role_id ?? ""))
-    .filter(Boolean);
-}
-
-async function peopleServerRoleState(accountId, serverId) {
-  const uid = String(accountId || "");
-  const sid = String(serverId || "");
-  const server = await peopleGetServer(sid);
-  if (!server || !uid || !(await peopleIsServerMember(uid, sid))) {
-    return null;
-  }
-
-  const roles = await peopleListServerRoles(sid);
-  const everyone = roles.find((role) => role.everyone) || null;
-  const roleIds = new Set(await peopleMemberRoleIds(sid, uid));
-  const assigned = roles.filter((role) => !role.everyone && roleIds.has(String(role.id)));
-  const owner = Boolean(server.ownerId && String(server.ownerId) === uid);
-  let mask = peoplePermissionMask(everyone?.permissionMask || 0);
-  for (const role of assigned) mask |= peoplePermissionMask(role.permissionMask);
-  if (peoplePermissionHas(mask, "ADMINISTRATOR") || owner) mask = PEOPLE_PERMISSION_ALL_MASK;
-  const highestRolePosition = owner
-    ? 1000000000
-    : assigned.reduce((max, role) => Math.max(max, Number(role.position || 0)), 0);
-
-  return { server, roles, everyone, assigned, roleIds, owner, mask, highestRolePosition };
-}
-
-async function peopleListChannelRoleOverrides(serverId, channelId) {
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  if (!sid || !cid) return [];
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT server_id, channel_id, role_id, allow_permissions, deny_permissions " +
-      "FROM people_server_role_channel_overrides WHERE server_id = $1 AND channel_id = $2",
-      [sid, cid]
-    );
-    return result.rows.map((row) => ({
-      serverId: String(row.server_id),
-      channelId: String(row.channel_id),
-      roleId: String(row.role_id),
-      allow: peoplePermissionMask(row.allow_permissions),
-      deny: peoplePermissionMask(row.deny_permissions)
-    }));
-  }
-
-  return peopleReadLocalServers().permissionOverrides
-    .filter((item) =>
-      String(item.serverId ?? item.server_id ?? "") === sid &&
-      String(item.channelId ?? item.channel_id ?? "") === cid
-    )
-    .map((item) => ({
-      serverId: sid,
-      channelId: cid,
-      roleId: String(item.roleId ?? item.role_id ?? ""),
-      allow: peoplePermissionMask(item.allow ?? item.allow_permissions),
-      deny: peoplePermissionMask(item.deny ?? item.deny_permissions)
-    }));
-}
-
-function peopleApplyRoleOverrideLevel(mask, roleState, overrides) {
-  let result = peoplePermissionMask(mask);
-  if (!roleState || roleState.owner || peoplePermissionHas(result, "ADMINISTRATOR")) {
-    return PEOPLE_PERMISSION_ALL_MASK;
-  }
-
-  const everyoneId = roleState.everyone ? String(roleState.everyone.id) : "";
-  const everyoneOverride = overrides.find((item) => String(item.roleId) === everyoneId);
-  if (everyoneOverride) {
-    result &= ~peoplePermissionMask(everyoneOverride.deny);
-    result |= peoplePermissionMask(everyoneOverride.allow);
-  }
-
-  let roleDeny = 0;
-  let roleAllow = 0;
-  for (const role of roleState.assigned) {
-    const override = overrides.find((item) => String(item.roleId) === String(role.id));
-    if (!override) continue;
-    roleDeny |= peoplePermissionMask(override.deny);
-    roleAllow |= peoplePermissionMask(override.allow);
-  }
-  result &= ~roleDeny;
-  result |= roleAllow;
-  return result & PEOPLE_PERMISSION_ALL_MASK;
-}
-
-async function peopleServerEffectivePermissionMask(accountId, serverId, channelId = null) {
-  const state = await peopleServerRoleState(accountId, serverId);
-  if (!state) return 0;
-  if (state.owner || peoplePermissionHas(state.mask, "ADMINISTRATOR")) {
-    return PEOPLE_PERMISSION_ALL_MASK;
-  }
-
-  let mask = state.mask;
-  const cid = channelId ? String(channelId) : "";
-  if (!cid) return mask;
-
-  const channel = await peopleGetServerChannel(serverId, cid);
-  if (!channel) return 0;
-
-  if (channel.parentId) {
-    const categoryOverrides = await peopleListChannelRoleOverrides(serverId, channel.parentId);
-    mask = peopleApplyRoleOverrideLevel(mask, state, categoryOverrides);
-  }
-  const channelOverrides = await peopleListChannelRoleOverrides(serverId, cid);
-  mask = peopleApplyRoleOverrideLevel(mask, state, channelOverrides);
-  return mask;
-}
-
-async function peopleCanServerPermission(accountId, serverId, permission, channelId = null) {
-  const mask = await peopleServerEffectivePermissionMask(accountId, serverId, channelId);
-  return peoplePermissionHas(mask, permission);
-}
-
-async function peoplePermissionSnapshot(accountId, serverId, channelId = null) {
-  const state = await peopleServerRoleState(accountId, serverId);
-  if (!state) return { mask: 0, names: [], owner: false, highestRolePosition: 0 };
-  const mask = channelId
-    ? await peopleServerEffectivePermissionMask(accountId, serverId, channelId)
-    : state.mask;
-  return {
-    mask,
-    names: peoplePermissionNames(mask),
-    owner: state.owner,
-    highestRolePosition: state.highestRolePosition
-  };
-}
-
-async function peopleListVisibleServerChannels(accountId, serverId) {
-  const channels = await peopleListServerChannels(serverId);
-  const output = [];
-  for (const channel of channels) {
-    const mask = await peopleServerEffectivePermissionMask(accountId, serverId, channel.id);
-    if (!peoplePermissionHas(mask, "VIEW_CHANNEL")) continue;
-    output.push({
-      ...channel,
-      permissions: peoplePermissionNames(mask),
-      permissionMask: mask
-    });
-  }
-  return output;
-}
-
-async function peopleEmitServerChannelEvent(serverId, channelId, eventName, payload) {
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  if (!sid || !eventName) return;
-  const room = io.sockets.adapter.rooms.get(peopleServerRoom(sid));
-  if (!room) return;
-
-  const cache = new Map();
-  for (const socketId of room) {
-    const uid = String(userIds.get(socketId) || "");
-    if (!uid) continue;
-    let allowed = cache.get(uid);
-    if (allowed === undefined) {
-      allowed = cid ? await peopleCanServerPermission(uid, sid, "VIEW_CHANNEL", cid) : true;
-      cache.set(uid, allowed);
-    }
-    if (allowed) io.to(socketId).emit(eventName, payload);
-  }
-}
-
-async function peopleBroadcastServerPermissionRefresh(serverId) {
-  const sid = String(serverId || "");
-  if (!sid) return;
-  await peopleBroadcastServerChannels(sid);
-  const room = io.sockets.adapter.rooms.get(peopleServerRoom(sid));
-  if (!room) return;
-  const cache = new Map();
-  for (const socketId of room) {
-    const uid = String(userIds.get(socketId) || "");
-    if (!uid) continue;
-    let snapshot = cache.get(uid);
-    if (!snapshot) {
-      snapshot = await peoplePermissionSnapshot(uid, sid);
-      cache.set(uid, snapshot);
-    }
-    io.to(socketId).emit("server-permissions-updated", { serverId: sid, permissions: snapshot });
-  }
-}
-
-async function peopleCreateServerRole(serverId, name, color, permissions, actorState) {
-  const sid = String(serverId || "");
-  const cleanName = peopleRoleName(name);
-  if (!sid || !cleanName || cleanName === "@everyone") {
-    const err = new Error("ROLE_INVALID"); err.code = "ROLE_INVALID"; throw err;
-  }
-  const cleanMask = peoplePermissionMask(permissions);
-  if (!actorState?.owner && (cleanMask & ~actorState.mask) !== 0) {
-    const err = new Error("ROLE_PERMISSION_ESCALATION"); err.code = "ROLE_PERMISSION_ESCALATION"; throw err;
-  }
-  const roles = await peopleListServerRoles(sid);
-  const maxPosition = roles.reduce((max, role) => Math.max(max, Number(role.position || 0)), 0);
-  let position = maxPosition + 10;
-  if (!actorState?.owner) position = Math.max(1, Math.min(position, actorState.highestRolePosition - 1));
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "INSERT INTO people_server_roles (server_id, name, color, permissions, position, is_everyone) " +
-      "VALUES ($1, $2, $3, $4, $5, FALSE) " +
-      "RETURNING id, server_id, name, color, permissions, position, is_everyone, created_at",
-      [sid, cleanName, peopleRoleColor(color), cleanMask, position]
-    );
-    return peopleRolePublic(result.rows[0]);
-  }
-
-  const data = peopleReadLocalServers();
-  const role = {
-    id: cryptoAccounts.randomUUID(), serverId: sid, name: cleanName,
-    color: peopleRoleColor(color), permissions: cleanMask, position,
-    everyone: false, createdAt: new Date().toISOString()
-  };
-  data.roles.push(role);
-  peopleWriteLocalServers(data);
-  return peopleRolePublic(role);
-}
-
-async function peopleUpdateServerRole(serverId, roleId, patch, actorState) {
-  const sid = String(serverId || "");
-  const current = await peopleGetServerRole(sid, roleId);
-  if (!current) return null;
-  if (!actorState?.owner && Number(current.position || 0) >= actorState.highestRolePosition) {
-    const err = new Error("ROLE_HIERARCHY"); err.code = "ROLE_HIERARCHY"; throw err;
-  }
-
-  let name = current.name;
-  let color = current.color;
-  let mask = current.permissionMask;
-  let position = current.position;
-  if (!current.everyone && Object.prototype.hasOwnProperty.call(patch || {}, "name")) {
-    name = peopleRoleName(patch.name);
-    if (!name || name === "@everyone") { const err = new Error("ROLE_INVALID"); err.code = "ROLE_INVALID"; throw err; }
-  }
-  if (!current.everyone && Object.prototype.hasOwnProperty.call(patch || {}, "color")) color = peopleRoleColor(patch.color);
-  if (Object.prototype.hasOwnProperty.call(patch || {}, "permissions")) {
-    mask = peoplePermissionMask(patch.permissions);
-    if (!actorState?.owner && (mask & ~actorState.mask) !== 0) {
-      const err = new Error("ROLE_PERMISSION_ESCALATION"); err.code = "ROLE_PERMISSION_ESCALATION"; throw err;
-    }
-  }
-  if (!current.everyone && Object.prototype.hasOwnProperty.call(patch || {}, "position")) {
-    position = Math.max(1, Math.floor(Number(patch.position) || 1));
-    if (!actorState?.owner && position >= actorState.highestRolePosition) {
-      const err = new Error("ROLE_HIERARCHY"); err.code = "ROLE_HIERARCHY"; throw err;
-    }
-  }
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "UPDATE people_server_roles SET name = $3, color = $4, permissions = $5, position = $6 " +
-      "WHERE id = $1 AND server_id = $2 " +
-      "RETURNING id, server_id, name, color, permissions, position, is_everyone, created_at",
-      [String(current.id), sid, name, color, mask, position]
-    );
-    return peopleRolePublic(result.rows[0]);
-  }
-
-  const data = peopleReadLocalServers();
-  const stored = data.roles.find((role) => String(role.id) === String(current.id) && String(role.serverId ?? role.server_id ?? "") === sid);
-  if (!stored) return null;
-  stored.name = name; stored.color = color; stored.permissions = mask; stored.position = position;
-  peopleWriteLocalServers(data);
-  return peopleRolePublic(stored);
-}
-
-async function peopleDeleteServerRole(serverId, roleId, actorState) {
-  const sid = String(serverId || "");
-  const current = await peopleGetServerRole(sid, roleId);
-  if (!current || current.everyone) return false;
-  if (!actorState?.owner && Number(current.position || 0) >= actorState.highestRolePosition) {
-    const err = new Error("ROLE_HIERARCHY"); err.code = "ROLE_HIERARCHY"; throw err;
-  }
-
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "DELETE FROM people_server_roles WHERE id = $1 AND server_id = $2 RETURNING id",
-      [String(current.id), sid]
-    );
-    return Boolean(result.rows[0]);
-  }
-
-  const data = peopleReadLocalServers();
-  const before = data.roles.length;
-  data.roles = data.roles.filter((role) => String(role.id) !== String(current.id));
-  data.memberRoles = data.memberRoles.filter((item) => String(item.roleId ?? item.role_id ?? "") !== String(current.id));
-  data.permissionOverrides = data.permissionOverrides.filter((item) => String(item.roleId ?? item.role_id ?? "") !== String(current.id));
-  peopleWriteLocalServers(data);
-  return data.roles.length !== before;
-}
-
-async function peopleSetMemberRoles(serverId, targetUserId, requestedRoleIds, actorState) {
-  const sid = String(serverId || "");
-  const uid = String(targetUserId || "");
-  if (!sid || !uid || !(await peopleIsServerMember(uid, sid))) {
-    const err = new Error("MEMBER_INVALID"); err.code = "MEMBER_INVALID"; throw err;
-  }
-  const roles = await peopleListServerRoles(sid);
-  const byId = new Map(roles.filter((role) => !role.everyone).map((role) => [String(role.id), role]));
-  const requested = [...new Set((Array.isArray(requestedRoleIds) ? requestedRoleIds : []).map(String))]
-    .filter((id) => byId.has(id));
-  const current = await peopleMemberRoleIds(sid, uid);
-  const changed = new Set([...current, ...requested]);
-  for (const rid of changed) {
-    const inCurrent = current.includes(rid);
-    const inRequested = requested.includes(rid);
-    if (inCurrent === inRequested) continue;
-    const role = byId.get(rid);
-    if (!role) continue;
-    if (!actorState?.owner && Number(role.position || 0) >= actorState.highestRolePosition) {
-      const err = new Error("ROLE_HIERARCHY"); err.code = "ROLE_HIERARCHY"; throw err;
-    }
-  }
-
-  if (peoplePool) {
-    const client = await peoplePool.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query(
-        "DELETE FROM people_server_member_roles WHERE server_id = $1 AND user_id = $2",
-        [sid, uid]
-      );
-      for (const rid of requested) {
-        await client.query(
-          "INSERT INTO people_server_member_roles (server_id, user_id, role_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-          [sid, uid, rid]
-        );
-      }
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK").catch(() => {});
-      throw err;
-    } finally {
-      client.release();
-    }
-  } else {
-    const data = peopleReadLocalServers();
-    data.memberRoles = data.memberRoles.filter((item) =>
-      !(String(item.serverId ?? item.server_id ?? "") === sid && String(item.userId ?? item.user_id ?? "") === uid)
-    );
-    for (const rid of requested) {
-      data.memberRoles.push({ serverId: sid, userId: uid, roleId: rid, assignedAt: new Date().toISOString() });
-    }
-    peopleWriteLocalServers(data);
-  }
-  return requested;
-}
-
-async function peopleSetRoleChannelOverride(serverId, channelId, roleId, allow, deny, actorState) {
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  const role = await peopleGetServerRole(sid, roleId);
-  const channel = await peopleGetServerChannel(sid, cid);
-  if (!role || !channel) { const err = new Error("OVERRIDE_INVALID"); err.code = "OVERRIDE_INVALID"; throw err; }
-  if (!actorState?.owner && Number(role.position || 0) >= actorState.highestRolePosition && !role.everyone) {
-    const err = new Error("ROLE_HIERARCHY"); err.code = "ROLE_HIERARCHY"; throw err;
-  }
-  let allowMask = peoplePermissionMask(allow);
-  let denyMask = peoplePermissionMask(deny);
-  denyMask &= ~allowMask;
-  if (!actorState?.owner && (allowMask & ~actorState.mask) !== 0) {
-    const err = new Error("ROLE_PERMISSION_ESCALATION"); err.code = "ROLE_PERMISSION_ESCALATION"; throw err;
-  }
-
-  if (peoplePool) {
-    await peoplePool.query(
-      "INSERT INTO people_server_role_channel_overrides " +
-      "(server_id, channel_id, role_id, allow_permissions, deny_permissions) " +
-      "VALUES ($1, $2, $3, $4, $5) " +
-      "ON CONFLICT (server_id, channel_id, role_id) DO UPDATE SET " +
-      "allow_permissions = EXCLUDED.allow_permissions, deny_permissions = EXCLUDED.deny_permissions",
-      [sid, cid, String(role.id), allowMask, denyMask]
-    );
-  } else {
-    const data = peopleReadLocalServers();
-    data.permissionOverrides = data.permissionOverrides.filter((item) =>
-      !(String(item.serverId ?? item.server_id ?? "") === sid &&
-        String(item.channelId ?? item.channel_id ?? "") === cid &&
-        String(item.roleId ?? item.role_id ?? "") === String(role.id))
-    );
-    data.permissionOverrides.push({ serverId: sid, channelId: cid, roleId: String(role.id), allow: allowMask, deny: denyMask });
-    peopleWriteLocalServers(data);
-  }
-  return { serverId: sid, channelId: cid, roleId: String(role.id), allow: peoplePermissionNames(allowMask), deny: peoplePermissionNames(denyMask) };
-}
-
-async function peopleDeleteRoleChannelOverride(serverId, channelId, roleId) {
-  const sid = String(serverId || "");
-  const cid = String(channelId || "");
-  const rid = String(roleId || "");
-  if (peoplePool) {
-    await peoplePool.query(
-      "DELETE FROM people_server_role_channel_overrides WHERE server_id = $1 AND channel_id = $2 AND role_id = $3",
-      [sid, cid, rid]
-    );
-    return;
-  }
-  const data = peopleReadLocalServers();
-  data.permissionOverrides = data.permissionOverrides.filter((item) =>
-    !(String(item.serverId ?? item.server_id ?? "") === sid &&
-      String(item.channelId ?? item.channel_id ?? "") === cid &&
-      String(item.roleId ?? item.role_id ?? "") === rid)
-  );
-  peopleWriteLocalServers(data);
-}
-
-
-// === PEOPLE_SERVER_MODERATION_PERMISSIONS_V1_START ===
-async function peopleServerIsBanned(serverId, userId) {
-  const sid = String(serverId || "");
-  const uid = String(userId || "");
-  if (!sid || !uid) return false;
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT 1 FROM people_server_bans WHERE server_id = $1 AND user_id = $2 LIMIT 1",
-      [sid, uid]
-    );
-    return Boolean(result.rows[0]);
-  }
-  const data = peopleReadLocalServers();
-  return (data.bans || []).some((item) =>
-    String(item.serverId ?? item.server_id ?? "") === sid &&
-    String(item.userId ?? item.user_id ?? "") === uid
-  );
-}
-
-async function peopleServerListBans(serverId) {
-  const sid = String(serverId || "");
-  let rows = [];
-  if (peoplePool) {
-    const result = await peoplePool.query(
-      "SELECT b.user_id, b.banned_by, b.reason, b.created_at, a.username " +
-      "FROM people_server_bans b JOIN people_accounts a ON a.id = b.user_id " +
-      "WHERE b.server_id = $1 ORDER BY b.created_at DESC",
-      [sid]
-    );
-    rows = result.rows.map((row) => ({
-      userId: String(row.user_id), username: row.username, bannedBy: row.banned_by ? String(row.banned_by) : null,
-      reason: String(row.reason || ""), createdAt: row.created_at
-    }));
-  } else {
-    const data = peopleReadLocalServers();
-    const source = (data.bans || []).filter((item) => String(item.serverId ?? item.server_id ?? "") === sid);
-    const accounts = await peopleFindAccountsByIds(source.map((item) => item.userId ?? item.user_id));
-    const byId = new Map(accounts.map((account) => [String(account.id), account]));
-    rows = source.map((item) => {
-      const uid = String(item.userId ?? item.user_id ?? "");
-      return {
-        userId: uid,
-        username: peopleUsername(byId.get(uid)?.username || "Utilisateur"),
-        bannedBy: item.bannedBy ?? item.banned_by ?? null,
-        reason: String(item.reason || ""),
-        createdAt: item.createdAt ?? item.created_at ?? null
-      };
-    }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-  }
-  return rows;
-}
-
-async function peopleServerCanModerate(actorId, serverId, targetId, permission) {
-  const actor = String(actorId || "");
-  const target = String(targetId || "");
-  if (!actor || !target || actor === target) return { ok: false, reason: "Tu ne peux pas te modérer toi-même." };
-  const server = await peopleGetServer(serverId);
-  if (!server) return { ok: false, reason: "Serveur introuvable." };
-  if (server.ownerId && String(server.ownerId) === target) return { ok: false, reason: "Le propriétaire du serveur ne peut pas être modéré." };
-  const actorState = await peopleServerRoleState(actor, server.id);
-  if (!actorState || !peoplePermissionHas(actorState.mask, permission)) {
-    return { ok: false, reason: "Tu n'as pas cette permission de modération." };
-  }
-  if (actorState.owner) return { ok: true, server, actorState };
-  const targetMember = await peopleIsServerMember(target, server.id);
-  if (targetMember) {
-    const targetState = await peopleServerRoleState(target, server.id);
-    if (targetState && Number(targetState.highestRolePosition || 0) >= Number(actorState.highestRolePosition || 0)) {
-      return { ok: false, reason: "Ce membre a un rôle égal ou supérieur au tien." };
-    }
-  }
-  return { ok: true, server, actorState };
-}
-
-async function peopleServerRemoveMember(serverId, userId) {
-  const sid = String(serverId || "");
-  const uid = String(userId || "");
-  if (peoplePool) {
-    await peoplePool.query("DELETE FROM people_server_members WHERE server_id = $1 AND user_id = $2", [sid, uid]);
-  } else {
-    const data = peopleReadLocalServers();
-    data.members = data.members.filter((item) => !(String(item.serverId ?? item.server_id ?? "") === sid && String(item.userId ?? item.user_id ?? "") === uid));
-    data.memberRoles = (data.memberRoles || []).filter((item) => !(String(item.serverId ?? item.server_id ?? "") === sid && String(item.userId ?? item.user_id ?? "") === uid));
-    peopleWriteLocalServers(data);
-  }
-
-  for (const [socketId, currentServerId] of [...socketServerIds.entries()]) {
-    if (String(currentServerId || "") !== sid || String(userIds.get(socketId) || "") !== uid) continue;
-    const targetSocket = io.sockets.sockets.get(socketId);
-    if (targetSocket) {
-      leaveVoice(targetSocket);
-      await targetSocket.leave(peopleServerRoom(sid));
-      targetSocket.emit("server-membership-left", { serverId: sid });
-    }
-    socketServerIds.delete(socketId);
-    socketTextChannelIds.delete(socketId);
-  }
-
-  for (const [voiceSocketId, voiceUser] of [...voiceUsers.entries()]) {
-    if (String(voiceUser?.serverId || "") !== sid || String(voiceUser?.accountId || userIds.get(voiceSocketId) || "") !== uid) continue;
-    const voiceSocket = io.sockets.sockets.get(voiceSocketId);
-    if (voiceSocket) leaveVoice(voiceSocket);
-  }
-
-  emitOnlineUsers(sid);
-  peopleBroadcastServerPermissionRefresh(sid);
-}
-
-async function peopleServerBanMember(serverId, targetId, actorId, reason = "") {
-  const sid = String(serverId || "");
-  const uid = String(targetId || "");
-  const actor = String(actorId || "");
-  const cleanReason = String(reason || "").trim().slice(0, 240);
-  if (peoplePool) {
-    await peoplePool.query(
-      "INSERT INTO people_server_bans (server_id, user_id, banned_by, reason) VALUES ($1, $2, $3, $4) " +
-      "ON CONFLICT (server_id, user_id) DO UPDATE SET banned_by = EXCLUDED.banned_by, reason = EXCLUDED.reason, created_at = NOW()",
-      [sid, uid, actor, cleanReason]
-    );
-  } else {
-    const data = peopleReadLocalServers();
-    data.bans = Array.isArray(data.bans) ? data.bans : [];
-    data.bans = data.bans.filter((item) => !(String(item.serverId ?? item.server_id ?? "") === sid && String(item.userId ?? item.user_id ?? "") === uid));
-    data.bans.push({ serverId: sid, userId: uid, bannedBy: actor, reason: cleanReason, createdAt: new Date().toISOString() });
-    peopleWriteLocalServers(data);
-  }
-  if (await peopleIsServerMember(uid, sid)) await peopleServerRemoveMember(sid, uid);
-}
-
-async function peopleServerUnbanMember(serverId, targetId) {
-  const sid = String(serverId || "");
-  const uid = String(targetId || "");
-  if (peoplePool) {
-    await peoplePool.query("DELETE FROM people_server_bans WHERE server_id = $1 AND user_id = $2", [sid, uid]);
-  } else {
-    const data = peopleReadLocalServers();
-    data.bans = (data.bans || []).filter((item) => !(String(item.serverId ?? item.server_id ?? "") === sid && String(item.userId ?? item.user_id ?? "") === uid));
-    peopleWriteLocalServers(data);
-  }
-}
-// === PEOPLE_SERVER_MODERATION_PERMISSIONS_V1_END ===
-
-async function peopleInitServerRolesV1() {
-  if (peoplePool) {
-    await peoplePool.query(
-      "CREATE TABLE IF NOT EXISTS people_server_roles (" +
-      "id BIGSERIAL PRIMARY KEY, " +
-      "server_id BIGINT NOT NULL REFERENCES people_servers(id) ON DELETE CASCADE, " +
-      "name VARCHAR(32) NOT NULL, " +
-      "color VARCHAR(16) NOT NULL DEFAULT '#99AAB5', " +
-      "permissions INTEGER NOT NULL DEFAULT 0, " +
-      "position INTEGER NOT NULL DEFAULT 0, " +
-      "is_everyone BOOLEAN NOT NULL DEFAULT FALSE, " +
-      "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()" +
-      ")"
-    );
-    await peoplePool.query(
-      "CREATE UNIQUE INDEX IF NOT EXISTS people_server_roles_everyone_idx " +
-      "ON people_server_roles(server_id) WHERE is_everyone = TRUE"
-    );
-    await peoplePool.query(
-      "CREATE INDEX IF NOT EXISTS people_server_roles_order_idx ON people_server_roles(server_id, position DESC, id)"
-    );
-    await peoplePool.query(
-      "CREATE TABLE IF NOT EXISTS people_server_member_roles (" +
-      "server_id BIGINT NOT NULL, " +
-      "user_id BIGINT NOT NULL, " +
-      "role_id BIGINT NOT NULL REFERENCES people_server_roles(id) ON DELETE CASCADE, " +
-      "assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
-      "PRIMARY KEY(server_id, user_id, role_id), " +
-      "FOREIGN KEY(server_id, user_id) REFERENCES people_server_members(server_id, user_id) ON DELETE CASCADE" +
-      ")"
-    );
-    await peoplePool.query(
-      "CREATE TABLE IF NOT EXISTS people_server_role_channel_overrides (" +
-      "server_id BIGINT NOT NULL REFERENCES people_servers(id) ON DELETE CASCADE, " +
-      "channel_id BIGINT NOT NULL REFERENCES people_server_channels(id) ON DELETE CASCADE, " +
-      "role_id BIGINT NOT NULL REFERENCES people_server_roles(id) ON DELETE CASCADE, " +
-      "allow_permissions INTEGER NOT NULL DEFAULT 0, " +
-      "deny_permissions INTEGER NOT NULL DEFAULT 0, " +
-      "PRIMARY KEY(server_id, channel_id, role_id)" +
-      ")"
-    );
-    await peoplePool.query(
-      "CREATE TABLE IF NOT EXISTS people_server_bans (" +
-      "server_id BIGINT NOT NULL REFERENCES people_servers(id) ON DELETE CASCADE, " +
-      "user_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
-      "banned_by BIGINT NULL REFERENCES people_accounts(id) ON DELETE SET NULL, " +
-      "reason VARCHAR(240) NOT NULL DEFAULT '', " +
-      "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
-      "PRIMARY KEY(server_id, user_id)" +
-      ")"
-    );
-    const servers = await peoplePool.query("SELECT id FROM people_servers ORDER BY id ASC");
-    for (const row of servers.rows) await peopleEnsureServerEveryoneRole(String(row.id));
-  } else {
-    const data = peopleReadLocalServers();
-    let changed = false;
-    data.roles = Array.isArray(data.roles) ? data.roles : [];
-    data.memberRoles = Array.isArray(data.memberRoles) ? data.memberRoles : [];
-    data.permissionOverrides = Array.isArray(data.permissionOverrides) ? data.permissionOverrides : [];
-    data.bans = Array.isArray(data.bans) ? data.bans : [];
-    for (const server of data.servers) {
-      const sid = String(server.id || "");
-      if (!sid) continue;
-      if (!data.roles.some((role) => String(role.serverId ?? role.server_id ?? "") === sid && Boolean(role.everyone ?? role.is_everyone))) {
-        data.roles.push({
-          id: cryptoAccounts.randomUUID(), serverId: sid, name: "@everyone", color: "#99AAB5",
-          permissions: PEOPLE_PERMISSION_EVERYONE_DEFAULT, position: 0, everyone: true, createdAt: new Date().toISOString()
-        });
-        changed = true;
-      }
-    }
-    if (changed) peopleWriteLocalServers(data);
-  }
-  console.log("[People] Rôles et permissions serveur V1 prêts.");
-}
-
-function peoplePermissionCatalog() {
-  return PEOPLE_PERMISSION_DEFINITIONS.map((item) => ({ key: item.key, label: item.label, group: item.group, bit: item.bit }));
-}
-
-async function peopleRequireRoleManager(session, serverId) {
-  const state = await peopleServerRoleState(session.id, serverId);
-  if (!state || !peoplePermissionHas(state.mask, "MANAGE_ROLES")) return null;
-  return state;
-}
-
-app.get("/api/servers/:id/permissions/me", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    if (!(await peopleIsServerMember(session.id, req.params.id))) return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-    return res.json({ ok: true, permissions: await peoplePermissionSnapshot(session.id, req.params.id), catalog: peoplePermissionCatalog() });
-  } catch (err) {
-    console.error("[People permissions/me]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger tes permissions." });
-  }
-});
-
-app.get("/api/servers/:id/roles", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    if (!(await peopleIsServerMember(session.id, req.params.id))) return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-    const [roles, me] = await Promise.all([peopleListServerRoles(req.params.id), peoplePermissionSnapshot(session.id, req.params.id)]);
-    return res.json({ ok: true, roles, permissions: peoplePermissionCatalog(), me });
-  } catch (err) {
-    console.error("[People roles/list]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger les rôles." });
-  }
-});
-
-app.post("/api/servers/:id/roles", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const state = await peopleRequireRoleManager(session, req.params.id);
-    if (!state) return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les rôles." });
-    const role = await peopleCreateServerRole(req.params.id, req.body?.name, req.body?.color, req.body?.permissions || [], state);
-    await peopleBroadcastServerPermissionRefresh(req.params.id);
-    return res.status(201).json({ ok: true, role });
-  } catch (err) {
-    const bad = ["ROLE_INVALID", "ROLE_PERMISSION_ESCALATION", "ROLE_HIERARCHY"].includes(err?.code);
-    return res.status(bad ? 400 : 500).json({ ok: false, error: err?.code === "ROLE_PERMISSION_ESCALATION" ? "Tu ne peux pas accorder une permission que tu ne possèdes pas." : "Impossible de créer ce rôle." });
-  }
-});
-
-app.patch("/api/servers/:id/roles/:roleId", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const state = await peopleRequireRoleManager(session, req.params.id);
-    if (!state) return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les rôles." });
-    const role = await peopleUpdateServerRole(req.params.id, req.params.roleId, req.body || {}, state);
-    if (!role) return res.status(404).json({ ok: false, error: "Rôle introuvable." });
-    await peopleBroadcastServerPermissionRefresh(req.params.id);
-    return res.json({ ok: true, role });
-  } catch (err) {
-    const message = err?.code === "ROLE_HIERARCHY" ? "Ce rôle est trop haut dans la hiérarchie." :
-      err?.code === "ROLE_PERMISSION_ESCALATION" ? "Tu ne peux pas accorder une permission que tu ne possèdes pas." : "Impossible de modifier ce rôle.";
-    return res.status(["ROLE_INVALID","ROLE_HIERARCHY","ROLE_PERMISSION_ESCALATION"].includes(err?.code) ? 400 : 500).json({ ok: false, error: message });
-  }
-});
-
-app.delete("/api/servers/:id/roles/:roleId", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const state = await peopleRequireRoleManager(session, req.params.id);
-    if (!state) return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les rôles." });
-    const removed = await peopleDeleteServerRole(req.params.id, req.params.roleId, state);
-    if (!removed) return res.status(400).json({ ok: false, error: "Ce rôle ne peut pas être supprimé." });
-    await peopleBroadcastServerPermissionRefresh(req.params.id);
-    return res.json({ ok: true });
-  } catch (err) {
-    return res.status(err?.code === "ROLE_HIERARCHY" ? 400 : 500).json({ ok: false, error: err?.code === "ROLE_HIERARCHY" ? "Ce rôle est trop haut dans la hiérarchie." : "Impossible de supprimer ce rôle." });
-  }
-});
-
-app.get("/api/servers/:id/member-roles", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const server = await peopleGetServer(req.params.id);
-    if (!server || !(await peopleIsServerMember(session.id, server.id))) return res.status(403).json({ ok: false, error: "Accès refusé." });
-    const roster = await peopleServerPresenceRoster(server.id);
-    const members = [];
-    for (const member of roster) {
-      const id = String(member.accountId || member.id || "");
-      members.push({
-        id,
-        username: member.username || "Membre",
-        owner: Boolean(server.ownerId && String(server.ownerId) === id),
-        roleIds: await peopleMemberRoleIds(server.id, id)
-      });
-    }
-    return res.json({ ok: true, members, me: await peoplePermissionSnapshot(session.id, server.id) });
-  } catch (err) {
-    console.error("[People roles/members]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger les rôles des membres." });
-  }
-});
-
-app.put("/api/servers/:id/members/:userId/roles", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const state = await peopleRequireRoleManager(session, req.params.id);
-    if (!state) return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les rôles." });
-    const roleIds = await peopleSetMemberRoles(req.params.id, req.params.userId, req.body?.roleIds, state);
-    await peopleBroadcastServerPermissionRefresh(req.params.id);
-    return res.json({ ok: true, roleIds });
-  } catch (err) {
-    const status = ["MEMBER_INVALID", "ROLE_HIERARCHY"].includes(err?.code) ? 400 : 500;
-    return res.status(status).json({ ok: false, error: err?.code === "ROLE_HIERARCHY" ? "Tu ne peux pas attribuer ou retirer un rôle égal ou supérieur au tien." : "Impossible de modifier les rôles de ce membre." });
-  }
-});
-
-app.get("/api/servers/:id/permission-overrides", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const state = await peopleServerRoleState(session.id, req.params.id);
-    if (!state || !(peoplePermissionHas(state.mask, "MANAGE_ROLES") || peoplePermissionHas(state.mask, "MANAGE_CHANNELS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les permissions de salon." });
-    }
-    const channel = await peopleGetServerChannel(req.params.id, req.query?.channelId);
-    if (!channel) return res.status(404).json({ ok: false, error: "Salon introuvable." });
-    const overrides = await peopleListChannelRoleOverrides(req.params.id, channel.id);
-    return res.json({
-      ok: true,
-      channel,
-      overrides: overrides.map((item) => ({ ...item, allow: peoplePermissionNames(item.allow), deny: peoplePermissionNames(item.deny) }))
-    });
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: "Impossible de charger les permissions du salon." });
-  }
-});
-
-app.put("/api/servers/:id/channels/:channelId/role-overrides/:roleId", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const state = await peopleServerRoleState(session.id, req.params.id);
-    if (!state || !(peoplePermissionHas(state.mask, "MANAGE_ROLES") || peoplePermissionHas(state.mask, "MANAGE_CHANNELS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les permissions de salon." });
-    }
-    const override = await peopleSetRoleChannelOverride(
-      req.params.id, req.params.channelId, req.params.roleId,
-      req.body?.allow || [], req.body?.deny || [], state
-    );
-    await peopleBroadcastServerPermissionRefresh(req.params.id);
-    return res.json({ ok: true, override });
-  } catch (err) {
-    const bad = ["OVERRIDE_INVALID","ROLE_HIERARCHY","ROLE_PERMISSION_ESCALATION"].includes(err?.code);
-    return res.status(bad ? 400 : 500).json({ ok: false, error: err?.code === "ROLE_HIERARCHY" ? "Ce rôle est trop haut dans la hiérarchie." : err?.code === "ROLE_PERMISSION_ESCALATION" ? "Tu ne peux pas autoriser une permission que tu ne possèdes pas." : "Impossible de modifier ces permissions." });
-  }
-});
-
-app.delete("/api/servers/:id/channels/:channelId/role-overrides/:roleId", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const state = await peopleServerRoleState(session.id, req.params.id);
-    if (!state || !(peoplePermissionHas(state.mask, "MANAGE_ROLES") || peoplePermissionHas(state.mask, "MANAGE_CHANNELS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les permissions de salon." });
-    }
-    await peopleDeleteRoleChannelOverride(req.params.id, req.params.channelId, req.params.roleId);
-    await peopleBroadcastServerPermissionRefresh(req.params.id);
-    return res.json({ ok: true });
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: "Impossible de réinitialiser ces permissions." });
-  }
-});
-
-
-// === PEOPLE_SERVER_MODERATION_ROUTES_V1_START ===
-app.delete("/api/servers/:id/members/:userId", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const targetId = String(req.params.userId || "");
-    if (!(await peopleIsServerMember(targetId, req.params.id))) {
-      return res.status(404).json({ ok: false, error: "Ce membre n'est plus dans le serveur." });
-    }
-    const check = await peopleServerCanModerate(session.id, req.params.id, targetId, "KICK_MEMBERS");
-    if (!check.ok) return res.status(403).json({ ok: false, error: check.reason });
-    await peopleServerRemoveMember(req.params.id, targetId);
-    return res.json({ ok: true, userId: targetId });
-  } catch (err) {
-    console.error("[People server/kick]", err);
-    return res.status(500).json({ ok: false, error: "Impossible d'exclure ce membre." });
-  }
-});
-
-app.get("/api/servers/:id/bans", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    if (!(await peopleCanServerPermission(session.id, req.params.id, "BAN_MEMBERS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de voir les bannissements." });
-    }
-    return res.json({ ok: true, bans: await peopleServerListBans(req.params.id) });
-  } catch (err) {
-    console.error("[People server/bans]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger les bannissements." });
-  }
-});
-
-app.put("/api/servers/:id/bans/:userId", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    const targetId = String(req.params.userId || "");
-    const account = await peopleFindAccountById(targetId);
-    if (!account) return res.status(404).json({ ok: false, error: "Utilisateur introuvable." });
-    const check = await peopleServerCanModerate(session.id, req.params.id, targetId, "BAN_MEMBERS");
-    if (!check.ok) return res.status(403).json({ ok: false, error: check.reason });
-    await peopleServerBanMember(req.params.id, targetId, session.id, req.body?.reason);
-    return res.json({ ok: true, userId: targetId });
-  } catch (err) {
-    console.error("[People server/ban]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de bannir cet utilisateur." });
-  }
-});
-
-app.delete("/api/servers/:id/bans/:userId", async (req, res) => {
-  try {
-    const session = peopleSessionForRequest(req, res); if (!session) return;
-    if (!(await peopleCanServerPermission(session.id, req.params.id, "BAN_MEMBERS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de lever ce bannissement." });
-    }
-    await peopleServerUnbanMember(req.params.id, req.params.userId);
-    return res.json({ ok: true, userId: String(req.params.userId || "") });
-  } catch (err) {
-    console.error("[People server/unban]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de lever ce bannissement." });
-  }
-});
-// === PEOPLE_SERVER_MODERATION_ROUTES_V1_END ===
-
-// === PEOPLE_ROLES_PERMISSIONS_V1_END ===
-
 
 app.get(
   "/api/servers",
@@ -12235,10 +11132,10 @@ app.patch(
         return res.status(404).json({ ok: false, error: "Serveur introuvable." });
       }
 
-      if (!(await peopleCanServerPermission(session.id, server.id, "MANAGE_SERVER"))) {
+      if (!server.ownerId || String(server.ownerId) !== String(session.id)) {
         return res.status(403).json({
           ok: false,
-          error: "Tu n'as pas la permission de gérer ce serveur."
+          error: "Seul le propriétaire peut modifier les paramètres du serveur pour le moment."
         });
       }
 
@@ -12298,8 +11195,8 @@ app.patch(
       if (!current) {
         return res.status(404).json({ ok: false, error: "Serveur introuvable." });
       }
-      if (!(await peopleCanServerPermission(session.id, current.id, "MANAGE_SERVER"))) {
-        return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer ce serveur." });
+      if (!current.ownerId || String(current.ownerId) !== String(session.id)) {
+        return res.status(403).json({ ok: false, error: "Seul le propriétaire peut modifier l'image du serveur." });
       }
 
       const raw = req.body?.iconData;
@@ -12595,13 +11492,6 @@ app.post(
         });
       }
 
-      if (await peopleServerIsBanned(server.id, session.id)) {
-        return res.status(403).json({
-          ok: false,
-          error: "Tu es banni de ce serveur."
-        });
-      }
-
       const wasAlreadyMember =
         await peopleIsServerMember(
           session.id,
@@ -12749,13 +11639,6 @@ app.delete(
                   String(session.id)
               )
           );
-
-        data.memberRoles = (data.memberRoles || []).filter(
-          (entry) => !(
-            String(entry.serverId ?? entry.server_id ?? "") === String(server.id) &&
-            String(entry.userId ?? entry.user_id ?? "") === String(session.id)
-          )
-        );
 
         if (leavingOwner) {
           const storedServer =
@@ -12939,20 +11822,17 @@ app.get(
 
       const roster = await peopleServerPresenceRoster(server.id);
       const ownerId = server.ownerId ? String(server.ownerId) : null;
-      const members = await Promise.all(roster.map(async (entry) => {
+      const members = roster.map((entry) => {
         const id = String(entry.accountId || entry.id || "");
-        const roleState = await peopleServerRoleState(id, server.id);
         return {
           id,
           accountId: id,
           username: entry.username || "Membre",
           online: Boolean(entry.online),
           connections: Number(entry.connections || 0),
-          owner: Boolean(ownerId && id === ownerId),
-          roleIds: Array.isArray(roleState?.roleIds) ? roleState.roleIds : [],
-          highestRolePosition: Number(roleState?.highestRolePosition || 0)
+          owner: Boolean(ownerId && id === ownerId)
         };
-      }));
+      });
 
       return res.json({
         ok: true,
@@ -13005,13 +11885,6 @@ app.get(
           ok: false,
           error:
             "Tu n'es pas membre de ce serveur."
-        });
-      }
-
-      if (!(await peopleCanServerPermission(session.id, server.id, "CREATE_INVITE"))) {
-        return res.status(403).json({
-          ok: false,
-          error: "Tu n'as pas la permission de créer une invitation."
         });
       }
 
@@ -15452,47 +14325,42 @@ function peopleVoiceRoster(
     );
 }
 
-async function peopleVoiceRosterForAccount(serverId, accountId) {
-  const sid = String(serverId || "");
-  const uid = String(accountId || "");
-  if (!sid || !uid) return [];
-  const roster = peopleVoiceRoster(sid);
-  const visible = new Map();
-  const output = [];
-  for (const user of roster) {
-    const cid = String(user?.channelId || "");
-    if (!cid) continue;
-    let allowed = visible.get(cid);
-    if (allowed === undefined) {
-      allowed = await peopleCanServerPermission(uid, sid, "VIEW_CHANNEL", cid);
-      visible.set(cid, allowed);
-    }
-    if (allowed) output.push(user);
-  }
-  return output;
-}
+function emitVoiceState(
+  serverId
+) {
+  const sid =
+    String(serverId || "");
 
-function emitVoiceState(serverId) {
-  const sid = String(serverId || "");
   if (!sid) return;
 
-  void (async () => {
-    const socketIds = new Set([
-      ...(io.sockets.adapter.rooms.get(peopleServerRoom(sid)) || []),
-      ...(io.sockets.adapter.rooms.get(peopleVoiceRoom(sid)) || [])
-    ]);
-    const cache = new Map();
-    for (const socketId of socketIds) {
-      const uid = String(userIds.get(socketId) || "");
-      if (!uid) continue;
-      let roster = cache.get(uid);
-      if (!roster) {
-        roster = await peopleVoiceRosterForAccount(sid, uid);
-        cache.set(uid, roster);
-      }
-      io.to(socketId).emit("voice-state", { serverId: sid, roster });
-    }
-  })().catch((err) => console.error("[People voice permissions]", err));
+  const payload = {
+    serverId:
+      sid,
+    roster:
+      peopleVoiceRoster(
+        sid
+      )
+  };
+
+  /*
+    - peopleServerRoom : personnes qui REGARDENT ce serveur
+    - peopleVoiceRoom  : personnes qui sont DANS le vocal,
+      même si elles naviguent ailleurs dans People.
+  */
+  io.to(
+    peopleServerRoom(
+      sid
+    )
+  )
+    .to(
+      peopleVoiceRoom(
+        sid
+      )
+    )
+    .emit(
+      "voice-state",
+      payload
+    );
 }
 
 function leaveVoice(socket) {
@@ -15590,10 +14458,6 @@ app.post(
         return res.status(404).json({ ok: false, error: "Salon textuel introuvable." });
       }
 
-      if (!(await peopleCanServerPermission(session.id, serverId, "SEND_MESSAGES", channelId))) {
-        return res.status(403).json({ ok: false, error: "Tu n'as pas la permission d'envoyer des messages dans ce salon." });
-      }
-
       const text = String(req.body?.text || "").trim().slice(0, 1000);
       const replyToId = peopleReplyId(req.body?.replyToId);
       const clientId = String(req.body?.clientId || "").trim().slice(0, 120);
@@ -15617,7 +14481,7 @@ app.post(
       }
 
       const payload = clientId ? { ...saved, clientId } : saved;
-      await peopleEmitServerChannelEvent(serverId, channelId, "chat-message", payload);
+      io.to(peopleServerRoom(serverId)).emit("chat-message", payload);
 
       return res.json({ ok: true, message: payload });
     } catch (err) {
@@ -16584,17 +15448,14 @@ io.on("connection", (socket) => {
           )
         );
 
-        const [channels, permissions] = await Promise.all([
-          peopleListVisibleServerChannels(accountId, server.id),
-          peoplePermissionSnapshot(accountId, server.id)
-        ]);
+        const channels = await peopleListServerChannels(server.id);
         const requestedText = channelId
           ? channels.find((item) => String(item.id) === String(channelId) && item.type === "text")
           : null;
         const activeTextChannel = requestedText || channels.find((item) => item.type === "text") || null;
 
         if (!activeTextChannel) {
-          return ack({ ok: false, error: "Tu n'as accès à aucun salon textuel de ce serveur." });
+          return ack({ ok: false, error: "Ce serveur n'a aucun salon textuel." });
         }
 
         socketTextChannelIds.set(socket.id, String(activeTextChannel.id));
@@ -16614,9 +15475,8 @@ io.on("connection", (socket) => {
           ]);
 
         const voice =
-          await peopleVoiceRosterForAccount(
-            server.id,
-            accountId
+          peopleVoiceRoster(
+            server.id
           );
 
         emitOnlineUsers(
@@ -16634,7 +15494,6 @@ io.on("connection", (socket) => {
           online,
           voice,
           channels,
-          permissions,
           activeChannelId: String(activeTextChannel.id)
         });
       } catch (err) {
@@ -16663,20 +15522,10 @@ io.on("connection", (socket) => {
         if (!(await peopleIsServerMember(accountId, sid))) return ack({ ok: false, error: "Tu n'es pas membre de ce serveur." });
         const channel = await peopleGetServerChannel(sid, channelId, "text");
         if (!channel) return ack({ ok: false, error: "Salon textuel introuvable." });
-        const channelMask = await peopleServerEffectivePermissionMask(accountId, sid, channel.id);
-        if (!peoplePermissionHas(channelMask, "VIEW_CHANNEL")) {
-          return ack({ ok: false, error: "Tu n'as pas accès à ce salon." });
-        }
         socketServerIds.set(socket.id, sid);
         socketTextChannelIds.set(socket.id, String(channel.id));
         const history = await peopleServerLoadMessages(sid, channel.id, 100);
-        ack({
-          ok: true,
-          serverId: sid,
-          channel: { ...channel, permissions: peoplePermissionNames(channelMask), permissionMask: channelMask },
-          activeChannelId: String(channel.id),
-          history
-        });
+        ack({ ok: true, serverId: sid, channel, activeChannelId: String(channel.id), history });
       } catch (err) {
         console.error("[People channel/select]", err);
         ack({ ok: false, error: "Impossible d'ouvrir ce salon." });
@@ -16737,16 +15586,6 @@ io.on("connection", (socket) => {
         return;
       }
 
-      if (!(await peopleCanServerPermission(senderId, serverId, "SEND_MESSAGES", channelId))) {
-        reply({ ok: false, error: "Tu n'as pas la permission d'envoyer des messages dans ce salon." });
-        return;
-      }
-
-      if (imageKey && !(await peopleCanServerPermission(senderId, serverId, "ATTACH_FILES", channelId))) {
-        reply({ ok: false, error: "Tu n'as pas la permission de joindre des fichiers dans ce salon." });
-        return;
-      }
-
       // Identifiant purement client : il sert uniquement à remplacer le
       // message optimiste local par la version persistée du serveur.
       const cleanClientId =
@@ -16779,9 +15618,9 @@ io.on("connection", (socket) => {
             ? { ...saved, clientId: cleanClientId }
             : saved;
 
-        await peopleEmitServerChannelEvent(
-          serverId,
-          channelId,
+        io.to(
+          peopleServerRoom(serverId)
+        ).emit(
           "chat-message",
           payload
         );
@@ -16882,9 +15721,9 @@ io.on("connection", (socket) => {
           editedAt: edited.editedAt
         };
 
-        await peopleEmitServerChannelEvent(
-          serverId,
-          channelId,
+        io.to(
+          peopleServerRoom(serverId)
+        ).emit(
           "chat-message-edited",
           payload
         );
@@ -16955,17 +15794,21 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Tu n'as pas la permission de supprimer ce message."
+              "Tu ne peux supprimer que tes propres messages."
           });
         }
 
-        await peopleEmitServerChannelEvent(
-          serverId,
-          channelId,
+        io.to(
+          peopleServerRoom(
+            serverId
+          )
+        ).emit(
           "chat-message-deleted",
           {
-            id: String(id),
-            channelId: String(channelId)
+            id:
+              String(id),
+            channelId:
+              String(channelId)
           }
         );
 
@@ -17082,12 +15925,6 @@ io.on("connection", (socket) => {
         }
 
         const voiceChannelId = String(voiceChannel.id);
-        const voiceMask = await peopleServerEffectivePermissionMask(accountId, sid, voiceChannelId);
-        if (!peoplePermissionHas(voiceMask, "VIEW_CHANNEL") || !peoplePermissionHas(voiceMask, "CONNECT")) {
-          return ack({ ok: false, error: "Tu n'as pas la permission de rejoindre ce vocal." });
-        }
-        const canSpeakHere = peoplePermissionHas(voiceMask, "SPEAK");
-        const canStreamHere = peoplePermissionHas(voiceMask, "STREAM");
 
         const aid =
           String(
@@ -17216,17 +16053,17 @@ io.on("connection", (socket) => {
               voiceChannelId,
             username,
             muted:
-              canSpeakHere
-                ? Boolean(muted)
-                : true,
+              Boolean(
+                muted
+              ),
             camera:
-              canStreamHere
-                ? Boolean(camera)
-                : false,
+              Boolean(
+                camera
+              ),
             screen:
-              canStreamHere
-                ? Boolean(screen)
-                : false
+              Boolean(
+                screen
+              )
           }
         );
 
@@ -17303,59 +16140,73 @@ io.on("connection", (socket) => {
 
   socket.on(
     "voice-mute",
-    async ({ muted } = {}) => {
-      const user = voiceUsers.get(socket.id);
-      if (!user) return;
-      if (!Boolean(muted)) {
-        const allowed = await peopleCanServerPermission(
-          user.accountId,
-          user.serverId,
-          "SPEAK",
-          user.channelId
+    ({ muted } = {}) => {
+      const user =
+        voiceUsers.get(
+          socket.id
         );
-        if (!allowed) {
-          socket.emit("system-message", { text: "Tu n'as pas la permission de parler dans ce vocal.", time: Date.now() });
-          user.muted = true;
-          voiceUsers.set(socket.id, user);
-          emitVoiceState(user.serverId);
-          return;
-        }
-      }
-      user.muted = Boolean(muted);
-      voiceUsers.set(socket.id, user);
-      emitVoiceState(user.serverId);
+
+      if (!user) return;
+
+      user.muted =
+        Boolean(muted);
+
+      voiceUsers.set(
+        socket.id,
+        user
+      );
+
+      emitVoiceState(
+        user.serverId
+      );
     }
   );
 
   socket.on(
     "voice-camera",
-    async ({ camera } = {}) => {
-      const user = voiceUsers.get(socket.id);
+    ({ camera } = {}) => {
+      const user =
+        voiceUsers.get(
+          socket.id
+        );
+
       if (!user) return;
-      if (Boolean(camera) && !(await peopleCanServerPermission(user.accountId, user.serverId, "STREAM", user.channelId))) {
-        socket.emit("system-message", { text: "Tu n'as pas la permission d'activer ta caméra dans ce vocal.", time: Date.now() });
-        user.camera = false;
-      } else {
-        user.camera = Boolean(camera);
-      }
-      voiceUsers.set(socket.id, user);
-      emitVoiceState(user.serverId);
+
+      user.camera =
+        Boolean(camera);
+
+      voiceUsers.set(
+        socket.id,
+        user
+      );
+
+      emitVoiceState(
+        user.serverId
+      );
     }
   );
 
   socket.on(
     "voice-screen",
-    async ({ screen } = {}) => {
-      const user = voiceUsers.get(socket.id);
+    ({ screen } = {}) => {
+      const user =
+        voiceUsers.get(
+          socket.id
+        );
+
       if (!user) return;
-      if (Boolean(screen) && !(await peopleCanServerPermission(user.accountId, user.serverId, "STREAM", user.channelId))) {
-        socket.emit("system-message", { text: "Tu n'as pas la permission de partager ton écran dans ce vocal.", time: Date.now() });
-        user.screen = false;
-      } else {
-        user.screen = Boolean(screen);
-      }
-      voiceUsers.set(socket.id, user);
-      emitVoiceState(user.serverId);
+
+      user.screen =
+        Boolean(screen);
+
+      voiceUsers.set(
+        socket.id,
+        user
+      );
+
+      emitVoiceState(
+        user.serverId
+      );
     }
   );
 
@@ -17905,7 +16756,6 @@ peopleInitAccounts()
   .then(() => peopleInitSocial())
   .then(() => peopleInitServersV1())
   .then(() => peopleInitServerChannelsV2())
-  .then(() => peopleInitServerRolesV1())
   .then(() => peopleMigrateStoredMessageEncryption())
   // === PEOPLE_DELETE_EMPTY_ON_STARTUP_V1 ===
   .then(() => peopleDeleteAllEmptyServers())
