@@ -101,6 +101,153 @@ function peopleDeleteGeneralMessageFromServer(
   );
 }
 
+// === PEOPLE_GENERAL_EDIT_V6_START ===
+function peopleEditGeneralMessageFromServer(
+  id,
+  text
+) {
+  return new Promise(
+    (resolve, reject) => {
+      socket.emit(
+        "chat-message-edit",
+        {
+          id,
+          text
+        },
+        (response) => {
+          if (!response?.ok) {
+            reject(
+              new Error(
+                response?.error ||
+                "Modification impossible."
+              )
+            );
+            return;
+          }
+
+          resolve(
+            response?.message || null
+          );
+        }
+      );
+    }
+  );
+}
+
+function peopleApplyGeneralMessageEdit(
+  {
+    id,
+    text,
+    editedAt,
+    channelId
+  } = {}
+) {
+  if (
+    channelId &&
+    peopleActiveTextChannelId &&
+    String(channelId) !==
+      String(peopleActiveTextChannelId)
+  ) {
+    return;
+  }
+
+  const wanted =
+    String(id || "");
+
+  if (!wanted) return;
+
+  const unit =
+    Array.from(
+      messages.querySelectorAll(
+        "[data-message-id]"
+      )
+    ).find(
+      (element) =>
+        String(
+          element.dataset.messageId || ""
+        ) === wanted
+    );
+
+  if (!unit) return;
+
+  const nextText =
+    String(text || "");
+
+  unit.dataset.peoplePlainText =
+    nextText;
+
+  const content =
+    unit.querySelector(
+      ":scope > .message-text"
+    );
+
+  const imageId =
+    unit.dataset.peopleImageId || null;
+
+  if (content) {
+    if (window.PeopleRichContent) {
+      window.PeopleRichContent.render(
+        content,
+        {
+          text: nextText,
+          imageId
+        }
+      );
+    } else {
+      content.textContent = nextText;
+    }
+  }
+
+  window.PeopleMessageActions
+    ?.setEditedLabel(
+      unit,
+      editedAt || new Date().toISOString()
+    );
+
+  window.PeopleMessageActions
+    ?.updateReplyPreview(
+      wanted,
+      {
+        text: nextText,
+        imageId
+      }
+    );
+}
+
+function peopleStartGeneralMessageEdit(
+  unit,
+  id
+) {
+  window.PeopleMessageActions
+    ?.startInlineEdit(
+      unit,
+      {
+        initialText:
+          unit?.dataset?.peoplePlainText || "",
+        maxLength: 1000,
+        allowEmpty:
+          Boolean(
+            unit?.dataset?.peopleImageId
+          ),
+        onSave:
+          async (nextText) => {
+            const message =
+              await peopleEditGeneralMessageFromServer(
+                id,
+                nextText
+              );
+
+            if (message) {
+              peopleApplyGeneralMessageEdit(
+                message
+              );
+            }
+          }
+      }
+    );
+}
+// === PEOPLE_GENERAL_EDIT_V6_END ===
+
 function peopleRemoveGeneralMessageFromDom(
   id
 ) {
@@ -808,6 +955,14 @@ function peopleGeneralTextLine(
       messageId;
   }
 
+  unit.dataset.peoplePlainText =
+    String(data?.text || "");
+
+  if (data?.imageId) {
+    unit.dataset.peopleImageId =
+      String(data.imageId);
+  }
+
   if (
     clientId &&
     data?.pending
@@ -862,6 +1017,12 @@ function peopleGeneralTextLine(
 
   unit.appendChild(text);
 
+  window.PeopleMessageActions
+    ?.setEditedLabel(
+      unit,
+      data?.editedAt || null
+    );
+
   if (
     messageId &&
     !data?.pending
@@ -880,6 +1041,10 @@ function peopleGeneralTextLine(
             imageId:
               data.imageId
           },
+          canEdit:
+            peopleGeneralOwnMessage(
+              data
+            ),
           canDelete:
             peopleGeneralOwnMessage(
               data
@@ -893,10 +1058,16 @@ function peopleGeneralTextLine(
                   username:
                     data.username,
                   text:
-                    data.text,
+                    unit.dataset.peoplePlainText || "",
                   imageId:
-                    data.imageId
+                    unit.dataset.peopleImageId || null
                 }),
+          onEdit:
+            () =>
+              peopleStartGeneralMessageEdit(
+                unit,
+                messageId
+              ),
           onDelete:
             () =>
               peopleDeleteGeneralMessageFromServer(
@@ -2582,6 +2753,17 @@ socket.on(
     }
   }
 );
+
+// === PEOPLE_GENERAL_EDIT_SOCKET_V6_START ===
+socket.on(
+  "chat-message-edited",
+  (payload = {}) => {
+    peopleApplyGeneralMessageEdit(
+      payload
+    );
+  }
+);
+// === PEOPLE_GENERAL_EDIT_SOCKET_V6_END ===
 
 // === PEOPLE_GENERAL_DELETE_CLIENT_V1_START ===
 socket.on(

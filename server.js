@@ -7894,6 +7894,299 @@ app.get(
 );
 // === PEOPLE_MESSAGE_IMAGES_V2_END ===
 
+// === PEOPLE_UNREAD_V1_START ===
+const PEOPLE_LOCAL_UNREAD = pathAccounts.join(
+  __dirname,
+  "people-unread.local.json"
+);
+
+let peopleUnreadTablePromise = null;
+
+async function peopleEnsureUnreadTable() {
+  if (!peoplePool) return;
+  if (!peopleUnreadTablePromise) {
+    peopleUnreadTablePromise = peoplePool.query(
+      "CREATE TABLE IF NOT EXISTS people_server_channel_reads (" +
+      "user_id TEXT NOT NULL, " +
+      "server_id TEXT NOT NULL, " +
+      "channel_id TEXT NOT NULL, " +
+      "last_read_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+      "PRIMARY KEY (user_id, server_id, channel_id)" +
+      ")"
+    ).then(() => peoplePool.query(
+      "CREATE INDEX IF NOT EXISTS people_server_channel_reads_lookup_idx " +
+      "ON people_server_channel_reads(user_id, server_id, channel_id, last_read_at)"
+    )).catch((err) => {
+      peopleUnreadTablePromise = null;
+      throw err;
+    });
+  }
+  await peopleUnreadTablePromise;
+}
+
+function peopleReadLocalUnread() {
+  try {
+    if (!fsAccounts.existsSync(PEOPLE_LOCAL_UNREAD)) return [];
+    const parsed = JSON.parse(
+      fsAccounts.readFileSync(PEOPLE_LOCAL_UNREAD, "utf8")
+    );
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function peopleWriteLocalUnread(rows) {
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_UNREAD,
+    JSON.stringify(Array.isArray(rows) ? rows : [], null, 2) + "\n",
+    "utf8"
+  );
+}
+
+function peopleUnreadKey(accountId, serverId, channelId) {
+  return [
+    String(accountId || ""),
+    String(serverId || ""),
+    String(channelId || "")
+  ].join("\u001f");
+}
+
+async function peopleUnreadLastRead(accountId, serverId, channelId) {
+  const uid = String(accountId || "");
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  if (!uid || !sid || !cid) return Date.now();
+
+  if (peoplePool) {
+    await peopleEnsureUnreadTable();
+    await peoplePool.query(
+      "INSERT INTO people_server_channel_reads " +
+      "(user_id, server_id, channel_id, last_read_at) " +
+      "VALUES ($1, $2, $3, NOW()) ON CONFLICT DO NOTHING",
+      [uid, sid, cid]
+    );
+    const result = await peoplePool.query(
+      "SELECT last_read_at FROM people_server_channel_reads " +
+      "WHERE user_id = $1 AND server_id = $2 AND channel_id = $3 LIMIT 1",
+      [uid, sid, cid]
+    );
+    const value = result.rows[0]?.last_read_at;
+    const time = value ? new Date(value).getTime() : Date.now();
+    return Number.isFinite(time) ? time : Date.now();
+  }
+
+  const rows = peopleReadLocalUnread();
+  const key = peopleUnreadKey(uid, sid, cid);
+  let row = rows.find((item) =>
+    peopleUnreadKey(item.userId, item.serverId, item.channelId) === key
+  );
+
+  if (!row) {
+    row = {
+      userId: uid,
+      serverId: sid,
+      channelId: cid,
+      lastReadAt: new Date().toISOString()
+    };
+    rows.push(row);
+    peopleWriteLocalUnread(rows);
+  }
+
+  const time = new Date(row.lastReadAt || 0).getTime();
+  return Number.isFinite(time) ? time : Date.now();
+}
+
+async function peopleUnreadMarkRead(accountId, serverId, channelId) {
+  const uid = String(accountId || "");
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  if (!uid || !sid || !cid) return;
+
+  if (peoplePool) {
+    await peopleEnsureUnreadTable();
+    await peoplePool.query(
+      "INSERT INTO people_server_channel_reads " +
+      "(user_id, server_id, channel_id, last_read_at) " +
+      "VALUES ($1, $2, $3, NOW()) " +
+      "ON CONFLICT (user_id, server_id, channel_id) " +
+      "DO UPDATE SET last_read_at = NOW()",
+      [uid, sid, cid]
+    );
+    return;
+  }
+
+  const rows = peopleReadLocalUnread();
+  const key = peopleUnreadKey(uid, sid, cid);
+  const now = new Date().toISOString();
+  const index = rows.findIndex((item) =>
+    peopleUnreadKey(item.userId, item.serverId, item.channelId) === key
+  );
+
+  const next = {
+    userId: uid,
+    serverId: sid,
+    channelId: cid,
+    lastReadAt: now
+  };
+
+  if (index >= 0) rows[index] = next;
+  else rows.push(next);
+  peopleWriteLocalUnread(rows);
+}
+
+async function peopleUnreadChannelInfo(accountId, serverId, channelId) {
+  const uid = String(accountId || "");
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  const lastReadAt = await peopleUnreadLastRead(uid, sid, cid);
+
+  if (peoplePool) {
+    const result = await peoplePool.query(
+      "SELECT id, created_at FROM people_general_messages " +
+      "WHERE server_id = $1 AND channel_id = $2 " +
+      "AND created_at > $3 AND COALESCE(is_system, FALSE) = FALSE " +
+      "ORDER BY created_at ASC, id ASC",
+      [sid, cid, new Date(lastReadAt)]
+    );
+
+    return {
+      channelId: cid,
+      unreadCount: result.rows.length,
+      firstUnreadMessageId: result.rows[0]?.id
+        ? String(result.rows[0].id)
+        : null
+    };
+  }
+
+  const items = peopleReadLocalGeneral()
+    .filter((message) =>
+      String(message.serverId || "") === sid &&
+      String(message.channelId || "") === cid &&
+      !message.system &&
+      !message.isSystem &&
+      Number(message.time || 0) > lastReadAt
+    )
+    .sort((a, b) =>
+      Number(a.time || 0) - Number(b.time || 0)
+    );
+
+  return {
+    channelId: cid,
+    unreadCount: items.length,
+    firstUnreadMessageId: items[0]?.id
+      ? String(items[0].id)
+      : null
+  };
+}
+
+async function peopleUnreadServerSummary(accountId, serverId) {
+  const sid = String(serverId || "");
+  const channels = (await peopleListServerChannels(sid))
+    .filter((channel) => channel?.type === "text");
+
+  const infos = [];
+  for (const channel of channels) {
+    infos.push(
+      await peopleUnreadChannelInfo(
+        accountId,
+        sid,
+        channel.id
+      )
+    );
+  }
+
+  return infos;
+}
+
+app.get("/api/unread/servers/:id", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const sid = String(req.params.id || "");
+    if (!(await peopleIsServerMember(session.id, sid))) {
+      return res.status(403).json({
+        ok: false,
+        error: "Tu n'es pas membre de ce serveur."
+      });
+    }
+
+    const channels = await peopleUnreadServerSummary(
+      session.id,
+      sid
+    );
+
+    return res.json({
+      ok: true,
+      serverId: sid,
+      channels,
+      unreadTotal: channels.reduce(
+        (sum, item) => sum + Number(item.unreadCount || 0),
+        0
+      )
+    });
+  } catch (err) {
+    console.error("[People unread/summary]", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Impossible de charger les messages non lus."
+    });
+  }
+});
+
+app.post(
+  "/api/unread/servers/:id/channels/:channelId/read",
+  async (req, res) => {
+    try {
+      const session = peopleSessionForRequest(req, res);
+      if (!session) return;
+
+      const sid = String(req.params.id || "");
+      const cid = String(req.params.channelId || "");
+
+      if (!(await peopleIsServerMember(session.id, sid))) {
+        return res.status(403).json({
+          ok: false,
+          error: "Tu n'es pas membre de ce serveur."
+        });
+      }
+
+      const channel = await peopleGetServerChannel(
+        sid,
+        cid,
+        "text"
+      );
+
+      if (!channel) {
+        return res.status(404).json({
+          ok: false,
+          error: "Salon textuel introuvable."
+        });
+      }
+
+      await peopleUnreadMarkRead(
+        session.id,
+        sid,
+        cid
+      );
+
+      return res.json({
+        ok: true,
+        serverId: sid,
+        channelId: cid
+      });
+    } catch (err) {
+      console.error("[People unread/read]", err);
+      return res.status(500).json({
+        ok: false,
+        error: "Impossible de marquer ce salon comme lu."
+      });
+    }
+  }
+);
+// === PEOPLE_UNREAD_V1_END ===
+
 // === PEOPLE_MESSAGE_REACTIONS_V1_START ===
 const PEOPLE_LOCAL_REACTIONS = pathAccounts.join(
   __dirname,
@@ -13878,6 +14171,68 @@ function leaveVoice(socket) {
     );
   }
 }
+
+
+// === PEOPLE_OFFLINE_SERVER_SEND_V1_START ===
+app.post(
+  "/api/servers/:serverId/channels/:channelId/messages",
+  async (req, res) => {
+    try {
+      const session = peopleSessionForRequest(req, res);
+      if (!session) return;
+
+      const serverId = String(req.params.serverId || "").trim();
+      const channelId = String(req.params.channelId || "").trim();
+
+      if (!serverId || !channelId) {
+        return res.status(400).json({ ok: false, error: "Salon invalide." });
+      }
+
+      if (!(await peopleIsServerMember(session.id, serverId))) {
+        return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
+      }
+
+      const channel = await peopleGetServerChannel(serverId, channelId, "text");
+      if (!channel) {
+        return res.status(404).json({ ok: false, error: "Salon textuel introuvable." });
+      }
+
+      const text = String(req.body?.text || "").trim().slice(0, 1000);
+      const replyToId = peopleReplyId(req.body?.replyToId);
+      const clientId = String(req.body?.clientId || "").trim().slice(0, 120);
+
+      if (!text) {
+        return res.status(400).json({ ok: false, error: "Message vide." });
+      }
+
+      const saved = await peopleServerSaveMessage(
+        serverId,
+        channelId,
+        session.id,
+        session.username,
+        text,
+        null,
+        replyToId
+      );
+
+      if (!saved) {
+        return res.status(500).json({ ok: false, error: "Impossible d'enregistrer le message." });
+      }
+
+      const payload = clientId ? { ...saved, clientId } : saved;
+      io.to(peopleServerRoom(serverId)).emit("chat-message", payload);
+
+      return res.json({ ok: true, message: payload });
+    } catch (err) {
+      console.error("[People offline server send]", err);
+      const error = err?.code === "REPLY_INVALID"
+        ? "Le message auquel tu réponds n'est plus disponible."
+        : "Le message en attente n'a pas pu être envoyé.";
+      return res.status(500).json({ ok: false, error });
+    }
+  }
+);
+// === PEOPLE_OFFLINE_SERVER_SEND_V1_END ===
 
 io.on("connection", (socket) => {
   socket.on(

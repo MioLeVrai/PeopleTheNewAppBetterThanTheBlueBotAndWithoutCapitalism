@@ -2773,7 +2773,7 @@ async function peopleDmHistory(
     const result =
       await peoplePool.query(
         "SELECT " +
-        "dm.id, dm.sender_id, dm.recipient_id, dm.body, dm.reply_to_id, dm.created_at, dm.read_at, " +
+        "dm.id, dm.sender_id, dm.recipient_id, dm.body, dm.reply_to_id, dm.created_at, dm.edited_at, dm.read_at, " +
         "(SELECT i.id FROM people_message_images i " +
         "WHERE i.dm_message_id = dm.id LIMIT 1) AS image_id, " +
         "ra.username AS reply_sender_username, " +
@@ -3451,6 +3451,14 @@ async function peopleEnsureReplyColumns() {
         peoplePool.query(
           "CREATE INDEX IF NOT EXISTS people_dm_reply_idx " +
           "ON people_direct_messages(reply_to_id)"
+        ),
+        peoplePool.query(
+          "ALTER TABLE people_general_messages " +
+          "ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ NULL"
+        ),
+        peoplePool.query(
+          "ALTER TABLE people_direct_messages " +
+          "ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ NULL"
         )
       ]).catch((err) => {
         peopleReplyColumnsPromise = null;
@@ -3688,6 +3696,218 @@ function peopleDeleteLocalBoundMessageImage(
     );
   }
 }
+
+// === PEOPLE_MESSAGE_EDIT_SERVER_V6_START ===
+async function peopleDmOwnedMessageContext(
+  accountId,
+  messageId
+) {
+  const owner = String(accountId || "");
+  const id = peopleReplyId(messageId);
+
+  if (!owner || !id) return null;
+
+  if (peoplePool) {
+    await peopleEnsureReplyColumns();
+
+    if (!/^\d+$/.test(id)) {
+      return null;
+    }
+
+    const result =
+      await peoplePool.query(
+        "SELECT dm.id, dm.sender_id, dm.recipient_id, " +
+        "EXISTS(SELECT 1 FROM people_message_images i WHERE i.dm_message_id = dm.id) AS has_image " +
+        "FROM people_direct_messages dm " +
+        "WHERE dm.id = $1 AND dm.sender_id = $2 LIMIT 1",
+        [id, owner]
+      );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    return {
+      id: String(row.id),
+      senderId: String(row.sender_id),
+      recipientId: String(row.recipient_id),
+      hasImage: Boolean(row.has_image)
+    };
+  }
+
+  const message =
+    peopleReadLocalSocial().dms.find(
+      (item) =>
+        String(item.id) === id &&
+        String(item.sender_id) === owner
+    );
+
+  if (!message) return null;
+
+  return {
+    id: String(message.id),
+    senderId: String(message.sender_id),
+    recipientId: String(message.recipient_id),
+    hasImage: Boolean(message.image_id)
+  };
+}
+
+async function peopleEditDmMessage(
+  accountId,
+  messageId,
+  body,
+  context = null
+) {
+  const owner = String(accountId || "");
+  const id = peopleReplyId(messageId);
+  const rawBody = String(body || "").trim();
+  const cleanBody =
+    peopleDmE2eeIsEnvelope(rawBody)
+      ? rawBody
+      : rawBody.slice(0, 2000);
+
+  const ctx =
+    context ||
+    await peopleDmOwnedMessageContext(
+      owner,
+      id
+    );
+
+  if (!ctx) return null;
+  if (!cleanBody && !ctx.hasImage) return null;
+
+  const editedAt =
+    new Date().toISOString();
+
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "UPDATE people_direct_messages " +
+        "SET body = $3, edited_at = $4 " +
+        "WHERE id = $1 AND sender_id = $2 " +
+        "RETURNING id, sender_id, recipient_id, edited_at",
+        [
+          id,
+          owner,
+          peopleEncryptMessageText(cleanBody),
+          editedAt
+        ]
+      );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    return {
+      id: String(row.id),
+      senderId: String(row.sender_id),
+      recipientId: String(row.recipient_id),
+      editedAt: row.edited_at
+    };
+  }
+
+  const data = peopleReadLocalSocial();
+  const message = data.dms.find(
+    (item) =>
+      String(item.id) === id &&
+      String(item.sender_id) === owner
+  );
+
+  if (!message) return null;
+
+  message.body = cleanBody;
+  message.edited_at = editedAt;
+  peopleWriteLocalSocial(data);
+
+  return {
+    id,
+    senderId: String(message.sender_id),
+    recipientId: String(message.recipient_id),
+    editedAt
+  };
+}
+
+async function peopleServerEditMessage(
+  accountId,
+  serverId,
+  channelId,
+  messageId,
+  text
+) {
+  const owner = String(accountId || "");
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  const id = peopleReplyId(messageId);
+  const cleanText = String(text || "").trim().slice(0, 1000);
+
+  if (!owner || !sid || !cid || !id) {
+    return null;
+  }
+
+  const editedAt =
+    new Date().toISOString();
+
+  if (peoplePool) {
+    await peopleEnsureReplyColumns();
+
+    if (!/^\d+$/.test(id) || !/^\d+$/.test(sid)) {
+      return null;
+    }
+
+    const result =
+      await peoplePool.query(
+        "UPDATE people_general_messages gm " +
+        "SET body = $5, edited_at = $6 " +
+        "WHERE gm.id = $1 AND gm.sender_id = $2 AND gm.server_id = $3 AND gm.channel_id = $4 " +
+        "AND (gm.is_system = FALSE OR gm.is_system IS NULL) " +
+        "AND ($7::boolean OR EXISTS(SELECT 1 FROM people_message_images i WHERE i.general_message_id = gm.id)) " +
+        "RETURNING gm.id, gm.edited_at",
+        [
+          id,
+          owner,
+          sid,
+          cid,
+          peopleEncryptMessageText(cleanText),
+          editedAt,
+          Boolean(cleanText)
+        ]
+      );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    return {
+      id: String(row.id),
+      channelId: cid,
+      text: cleanText,
+      editedAt: row.edited_at
+    };
+  }
+
+  const messages = peopleReadLocalGeneral();
+  const message = messages.find(
+    (item) =>
+      String(item.id) === id &&
+      String(item.senderId) === owner &&
+      String(item.serverId) === sid &&
+      String(item.channelId || "") === cid &&
+      !item.system &&
+      !item.isSystem
+  );
+
+  if (!message) return null;
+  if (!cleanText && !message.imageId) return null;
+
+  message.text = cleanText;
+  message.editedAt = editedAt;
+  peopleWriteLocalGeneral(messages);
+
+  return {
+    id,
+    channelId: cid,
+    text: cleanText,
+    editedAt
+  };
+}
+// === PEOPLE_MESSAGE_EDIT_SERVER_V6_END ===
 
 async function peopleDeleteGeneralMessage(
   accountId,
@@ -6170,6 +6390,154 @@ app.delete("/api/social/friends/:username", async (req, res) => {
   }
 });
 
+// === PEOPLE_DM_EDIT_ROUTE_V6_START ===
+app.patch(
+  "/api/dm/message/:id",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const body =
+        String(req.body?.body || "").trim();
+
+      const context =
+        await peopleDmOwnedMessageContext(
+          session.id,
+          req.params.id
+        );
+
+      if (!context) {
+        return res.status(403).json({
+          ok: false,
+          error:
+            "Tu ne peux modifier que tes propres messages."
+        });
+      }
+
+      const e2eeEnvelope =
+        body
+          ? peopleDmE2eeEnvelope(body)
+          : null;
+
+      if (
+        (!body && !context.hasImage) ||
+        (!e2eeEnvelope && body.length > 2000) ||
+        (e2eeEnvelope && body.length > 24000)
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Le message modifié est invalide."
+        });
+      }
+
+      if (e2eeEnvelope) {
+        const senderId =
+          String(context.senderId);
+        const recipientId =
+          String(context.recipientId);
+
+        const allowedIds =
+          new Set([
+            senderId,
+            recipientId
+          ]);
+
+        const hasSenderKey =
+          e2eeEnvelope.keys.some(
+            (item) =>
+              String(item.u) ===
+                senderId
+          );
+
+        const hasRecipientKey =
+          e2eeEnvelope.keys.some(
+            (item) =>
+              String(item.u) ===
+                recipientId
+          );
+
+        if (
+          e2eeEnvelope.from !== senderId ||
+          e2eeEnvelope.to !== recipientId ||
+          !hasSenderKey ||
+          !hasRecipientKey ||
+          e2eeEnvelope.keys.some(
+            (item) =>
+              !allowedIds.has(
+                String(item.u)
+              )
+          )
+        ) {
+          return res.status(400).json({
+            ok: false,
+            error:
+              "Enveloppe E2EE invalide."
+          });
+        }
+      }
+
+      const edited =
+        await peopleEditDmMessage(
+          session.id,
+          req.params.id,
+          body,
+          context
+        );
+
+      if (!edited) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Impossible de modifier ce message."
+        });
+      }
+
+      const payload = {
+        id: edited.id,
+        senderId: edited.senderId,
+        recipientId: edited.recipientId,
+        editedAt: edited.editedAt
+      };
+
+      peopleEmitToAccount(
+        edited.senderId,
+        "dm-message-edited",
+        payload
+      );
+
+      peopleEmitToAccount(
+        edited.recipientId,
+        "dm-message-edited",
+        payload
+      );
+
+      res.json({
+        ok: true,
+        message: payload
+      });
+    } catch (err) {
+      console.error(
+        "[People dm/edit]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de modifier ce message."
+      });
+    }
+  }
+);
+// === PEOPLE_DM_EDIT_ROUTE_V6_END ===
+
 // === PEOPLE_MESSAGE_DELETE_ROUTES_V1_START ===
 app.delete(
   "/api/dm/message/:id",
@@ -6503,6 +6871,10 @@ app.get("/api/dm/:username", async (req, res) => {
               ),
             createdAt:
               message.created_at,
+            editedAt:
+              message.edited_at ||
+              message.editedAt ||
+              null,
             readAt:
               message.read_at ||
               null
@@ -9182,10 +9554,12 @@ async function peopleServerLoadMessages(
     );
 
   if (peoplePool) {
+    await peopleEnsureReplyColumns();
+
     const result =
       await peoplePool.query(
         "SELECT " +
-        "gm.id, gm.username, gm.body, gm.reply_to_id, gm.is_system, gm.created_at, " +
+        "gm.id, gm.username, gm.body, gm.reply_to_id, gm.is_system, gm.created_at, gm.edited_at, " +
         "(SELECT i.id FROM people_message_images i " +
         "WHERE i.general_message_id = gm.id LIMIT 1) AS image_id, " +
         "rgm.username AS reply_username, " +
@@ -9258,7 +9632,9 @@ async function peopleServerLoadMessages(
           time:
             new Date(
               row.created_at
-            ).getTime()
+            ).getTime(),
+          editedAt:
+            row.edited_at || null
         })
       );
   }
@@ -9354,7 +9730,11 @@ async function peopleServerLoadMessages(
             Number(
               message.time ||
               Date.now()
-            )
+            ),
+          editedAt:
+            message.editedAt ||
+            message.edited_at ||
+            null
         };
       }
     );
@@ -14664,6 +15044,93 @@ io.on("connection", (socket) => {
     }
   );
   // === PEOPLE_GENERAL_OPTIMISTIC_SERVER_V1_END ===
+
+  // === PEOPLE_SERVER_MESSAGE_EDIT_SOCKET_V6_START ===
+  socket.on(
+    "chat-message-edit",
+    async (
+      { id, text } = {},
+      ack = () => {}
+    ) => {
+      try {
+        const senderId =
+          userIds.get(socket.id);
+
+        const serverId =
+          socketServerIds.get(socket.id);
+
+        const channelId =
+          socketTextChannelIds.get(socket.id);
+
+        if (!senderId || !serverId || !channelId) {
+          return ack({
+            ok: false,
+            error:
+              "Aucun serveur actif."
+          });
+        }
+
+        const rawText =
+          String(text || "");
+
+        if (rawText.length > 1000) {
+          return ack({
+            ok: false,
+            error:
+              "Le message est trop long."
+          });
+        }
+
+        const edited =
+          await peopleServerEditMessage(
+            senderId,
+            serverId,
+            channelId,
+            id,
+            rawText
+          );
+
+        if (!edited) {
+          return ack({
+            ok: false,
+            error:
+              "Tu ne peux modifier que tes propres messages."
+          });
+        }
+
+        const payload = {
+          id: edited.id,
+          channelId: edited.channelId,
+          text: edited.text,
+          editedAt: edited.editedAt
+        };
+
+        io.to(
+          peopleServerRoom(serverId)
+        ).emit(
+          "chat-message-edited",
+          payload
+        );
+
+        ack({
+          ok: true,
+          message: payload
+        });
+      } catch (err) {
+        console.error(
+          "[People server message/edit]",
+          err
+        );
+
+        ack({
+          ok: false,
+          error:
+            "Impossible de modifier ce message."
+        });
+      }
+    }
+  );
+  // === PEOPLE_SERVER_MESSAGE_EDIT_SOCKET_V6_END ===
 
   socket.on(
     "chat-message-delete",

@@ -1,0 +1,78 @@
+/* === PEOPLE_UNREAD_V1 === */
+.people-unread-divider {
+  width: 100%;
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 6px;
+  color: #f36b72;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .02em;
+  user-select: none;
+}
+
+.people-unread-divider::before,
+.people-unread-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1 1 auto;
+  background: rgba(243, 107, 114, .62);
+}
+
+.people-unread-divider > span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.people-message-group-body > .people-unread-divider {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.people-server-channel {
+  position: relative;
+}
+
+.people-server-channel.people-has-unread .people-server-channel-name {
+  color: var(--text, #f2eff8);
+  font-weight: 850;
+}
+
+.people-unread-channel-badge {
+  flex: 0 0 auto;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 6px;
+  margin-left: auto;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #da373c;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .22);
+}
+
+.dm-conversation-row:has(.dm-unread-badge) .dm-sidebar-copy strong {
+  color: var(--text, #f2eff8);
+  font-weight: 850;
+}
+
+@media (max-width: 720px) {
+  .people-unread-divider {
+    font-size: 10px;
+    gap: 6px;
+  }
+
+  .people-unread-channel-badge {
+    min-width: 17px;
+    height: 17px;
+    padding: 0 5px;
+    font-size: 9px;
+  }
+}

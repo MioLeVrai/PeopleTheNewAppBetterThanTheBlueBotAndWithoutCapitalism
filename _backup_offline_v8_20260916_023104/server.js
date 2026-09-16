@@ -2773,7 +2773,7 @@ async function peopleDmHistory(
     const result =
       await peoplePool.query(
         "SELECT " +
-        "dm.id, dm.sender_id, dm.recipient_id, dm.body, dm.reply_to_id, dm.created_at, dm.read_at, " +
+        "dm.id, dm.sender_id, dm.recipient_id, dm.body, dm.reply_to_id, dm.created_at, dm.edited_at, dm.read_at, " +
         "(SELECT i.id FROM people_message_images i " +
         "WHERE i.dm_message_id = dm.id LIMIT 1) AS image_id, " +
         "ra.username AS reply_sender_username, " +
@@ -3451,6 +3451,14 @@ async function peopleEnsureReplyColumns() {
         peoplePool.query(
           "CREATE INDEX IF NOT EXISTS people_dm_reply_idx " +
           "ON people_direct_messages(reply_to_id)"
+        ),
+        peoplePool.query(
+          "ALTER TABLE people_general_messages " +
+          "ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ NULL"
+        ),
+        peoplePool.query(
+          "ALTER TABLE people_direct_messages " +
+          "ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ NULL"
         )
       ]).catch((err) => {
         peopleReplyColumnsPromise = null;
@@ -3688,6 +3696,218 @@ function peopleDeleteLocalBoundMessageImage(
     );
   }
 }
+
+// === PEOPLE_MESSAGE_EDIT_SERVER_V6_START ===
+async function peopleDmOwnedMessageContext(
+  accountId,
+  messageId
+) {
+  const owner = String(accountId || "");
+  const id = peopleReplyId(messageId);
+
+  if (!owner || !id) return null;
+
+  if (peoplePool) {
+    await peopleEnsureReplyColumns();
+
+    if (!/^\d+$/.test(id)) {
+      return null;
+    }
+
+    const result =
+      await peoplePool.query(
+        "SELECT dm.id, dm.sender_id, dm.recipient_id, " +
+        "EXISTS(SELECT 1 FROM people_message_images i WHERE i.dm_message_id = dm.id) AS has_image " +
+        "FROM people_direct_messages dm " +
+        "WHERE dm.id = $1 AND dm.sender_id = $2 LIMIT 1",
+        [id, owner]
+      );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    return {
+      id: String(row.id),
+      senderId: String(row.sender_id),
+      recipientId: String(row.recipient_id),
+      hasImage: Boolean(row.has_image)
+    };
+  }
+
+  const message =
+    peopleReadLocalSocial().dms.find(
+      (item) =>
+        String(item.id) === id &&
+        String(item.sender_id) === owner
+    );
+
+  if (!message) return null;
+
+  return {
+    id: String(message.id),
+    senderId: String(message.sender_id),
+    recipientId: String(message.recipient_id),
+    hasImage: Boolean(message.image_id)
+  };
+}
+
+async function peopleEditDmMessage(
+  accountId,
+  messageId,
+  body,
+  context = null
+) {
+  const owner = String(accountId || "");
+  const id = peopleReplyId(messageId);
+  const rawBody = String(body || "").trim();
+  const cleanBody =
+    peopleDmE2eeIsEnvelope(rawBody)
+      ? rawBody
+      : rawBody.slice(0, 2000);
+
+  const ctx =
+    context ||
+    await peopleDmOwnedMessageContext(
+      owner,
+      id
+    );
+
+  if (!ctx) return null;
+  if (!cleanBody && !ctx.hasImage) return null;
+
+  const editedAt =
+    new Date().toISOString();
+
+  if (peoplePool) {
+    const result =
+      await peoplePool.query(
+        "UPDATE people_direct_messages " +
+        "SET body = $3, edited_at = $4 " +
+        "WHERE id = $1 AND sender_id = $2 " +
+        "RETURNING id, sender_id, recipient_id, edited_at",
+        [
+          id,
+          owner,
+          peopleEncryptMessageText(cleanBody),
+          editedAt
+        ]
+      );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    return {
+      id: String(row.id),
+      senderId: String(row.sender_id),
+      recipientId: String(row.recipient_id),
+      editedAt: row.edited_at
+    };
+  }
+
+  const data = peopleReadLocalSocial();
+  const message = data.dms.find(
+    (item) =>
+      String(item.id) === id &&
+      String(item.sender_id) === owner
+  );
+
+  if (!message) return null;
+
+  message.body = cleanBody;
+  message.edited_at = editedAt;
+  peopleWriteLocalSocial(data);
+
+  return {
+    id,
+    senderId: String(message.sender_id),
+    recipientId: String(message.recipient_id),
+    editedAt
+  };
+}
+
+async function peopleServerEditMessage(
+  accountId,
+  serverId,
+  channelId,
+  messageId,
+  text
+) {
+  const owner = String(accountId || "");
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  const id = peopleReplyId(messageId);
+  const cleanText = String(text || "").trim().slice(0, 1000);
+
+  if (!owner || !sid || !cid || !id) {
+    return null;
+  }
+
+  const editedAt =
+    new Date().toISOString();
+
+  if (peoplePool) {
+    await peopleEnsureReplyColumns();
+
+    if (!/^\d+$/.test(id) || !/^\d+$/.test(sid)) {
+      return null;
+    }
+
+    const result =
+      await peoplePool.query(
+        "UPDATE people_general_messages gm " +
+        "SET body = $5, edited_at = $6 " +
+        "WHERE gm.id = $1 AND gm.sender_id = $2 AND gm.server_id = $3 AND gm.channel_id = $4 " +
+        "AND (gm.is_system = FALSE OR gm.is_system IS NULL) " +
+        "AND ($7::boolean OR EXISTS(SELECT 1 FROM people_message_images i WHERE i.general_message_id = gm.id)) " +
+        "RETURNING gm.id, gm.edited_at",
+        [
+          id,
+          owner,
+          sid,
+          cid,
+          peopleEncryptMessageText(cleanText),
+          editedAt,
+          Boolean(cleanText)
+        ]
+      );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    return {
+      id: String(row.id),
+      channelId: cid,
+      text: cleanText,
+      editedAt: row.edited_at
+    };
+  }
+
+  const messages = peopleReadLocalGeneral();
+  const message = messages.find(
+    (item) =>
+      String(item.id) === id &&
+      String(item.senderId) === owner &&
+      String(item.serverId) === sid &&
+      String(item.channelId || "") === cid &&
+      !item.system &&
+      !item.isSystem
+  );
+
+  if (!message) return null;
+  if (!cleanText && !message.imageId) return null;
+
+  message.text = cleanText;
+  message.editedAt = editedAt;
+  peopleWriteLocalGeneral(messages);
+
+  return {
+    id,
+    channelId: cid,
+    text: cleanText,
+    editedAt
+  };
+}
+// === PEOPLE_MESSAGE_EDIT_SERVER_V6_END ===
 
 async function peopleDeleteGeneralMessage(
   accountId,
@@ -6170,6 +6390,154 @@ app.delete("/api/social/friends/:username", async (req, res) => {
   }
 });
 
+// === PEOPLE_DM_EDIT_ROUTE_V6_START ===
+app.patch(
+  "/api/dm/message/:id",
+  async (req, res) => {
+    try {
+      const session =
+        peopleSessionForRequest(
+          req,
+          res
+        );
+
+      if (!session) return;
+
+      const body =
+        String(req.body?.body || "").trim();
+
+      const context =
+        await peopleDmOwnedMessageContext(
+          session.id,
+          req.params.id
+        );
+
+      if (!context) {
+        return res.status(403).json({
+          ok: false,
+          error:
+            "Tu ne peux modifier que tes propres messages."
+        });
+      }
+
+      const e2eeEnvelope =
+        body
+          ? peopleDmE2eeEnvelope(body)
+          : null;
+
+      if (
+        (!body && !context.hasImage) ||
+        (!e2eeEnvelope && body.length > 2000) ||
+        (e2eeEnvelope && body.length > 24000)
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Le message modifié est invalide."
+        });
+      }
+
+      if (e2eeEnvelope) {
+        const senderId =
+          String(context.senderId);
+        const recipientId =
+          String(context.recipientId);
+
+        const allowedIds =
+          new Set([
+            senderId,
+            recipientId
+          ]);
+
+        const hasSenderKey =
+          e2eeEnvelope.keys.some(
+            (item) =>
+              String(item.u) ===
+                senderId
+          );
+
+        const hasRecipientKey =
+          e2eeEnvelope.keys.some(
+            (item) =>
+              String(item.u) ===
+                recipientId
+          );
+
+        if (
+          e2eeEnvelope.from !== senderId ||
+          e2eeEnvelope.to !== recipientId ||
+          !hasSenderKey ||
+          !hasRecipientKey ||
+          e2eeEnvelope.keys.some(
+            (item) =>
+              !allowedIds.has(
+                String(item.u)
+              )
+          )
+        ) {
+          return res.status(400).json({
+            ok: false,
+            error:
+              "Enveloppe E2EE invalide."
+          });
+        }
+      }
+
+      const edited =
+        await peopleEditDmMessage(
+          session.id,
+          req.params.id,
+          body,
+          context
+        );
+
+      if (!edited) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "Impossible de modifier ce message."
+        });
+      }
+
+      const payload = {
+        id: edited.id,
+        senderId: edited.senderId,
+        recipientId: edited.recipientId,
+        editedAt: edited.editedAt
+      };
+
+      peopleEmitToAccount(
+        edited.senderId,
+        "dm-message-edited",
+        payload
+      );
+
+      peopleEmitToAccount(
+        edited.recipientId,
+        "dm-message-edited",
+        payload
+      );
+
+      res.json({
+        ok: true,
+        message: payload
+      });
+    } catch (err) {
+      console.error(
+        "[People dm/edit]",
+        err
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          "Impossible de modifier ce message."
+      });
+    }
+  }
+);
+// === PEOPLE_DM_EDIT_ROUTE_V6_END ===
+
 // === PEOPLE_MESSAGE_DELETE_ROUTES_V1_START ===
 app.delete(
   "/api/dm/message/:id",
@@ -6503,6 +6871,10 @@ app.get("/api/dm/:username", async (req, res) => {
               ),
             createdAt:
               message.created_at,
+            editedAt:
+              message.edited_at ||
+              message.editedAt ||
+              null,
             readAt:
               message.read_at ||
               null
@@ -7521,6 +7893,623 @@ app.get(
   }
 );
 // === PEOPLE_MESSAGE_IMAGES_V2_END ===
+
+// === PEOPLE_UNREAD_V1_START ===
+const PEOPLE_LOCAL_UNREAD = pathAccounts.join(
+  __dirname,
+  "people-unread.local.json"
+);
+
+let peopleUnreadTablePromise = null;
+
+async function peopleEnsureUnreadTable() {
+  if (!peoplePool) return;
+  if (!peopleUnreadTablePromise) {
+    peopleUnreadTablePromise = peoplePool.query(
+      "CREATE TABLE IF NOT EXISTS people_server_channel_reads (" +
+      "user_id TEXT NOT NULL, " +
+      "server_id TEXT NOT NULL, " +
+      "channel_id TEXT NOT NULL, " +
+      "last_read_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+      "PRIMARY KEY (user_id, server_id, channel_id)" +
+      ")"
+    ).then(() => peoplePool.query(
+      "CREATE INDEX IF NOT EXISTS people_server_channel_reads_lookup_idx " +
+      "ON people_server_channel_reads(user_id, server_id, channel_id, last_read_at)"
+    )).catch((err) => {
+      peopleUnreadTablePromise = null;
+      throw err;
+    });
+  }
+  await peopleUnreadTablePromise;
+}
+
+function peopleReadLocalUnread() {
+  try {
+    if (!fsAccounts.existsSync(PEOPLE_LOCAL_UNREAD)) return [];
+    const parsed = JSON.parse(
+      fsAccounts.readFileSync(PEOPLE_LOCAL_UNREAD, "utf8")
+    );
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function peopleWriteLocalUnread(rows) {
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_UNREAD,
+    JSON.stringify(Array.isArray(rows) ? rows : [], null, 2) + "\n",
+    "utf8"
+  );
+}
+
+function peopleUnreadKey(accountId, serverId, channelId) {
+  return [
+    String(accountId || ""),
+    String(serverId || ""),
+    String(channelId || "")
+  ].join("\u001f");
+}
+
+async function peopleUnreadLastRead(accountId, serverId, channelId) {
+  const uid = String(accountId || "");
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  if (!uid || !sid || !cid) return Date.now();
+
+  if (peoplePool) {
+    await peopleEnsureUnreadTable();
+    await peoplePool.query(
+      "INSERT INTO people_server_channel_reads " +
+      "(user_id, server_id, channel_id, last_read_at) " +
+      "VALUES ($1, $2, $3, NOW()) ON CONFLICT DO NOTHING",
+      [uid, sid, cid]
+    );
+    const result = await peoplePool.query(
+      "SELECT last_read_at FROM people_server_channel_reads " +
+      "WHERE user_id = $1 AND server_id = $2 AND channel_id = $3 LIMIT 1",
+      [uid, sid, cid]
+    );
+    const value = result.rows[0]?.last_read_at;
+    const time = value ? new Date(value).getTime() : Date.now();
+    return Number.isFinite(time) ? time : Date.now();
+  }
+
+  const rows = peopleReadLocalUnread();
+  const key = peopleUnreadKey(uid, sid, cid);
+  let row = rows.find((item) =>
+    peopleUnreadKey(item.userId, item.serverId, item.channelId) === key
+  );
+
+  if (!row) {
+    row = {
+      userId: uid,
+      serverId: sid,
+      channelId: cid,
+      lastReadAt: new Date().toISOString()
+    };
+    rows.push(row);
+    peopleWriteLocalUnread(rows);
+  }
+
+  const time = new Date(row.lastReadAt || 0).getTime();
+  return Number.isFinite(time) ? time : Date.now();
+}
+
+async function peopleUnreadMarkRead(accountId, serverId, channelId) {
+  const uid = String(accountId || "");
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  if (!uid || !sid || !cid) return;
+
+  if (peoplePool) {
+    await peopleEnsureUnreadTable();
+    await peoplePool.query(
+      "INSERT INTO people_server_channel_reads " +
+      "(user_id, server_id, channel_id, last_read_at) " +
+      "VALUES ($1, $2, $3, NOW()) " +
+      "ON CONFLICT (user_id, server_id, channel_id) " +
+      "DO UPDATE SET last_read_at = NOW()",
+      [uid, sid, cid]
+    );
+    return;
+  }
+
+  const rows = peopleReadLocalUnread();
+  const key = peopleUnreadKey(uid, sid, cid);
+  const now = new Date().toISOString();
+  const index = rows.findIndex((item) =>
+    peopleUnreadKey(item.userId, item.serverId, item.channelId) === key
+  );
+
+  const next = {
+    userId: uid,
+    serverId: sid,
+    channelId: cid,
+    lastReadAt: now
+  };
+
+  if (index >= 0) rows[index] = next;
+  else rows.push(next);
+  peopleWriteLocalUnread(rows);
+}
+
+async function peopleUnreadChannelInfo(accountId, serverId, channelId) {
+  const uid = String(accountId || "");
+  const sid = String(serverId || "");
+  const cid = String(channelId || "");
+  const lastReadAt = await peopleUnreadLastRead(uid, sid, cid);
+
+  if (peoplePool) {
+    const result = await peoplePool.query(
+      "SELECT id, created_at FROM people_general_messages " +
+      "WHERE server_id = $1 AND channel_id = $2 " +
+      "AND created_at > $3 AND COALESCE(is_system, FALSE) = FALSE " +
+      "ORDER BY created_at ASC, id ASC",
+      [sid, cid, new Date(lastReadAt)]
+    );
+
+    return {
+      channelId: cid,
+      unreadCount: result.rows.length,
+      firstUnreadMessageId: result.rows[0]?.id
+        ? String(result.rows[0].id)
+        : null
+    };
+  }
+
+  const items = peopleReadLocalGeneral()
+    .filter((message) =>
+      String(message.serverId || "") === sid &&
+      String(message.channelId || "") === cid &&
+      !message.system &&
+      !message.isSystem &&
+      Number(message.time || 0) > lastReadAt
+    )
+    .sort((a, b) =>
+      Number(a.time || 0) - Number(b.time || 0)
+    );
+
+  return {
+    channelId: cid,
+    unreadCount: items.length,
+    firstUnreadMessageId: items[0]?.id
+      ? String(items[0].id)
+      : null
+  };
+}
+
+async function peopleUnreadServerSummary(accountId, serverId) {
+  const sid = String(serverId || "");
+  const channels = (await peopleListServerChannels(sid))
+    .filter((channel) => channel?.type === "text");
+
+  const infos = [];
+  for (const channel of channels) {
+    infos.push(
+      await peopleUnreadChannelInfo(
+        accountId,
+        sid,
+        channel.id
+      )
+    );
+  }
+
+  return infos;
+}
+
+app.get("/api/unread/servers/:id", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const sid = String(req.params.id || "");
+    if (!(await peopleIsServerMember(session.id, sid))) {
+      return res.status(403).json({
+        ok: false,
+        error: "Tu n'es pas membre de ce serveur."
+      });
+    }
+
+    const channels = await peopleUnreadServerSummary(
+      session.id,
+      sid
+    );
+
+    return res.json({
+      ok: true,
+      serverId: sid,
+      channels,
+      unreadTotal: channels.reduce(
+        (sum, item) => sum + Number(item.unreadCount || 0),
+        0
+      )
+    });
+  } catch (err) {
+    console.error("[People unread/summary]", err);
+    return res.status(500).json({
+      ok: false,
+      error: "Impossible de charger les messages non lus."
+    });
+  }
+});
+
+app.post(
+  "/api/unread/servers/:id/channels/:channelId/read",
+  async (req, res) => {
+    try {
+      const session = peopleSessionForRequest(req, res);
+      if (!session) return;
+
+      const sid = String(req.params.id || "");
+      const cid = String(req.params.channelId || "");
+
+      if (!(await peopleIsServerMember(session.id, sid))) {
+        return res.status(403).json({
+          ok: false,
+          error: "Tu n'es pas membre de ce serveur."
+        });
+      }
+
+      const channel = await peopleGetServerChannel(
+        sid,
+        cid,
+        "text"
+      );
+
+      if (!channel) {
+        return res.status(404).json({
+          ok: false,
+          error: "Salon textuel introuvable."
+        });
+      }
+
+      await peopleUnreadMarkRead(
+        session.id,
+        sid,
+        cid
+      );
+
+      return res.json({
+        ok: true,
+        serverId: sid,
+        channelId: cid
+      });
+    } catch (err) {
+      console.error("[People unread/read]", err);
+      return res.status(500).json({
+        ok: false,
+        error: "Impossible de marquer ce salon comme lu."
+      });
+    }
+  }
+);
+// === PEOPLE_UNREAD_V1_END ===
+
+// === PEOPLE_MESSAGE_REACTIONS_V1_START ===
+const PEOPLE_LOCAL_REACTIONS = pathAccounts.join(
+  __dirname,
+  "people-reactions.local.json"
+);
+
+let peopleReactionTablePromise = null;
+
+function peopleReactionScope(value) {
+  const scope = String(value || "").trim().toLowerCase();
+  return scope === "dm" || scope === "general" ? scope : "";
+}
+
+function peopleReactionEmoji(value) {
+  const emoji = String(value || "").trim();
+  if (!emoji || emoji.length > 32 || /[\r\n\t]/.test(emoji)) return "";
+  return emoji;
+}
+
+function peopleReactionEmojiKey(scope, messageId, emoji) {
+  return cryptoAccounts
+    .createHmac("sha256", PEOPLE_MESSAGE_ENCRYPTION_KEY)
+    .update(String(scope || "") + "\0" + String(messageId || "") + "\0" + String(emoji || ""), "utf8")
+    .digest("base64url");
+}
+
+async function peopleEnsureReactionTable() {
+  if (!peoplePool) return;
+
+  if (!peopleReactionTablePromise) {
+    peopleReactionTablePromise = peoplePool.query(
+      "CREATE TABLE IF NOT EXISTS people_message_reactions (" +
+      "id BIGSERIAL PRIMARY KEY, " +
+      "scope VARCHAR(16) NOT NULL, " +
+      "message_id TEXT NOT NULL, " +
+      "account_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE, " +
+      "emoji_key VARCHAR(80) NOT NULL, " +
+      "emoji_cipher TEXT NOT NULL, " +
+      "created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
+      "UNIQUE(scope, message_id, account_id, emoji_key)" +
+      ")"
+    ).then(() => peoplePool.query(
+      "CREATE INDEX IF NOT EXISTS people_message_reactions_message_idx " +
+      "ON people_message_reactions(scope, message_id, created_at)"
+    )).catch((err) => {
+      peopleReactionTablePromise = null;
+      throw err;
+    });
+  }
+
+  await peopleReactionTablePromise;
+}
+
+function peopleReadLocalReactions() {
+  try {
+    if (!fsAccounts.existsSync(PEOPLE_LOCAL_REACTIONS)) return [];
+    const data = JSON.parse(fsAccounts.readFileSync(PEOPLE_LOCAL_REACTIONS, "utf8"));
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function peopleWriteLocalReactions(items) {
+  fsAccounts.writeFileSync(
+    PEOPLE_LOCAL_REACTIONS,
+    JSON.stringify(Array.isArray(items) ? items : [], null, 2) + "\n",
+    "utf8"
+  );
+}
+
+async function peopleReactionMessageContext(scope, messageId, accountId) {
+  const kind = peopleReactionScope(scope);
+  const id = peopleReplyId(messageId);
+  const me = String(accountId || "");
+
+  if (!kind || !id || !me) return null;
+
+  if (kind === "dm") {
+    if (peoplePool) {
+      if (!/^\d+$/.test(id)) return null;
+      const result = await peoplePool.query(
+        "SELECT id, sender_id, recipient_id FROM people_direct_messages WHERE id = $1 LIMIT 1",
+        [id]
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+      const senderId = String(row.sender_id);
+      const recipientId = String(row.recipient_id);
+      if (senderId !== me && recipientId !== me) return null;
+      return { scope: kind, messageId: id, senderId, recipientId };
+    }
+
+    const message = peopleReadLocalSocial().dms.find((item) => String(item.id) === id);
+    if (!message) return null;
+    const senderId = String(message.sender_id);
+    const recipientId = String(message.recipient_id);
+    if (senderId !== me && recipientId !== me) return null;
+    return { scope: kind, messageId: id, senderId, recipientId };
+  }
+
+  if (peoplePool) {
+    if (!/^\d+$/.test(id)) return null;
+    const result = await peoplePool.query(
+      "SELECT id, server_id, channel_id FROM people_general_messages WHERE id = $1 LIMIT 1",
+      [id]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    const serverId = row.server_id ? String(row.server_id) : "";
+    const channelId = row.channel_id ? String(row.channel_id) : "";
+    if (serverId && !(await peopleIsServerMember(me, serverId))) return null;
+    return { scope: kind, messageId: id, serverId, channelId };
+  }
+
+  const message = peopleReadLocalGeneral().find((item) => String(item.id) === id);
+  if (!message) return null;
+  const serverId = message.serverId ? String(message.serverId) : "";
+  const channelId = message.channelId ? String(message.channelId) : "";
+  if (serverId && !(await peopleIsServerMember(me, serverId))) return null;
+  return { scope: kind, messageId: id, serverId, channelId };
+}
+
+async function peopleReactionSummary(scope, messageId, accountId) {
+  const kind = peopleReactionScope(scope);
+  const id = peopleReplyId(messageId);
+  const me = String(accountId || "");
+  if (!kind || !id) return [];
+
+  let rows = [];
+
+  if (peoplePool) {
+    await peopleEnsureReactionTable();
+    const result = await peoplePool.query(
+      "SELECT r.emoji_cipher, r.account_id, a.username, r.created_at " +
+      "FROM people_message_reactions r " +
+      "LEFT JOIN people_accounts a ON a.id = r.account_id " +
+      "WHERE r.scope = $1 AND r.message_id = $2 " +
+      "ORDER BY r.created_at ASC",
+      [kind, id]
+    );
+    rows = result.rows.map((row) => ({
+      emoji: peopleDecryptMessageText(row.emoji_cipher),
+      accountId: String(row.account_id),
+      username: row.username || "Utilisateur"
+    }));
+  } else {
+    const accounts = new Map(
+      peopleReadLocalAccounts().map((account) => [String(account.id), account.username || "Utilisateur"])
+    );
+    rows = peopleReadLocalReactions()
+      .filter((item) => String(item.scope) === kind && String(item.messageId) === id)
+      .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))
+      .map((item) => ({
+        emoji: peopleDecryptMessageText(item.emoji || ""),
+        accountId: String(item.accountId || ""),
+        username: accounts.get(String(item.accountId || "")) || "Utilisateur"
+      }));
+  }
+
+  const grouped = new Map();
+  for (const row of rows) {
+    if (!row.emoji) continue;
+    let entry = grouped.get(row.emoji);
+    if (!entry) {
+      entry = { emoji: row.emoji, count: 0, me: false, users: [] };
+      grouped.set(row.emoji, entry);
+    }
+    entry.count += 1;
+    if (row.accountId === me) entry.me = true;
+    if (row.username && entry.users.length < 12 && !entry.users.includes(row.username)) {
+      entry.users.push(row.username);
+    }
+  }
+
+  return [...grouped.values()];
+}
+
+async function peopleToggleReaction(scope, messageId, accountId, emoji) {
+  const kind = peopleReactionScope(scope);
+  const id = peopleReplyId(messageId);
+  const me = String(accountId || "");
+  const cleanEmoji = peopleReactionEmoji(emoji);
+
+  if (!kind || !id || !me || !cleanEmoji) {
+    const err = new Error("REACTION_INVALID");
+    err.code = "REACTION_INVALID";
+    throw err;
+  }
+
+  const emojiKey = peopleReactionEmojiKey(kind, id, cleanEmoji);
+  const emojiCipher = peopleEncryptMessageText(cleanEmoji);
+
+  if (peoplePool) {
+    await peopleEnsureReactionTable();
+    const removed = await peoplePool.query(
+      "DELETE FROM people_message_reactions " +
+      "WHERE scope = $1 AND message_id = $2 AND account_id = $3 AND emoji_key = $4 " +
+      "RETURNING id",
+      [kind, id, me, emojiKey]
+    );
+
+    if (!removed.rows[0]) {
+      await peoplePool.query(
+        "INSERT INTO people_message_reactions(scope, message_id, account_id, emoji_key, emoji_cipher) " +
+        "VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
+        [kind, id, me, emojiKey, emojiCipher]
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  const items = peopleReadLocalReactions();
+  const index = items.findIndex((item) =>
+    String(item.scope) === kind &&
+    String(item.messageId) === id &&
+    String(item.accountId) === me &&
+    String(item.emojiKey || "") === emojiKey
+  );
+
+  if (index >= 0) {
+    items.splice(index, 1);
+    peopleWriteLocalReactions(items);
+    return false;
+  }
+
+  items.push({
+    scope: kind,
+    messageId: id,
+    accountId: me,
+    emojiKey,
+    emoji: emojiCipher,
+    createdAt: Date.now()
+  });
+  peopleWriteLocalReactions(items);
+  return true;
+}
+
+async function peopleBroadcastReactionUpdate(context) {
+  if (!context) return;
+
+  const payload = {
+    scope: context.scope,
+    messageId: context.messageId
+  };
+
+  if (context.scope === "dm") {
+    const recipients = [...new Set([context.senderId, context.recipientId].filter(Boolean))];
+    for (const recipientId of recipients) {
+      peopleEmitToAccount(recipientId, "message-reaction-updated", payload);
+    }
+    return;
+  }
+
+  if (context.serverId) {
+    payload.serverId = context.serverId;
+    payload.channelId = context.channelId || "";
+    io.to(peopleServerRoom(context.serverId)).emit("message-reaction-updated", payload);
+    return;
+  }
+
+  io.emit("message-reaction-updated", payload);
+}
+
+app.get("/api/message-reactions/:scope/:id", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const context = await peopleReactionMessageContext(
+      req.params.scope,
+      req.params.id,
+      session.id
+    );
+
+    if (!context) {
+      return res.status(404).json({ ok: false, error: "Message introuvable." });
+    }
+
+    const reactions = await peopleReactionSummary(context.scope, context.messageId, session.id);
+    res.json({ ok: true, reactions });
+  } catch (err) {
+    console.error("[People reactions/get]", err);
+    res.status(500).json({ ok: false, error: "Impossible de charger les réactions." });
+  }
+});
+
+app.post("/api/message-reactions/:scope/:id/toggle", async (req, res) => {
+  try {
+    const session = peopleSessionForRequest(req, res);
+    if (!session) return;
+
+    const context = await peopleReactionMessageContext(
+      req.params.scope,
+      req.params.id,
+      session.id
+    );
+
+    if (!context) {
+      return res.status(404).json({ ok: false, error: "Message introuvable." });
+    }
+
+    const emoji = peopleReactionEmoji(req.body?.emoji);
+    if (!emoji) {
+      return res.status(400).json({ ok: false, error: "Réaction invalide." });
+    }
+
+    const active = await peopleToggleReaction(context.scope, context.messageId, session.id, emoji);
+    const reactions = await peopleReactionSummary(context.scope, context.messageId, session.id);
+
+    res.json({ ok: true, active, reactions });
+    await peopleBroadcastReactionUpdate(context);
+  } catch (err) {
+    console.error("[People reactions/toggle]", err);
+    res.status(err?.code === "REACTION_INVALID" ? 400 : 500).json({
+      ok: false,
+      error: err?.code === "REACTION_INVALID" ? "Réaction invalide." : "Impossible de modifier la réaction."
+    });
+  }
+});
+// === PEOPLE_MESSAGE_REACTIONS_V1_END ===
 
 // === PEOPLE_SERVERS_V1_START ===
 const PEOPLE_LOCAL_SERVERS =
@@ -8858,10 +9847,12 @@ async function peopleServerLoadMessages(
     );
 
   if (peoplePool) {
+    await peopleEnsureReplyColumns();
+
     const result =
       await peoplePool.query(
         "SELECT " +
-        "gm.id, gm.username, gm.body, gm.reply_to_id, gm.is_system, gm.created_at, " +
+        "gm.id, gm.username, gm.body, gm.reply_to_id, gm.is_system, gm.created_at, gm.edited_at, " +
         "(SELECT i.id FROM people_message_images i " +
         "WHERE i.general_message_id = gm.id LIMIT 1) AS image_id, " +
         "rgm.username AS reply_username, " +
@@ -8934,7 +9925,9 @@ async function peopleServerLoadMessages(
           time:
             new Date(
               row.created_at
-            ).getTime()
+            ).getTime(),
+          editedAt:
+            row.edited_at || null
         })
       );
   }
@@ -9030,7 +10023,11 @@ async function peopleServerLoadMessages(
             Number(
               message.time ||
               Date.now()
-            )
+            ),
+          editedAt:
+            message.editedAt ||
+            message.edited_at ||
+            null
         };
       }
     );
@@ -14340,6 +15337,93 @@ io.on("connection", (socket) => {
     }
   );
   // === PEOPLE_GENERAL_OPTIMISTIC_SERVER_V1_END ===
+
+  // === PEOPLE_SERVER_MESSAGE_EDIT_SOCKET_V6_START ===
+  socket.on(
+    "chat-message-edit",
+    async (
+      { id, text } = {},
+      ack = () => {}
+    ) => {
+      try {
+        const senderId =
+          userIds.get(socket.id);
+
+        const serverId =
+          socketServerIds.get(socket.id);
+
+        const channelId =
+          socketTextChannelIds.get(socket.id);
+
+        if (!senderId || !serverId || !channelId) {
+          return ack({
+            ok: false,
+            error:
+              "Aucun serveur actif."
+          });
+        }
+
+        const rawText =
+          String(text || "");
+
+        if (rawText.length > 1000) {
+          return ack({
+            ok: false,
+            error:
+              "Le message est trop long."
+          });
+        }
+
+        const edited =
+          await peopleServerEditMessage(
+            senderId,
+            serverId,
+            channelId,
+            id,
+            rawText
+          );
+
+        if (!edited) {
+          return ack({
+            ok: false,
+            error:
+              "Tu ne peux modifier que tes propres messages."
+          });
+        }
+
+        const payload = {
+          id: edited.id,
+          channelId: edited.channelId,
+          text: edited.text,
+          editedAt: edited.editedAt
+        };
+
+        io.to(
+          peopleServerRoom(serverId)
+        ).emit(
+          "chat-message-edited",
+          payload
+        );
+
+        ack({
+          ok: true,
+          message: payload
+        });
+      } catch (err) {
+        console.error(
+          "[People server message/edit]",
+          err
+        );
+
+        ack({
+          ok: false,
+          error:
+            "Impossible de modifier ce message."
+        });
+      }
+    }
+  );
+  // === PEOPLE_SERVER_MESSAGE_EDIT_SOCKET_V6_END ===
 
   socket.on(
     "chat-message-delete",

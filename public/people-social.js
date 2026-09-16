@@ -300,6 +300,7 @@
     peopleDmViewCache.delete(key);
     peopleDmViewCache.set(key, value);
     peopleDmTrimMap(peopleDmViewCache, PEOPLE_DM_VIEW_CACHE_MAX);
+    void window.PeopleOffline?.cacheDmView?.(username, value);
   }
 
   function peopleDmCachedView(username) {
@@ -1057,20 +1058,22 @@
               );
           }
 
-          await api(
-            "/api/e2ee/device",
-            {
-              method:
-                "POST",
-              body:
-                JSON.stringify({
-                  deviceId:
-                    record.deviceId,
-                  publicJwk:
-                    record.publicJwk
-                })
-            }
-          );
+          if (navigator.onLine !== false) {
+            await api(
+              "/api/e2ee/device",
+              {
+                method:
+                  "POST",
+                body:
+                  JSON.stringify({
+                    deviceId:
+                      record.deviceId,
+                    publicJwk:
+                      record.publicJwk
+                  })
+              }
+            );
+          }
 
           return record;
         }
@@ -3572,7 +3575,28 @@
               data.unreadTotal || 0
             );
             renderConversationList();
-          } catch {}
+            void window.PeopleOffline?.cacheConversations?.(
+              conversations,
+              data.unreadTotal || 0
+            );
+          } catch {
+            if (navigator.onLine === false) {
+              const cachedData = await window.PeopleOffline?.getConversations?.().catch(() => null);
+              if (cachedData) {
+                conversations = Array.isArray(cachedData.conversations)
+                  ? cachedData.conversations
+                  : [];
+                conversationsByUsername = new Map(
+                  conversations.map((conversation) => [
+                    String(conversation?.user?.username || ""),
+                    conversation
+                  ])
+                );
+                updateUnreadBadge(cachedData.unreadTotal || 0);
+                renderConversationList();
+              }
+            }
+          }
         } while (
           conversationsRefreshQueued &&
           socialReady
@@ -3766,6 +3790,12 @@ function dmTextLine(
       "mine",
       Boolean(mine)
     );
+
+    if (message?._peopleOfflineQueueId) {
+      row.dataset.peopleDmPendingId = String(message._peopleOfflineQueueId);
+      row.dataset.peopleOfflinePending = "1";
+      row.classList.add("people-dm-pending");
+    }
 
     const av =
       document.createElement("button");
@@ -4419,7 +4449,16 @@ function dmTextLine(
 
     const wanted = peopleDmUsernameKey(username);
     const requestVersion = ++peopleDmLoadRequestVersion;
-    const cached = peopleDmCachedView(username);
+    let cached = peopleDmCachedView(username);
+
+    if (!cached) {
+      const persisted = await window.PeopleOffline?.getDmView?.(username).catch(() => null);
+      if (persisted) {
+        peopleDmViewCache.set(wanted, persisted);
+        peopleDmTrimMap(peopleDmViewCache, PEOPLE_DM_VIEW_CACHE_MAX);
+        cached = persisted;
+      }
+    }
 
     if (cached && options?.skipCache !== true) {
       peopleDmRenderConversation(
@@ -4433,6 +4472,26 @@ function dmTextLine(
             cached.hasNewer
         }
       );
+    }
+
+    if (navigator.onLine === false) {
+      if (cached) {
+        peopleDmRenderConversation(
+          username,
+          cached.user || activeDmUser,
+          cached.messages || [],
+          {
+            hasOlder: Boolean(cached.hasOlder),
+            hasNewer: Boolean(cached.hasNewer)
+          }
+        );
+      } else if (requestVersion === peopleDmLoadRequestVersion) {
+        const empty = document.createElement("div");
+        empty.className = "home-empty";
+        empty.textContent = "Cette conversation n'a pas encore été synchronisée sur cet appareil.";
+        dmMessages.replaceChildren(empty);
+      }
+      return;
     }
 
     try {
@@ -5152,6 +5211,12 @@ function dmTextLine(
 
       socialReady = true;
 
+      if (navigator.onLine === false) {
+        await refreshConversations();
+        showFriends({ refresh: false });
+        return;
+      }
+
       await Promise.all([
         refreshConversations(),
         refreshFriendRequests(),
@@ -5235,6 +5300,52 @@ function dmTextLine(
       const replyToId =
         replySnapshot?.id ||
         null;
+
+      if (navigator.onLine === false) {
+        if (files.length) {
+          alert("Les pièces jointes demandent une connexion. Ton texte reste dans le champ.");
+          return;
+        }
+
+        const pending = peopleDmAddPending(
+          targetUsername,
+          body
+        );
+
+        if (replySnapshot?.id) {
+          pending.message.replyTo = {
+            id: String(replySnapshot.id || ""),
+            username: replySnapshot.username,
+            text: replySnapshot.text,
+            imageId: replySnapshot.imageId || null,
+            deleted: false
+          };
+        }
+
+        await window.PeopleOffline?.queueDm?.({
+          username: targetUsername,
+          senderId: String(me?.id || ""),
+          recipientId: String(activeDmUser?.id || ""),
+          body,
+          replyToId,
+          replySnapshot: pending.message.replyTo || null,
+          clientId: pending.id,
+          createdAt: Date.now()
+        });
+
+        if (dmMessages) {
+          const built = dmMessageElement(pending.message);
+          built.row.dataset.peopleDmPendingId = pending.id;
+          built.row.classList.add("people-dm-pending");
+          dmMessages.appendChild(built.row);
+          peopleDmScrollToBottom();
+        }
+
+        dmInput.value = "";
+        peopleDmReplyController?.clear();
+        dmInput.focus();
+        return;
+      }
 
       /*
         Le texte seul est optimiste :
@@ -5846,6 +5957,52 @@ function dmTextLine(
       bootstrapSocial(event.detail || null);
     }
   );
+
+  // === PEOPLE_OFFLINE_DM_SENDER_V1_START ===
+  window.PeopleOffline?.registerDmSender?.(
+    async (payload) => {
+      const targetUsername = String(payload?.username || "").trim();
+      if (!targetUsername) {
+        throw new Error("Conversation privée introuvable.");
+      }
+
+      const encryptedBody = payload?.body
+        ? await peopleDmE2eeEncryptText(payload.body, targetUsername)
+        : "";
+
+      return api(
+        "/api/dm/" + encodeURIComponent(targetUsername),
+        {
+          method: "POST",
+          body: JSON.stringify({
+            body: encryptedBody,
+            imageId: null,
+            replyToId: payload?.replyToId || null
+          })
+        }
+      );
+    }
+  );
+
+  window.addEventListener(
+    "people-offline-message-sent",
+    (event) => {
+      if (event.detail?.type !== "dm") return;
+      const target = String(event.detail?.payload?.username || "");
+      const pendingId = String(event.detail?.payload?.clientId || event.detail?.id || "");
+      peopleDmRemovePending(pendingId);
+      peopleDmRemovePendingElement(pendingId);
+      if (
+        activeDmUser?.username &&
+        peopleDmUsernameKey(activeDmUser.username) === peopleDmUsernameKey(target)
+      ) {
+        void loadActiveDm({ skipCache: true });
+      } else {
+        void refreshConversations();
+      }
+    }
+  );
+  // === PEOPLE_OFFLINE_DM_SENDER_V1_END ===
 
   // === PEOPLE_DM_MENTION_PING_V2_START ===
   let peopleDmPingAudioContext = null;

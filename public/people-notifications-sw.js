@@ -1,13 +1,132 @@
 "use strict";
 
-const PEOPLE_NOTIFICATIONS_SW_VERSION = "20260908-4";
+const PEOPLE_NOTIFICATIONS_SW_VERSION = "20260916-offline-1";
+const PEOPLE_SHELL_CACHE = "people-shell-20260916-offline-1";
+const PEOPLE_SHELL_ASSETS = [
+  "/",
+  "/index.html",
+  "/socket.io/socket.io.js",
+  "/style.css",
+  "/people-offline.css",
+  "/people-offline.js",
+  "/people-avatars.js",
+  "/people-rich-content.js",
+  "/people-message-actions.js",
+  "/people-camera-effects.js",
+  "/app.js",
+  "/people-avatar-cropper.js",
+  "/people-avatar-ultra.js",
+  "/people-settings.js",
+  "/people-social.js",
+  "/people-message-reactions.js",
+  "/people-servers.js",
+  "/people-server-channels.js",
+  "/people-server-settings.js",
+  "/people-local-controls.js",
+  "/people-page-title.js",
+  "/people-mobile.js",
+  "/people-dm-calls.js",
+  "/people-media-fullscreen.js",
+  "/people-image-viewer.js",
+  "/people-server-voice-ui.js",
+  "/people-appearance-settings-v2.js",
+  "/people-theme-studio.js",
+  "/people-unread.js",
+  "/people-appearance.css",
+  "/people-settings.css",
+  "/people-server-channels.css",
+  "/people-server-settings.css",
+  "/people-dm-calls.css",
+  "/people-mobile.css",
+  "/people-media-fullscreen.css",
+  "/people-image-viewer.css",
+  "/people-server-voice-ui.css",
+  "/people-appearance-settings-v2.css",
+  "/people-theme-studio.css",
+  "/people-unread.css",
+  "/people-composer-lower.css"
+];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(PEOPLE_SHELL_CACHE);
+      await Promise.allSettled(
+        PEOPLE_SHELL_ASSETS.map(async (url) => {
+          const response = await fetch(url, { cache: "reload" });
+          if (response.ok) await cache.put(url, response.clone());
+        })
+      );
+      await self.skipWaiting();
+    })()
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key.startsWith("people-shell-") && key !== PEOPLE_SHELL_CACHE)
+          .map((key) => caches.delete(key))
+      );
+      await self.clients.claim();
+    })()
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/")) return;
+  if (url.pathname.startsWith("/socket.io/") && url.pathname !== "/socket.io/socket.io.js") return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      (async () => {
+        try {
+          const fresh = await fetch(request);
+          if (fresh.ok) {
+            const cache = await caches.open(PEOPLE_SHELL_CACHE);
+            await cache.put("/", fresh.clone());
+          }
+          return fresh;
+        } catch {
+          return (await caches.match(request)) || (await caches.match("/")) || Response.error();
+        }
+      })()
+    );
+    return;
+  }
+
+  const isStatic = /\.(?:js|css|png|jpg|jpeg|webp|gif|ico|svg|woff2?)$/i.test(url.pathname);
+  if (!isStatic) return;
+
+  event.respondWith(
+    (async () => {
+      const cached = await caches.match(request, { ignoreSearch: true });
+      const refresh = fetch(request)
+        .then(async (response) => {
+          if (response.ok) {
+            const cache = await caches.open(PEOPLE_SHELL_CACHE);
+            await cache.put(request, response.clone());
+          }
+          return response;
+        })
+        .catch(() => null);
+
+      if (cached) {
+        event.waitUntil(refresh);
+        return cached;
+      }
+
+      return (await refresh) || Response.error();
+    })()
+  );
 });
 
 self.addEventListener("message", (event) => {

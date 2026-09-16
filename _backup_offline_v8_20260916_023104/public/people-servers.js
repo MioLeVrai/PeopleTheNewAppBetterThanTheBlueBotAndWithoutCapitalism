@@ -657,24 +657,10 @@
       return;
     }
 
-    let data;
-
-    try {
-      data =
-        await api(
-          "/api/servers"
-        );
-      void window.PeopleOffline?.cacheServers?.(data.servers || []);
-    } catch (err) {
-      if (navigator.onLine !== false) throw err;
-      data = await window.PeopleOffline?.getServers?.().catch(() => null);
-      if (!data) {
-        servers = [];
-        serverById = new Map();
-        renderRail();
-        return;
-      }
-    }
+    const data =
+      await api(
+        "/api/servers"
+      );
 
     servers =
       Array.isArray(

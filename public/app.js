@@ -889,6 +889,14 @@ function peopleFailPendingGeneralMessage(
 function peopleHandleIncomingGeneralMessage(
   data
 ) {
+  if (data?.channelId) {
+    void window.PeopleOffline?.appendServerMessage?.(
+      data?.serverId || peopleActiveServerId,
+      data.channelId,
+      data
+    );
+  }
+
   if (
     data?.channelId &&
     peopleActiveTextChannelId &&
@@ -2024,6 +2032,8 @@ function peopleRememberServerPayload(serverId, payload) {
     if (first === undefined) break;
     peopleServerViewCache.delete(first);
   }
+
+  void window.PeopleOffline?.cacheServerPayload?.(key, payload);
 }
 
 function peopleCachedServerPayload(serverId) {
@@ -2144,6 +2154,21 @@ window.PeopleServerRuntime = {
     );
     peopleSyncVoiceUiContext();
 
+    if (navigator.onLine === false) {
+      const offlinePayload = await window.PeopleOffline?.getServerPayload?.(serverId).catch(() => null);
+      if (!offlinePayload) {
+        return { ok: false, error: "Ce serveur n'a pas encore été synchronisé sur cet appareil." };
+      }
+      if (
+        requestVersion === peopleServerSelectRequestVersion &&
+        peopleActiveServerId === serverId
+      ) {
+        peopleApplySelectedServerPayload(offlinePayload);
+        peopleSyncVoiceUiContext();
+      }
+      return { ...offlinePayload, ok: true, offline: true };
+    }
+
     const response = await peopleSelectServerSocket(serverId, peopleActiveTextChannelId);
 
     if (!response?.ok) {
@@ -2215,6 +2240,19 @@ window.PeopleServerRuntime = {
     const sid = String(peopleActiveServerId || "");
     const cid = String(channelId || "");
     if (!sid || !cid) return { ok: false, error: "Salon invalide." };
+
+    if (navigator.onLine === false) {
+      const history = await window.PeopleOffline?.getServerChannel?.(sid, cid).catch(() => null);
+      if (!history) {
+        return { ok: false, error: "Ce salon n'a pas encore été synchronisé sur cet appareil." };
+      }
+      peopleActiveTextChannelId = cid;
+      peopleGeneralReplyController?.clear();
+      peopleGeneralImagePicker?.clear();
+      renderChatHistory(history);
+      peopleDispatchServerChannelState();
+      return { ok: true, offline: true, activeChannelId: cid, history };
+    }
 
     const response = await new Promise((resolve) => {
       socket.emit("server-channel-select", { serverId: sid, channelId: cid }, (value) => {
@@ -2362,6 +2400,7 @@ function applyAuthenticatedUser(user) {
     username
   );
   joinScreen.classList.add("hidden");
+  void window.PeopleOffline?.cacheAuth?.(user);
   window.dispatchEvent(new CustomEvent("people-authenticated", { detail: user }));
   return true;
 }
@@ -2396,6 +2435,11 @@ async function bootstrapAuth() {
       socket.emit("join", { reconnect: true });
     }
   } catch {
+    const cachedUser = await window.PeopleOffline?.getAuth?.().catch(() => null);
+    if (cachedUser && applyAuthenticatedUser(cachedUser)) {
+      window.dispatchEvent(new CustomEvent("people-offline-auth", { detail: cachedUser }));
+      return;
+    }
     joinScreen.classList.remove("hidden");
   }
 }
@@ -2480,6 +2524,7 @@ logoutButton?.addEventListener("click", async () => {
     });
   } catch {}
 
+  await window.PeopleOffline?.clearAuth?.().catch(() => {});
   location.reload();
 });
 
@@ -2529,6 +2574,60 @@ messageForm.addEventListener(
       peopleGeneralReplyController
         ?.get() ||
       null;
+
+    if (navigator.onLine === false) {
+      if (files.length) {
+        alert("Les pièces jointes demandent une connexion. Ton texte reste dans le champ.");
+        return;
+      }
+
+      const clientId = peopleNewGeneralClientId();
+      const createdAt = Date.now();
+
+      await window.PeopleOffline?.queueServer?.({
+        serverId: String(peopleActiveServerId || ""),
+        channelId: String(peopleActiveTextChannelId || ""),
+        username,
+        text,
+        replyToId: reply?.id || null,
+        replySnapshot: reply
+          ? {
+              id: String(reply.id || ""),
+              username: reply.username,
+              text: reply.text,
+              imageId: reply.imageId || null,
+              deleted: false
+            }
+          : null,
+        clientId,
+        createdAt
+      });
+
+      addChatMessage({
+        channelId: peopleActiveTextChannelId,
+        username,
+        text,
+        imageId: null,
+        replyTo: reply
+          ? {
+              id: String(reply.id || ""),
+              username: reply.username,
+              text: reply.text,
+              imageId: reply.imageId || null,
+              deleted: false
+            }
+          : null,
+        time: createdAt,
+        clientId,
+        pending: true,
+        offlinePending: true
+      });
+
+      peopleGeneralReplyController?.clear();
+      messageInput.value = "";
+      messageInput.focus();
+      return;
+    }
 
     const submitButton =
       messageForm.querySelector(
@@ -2678,6 +2777,8 @@ messageForm.addEventListener(
 
 socket.on("connect", () => {
   if (!username) return;
+
+  setTimeout(() => void window.PeopleOffline?.flush?.(), 250);
 
   socket.emit("join", {
     reconnect: true
