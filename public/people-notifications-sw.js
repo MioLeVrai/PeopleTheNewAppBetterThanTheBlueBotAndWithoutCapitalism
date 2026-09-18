@@ -1,7 +1,7 @@
 "use strict";
 
-const PEOPLE_NOTIFICATIONS_SW_VERSION = "20260916-server-e2ee-v11a";
-const PEOPLE_SHELL_CACHE = "people-shell-20260916-server-e2ee-v11a";
+const PEOPLE_NOTIFICATIONS_SW_VERSION = "20260919-roles-render-fix-v3";
+const PEOPLE_SHELL_CACHE = "people-shell-20260919-roles-render-fix-v3";
 const PEOPLE_SHELL_ASSETS = [
   "/",
   "/index.html",
@@ -111,23 +111,20 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
-      const cached = await caches.match(request, { ignoreSearch: true });
-      const refresh = fetch(request)
-        .then(async (response) => {
-          if (response.ok) {
-            const cache = await caches.open(PEOPLE_SHELL_CACHE);
-            await cache.put(request, response.clone());
-          }
-          return response;
-        })
-        .catch(() => null);
-
-      if (cached) {
-        event.waitUntil(refresh);
-        return cached;
+      try {
+        const fresh = await fetch(request, { cache: "no-store" });
+        if (fresh.ok) {
+          const cache = await caches.open(PEOPLE_SHELL_CACHE);
+          await cache.put(request, fresh.clone());
+        }
+        return fresh;
+      } catch {
+        return (
+          (await caches.match(request)) ||
+          (await caches.match(url.pathname)) ||
+          Response.error()
+        );
       }
-
-      return (await refresh) || Response.error();
     })()
   );
 });

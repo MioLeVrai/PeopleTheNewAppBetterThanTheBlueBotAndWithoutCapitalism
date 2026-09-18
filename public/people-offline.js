@@ -528,7 +528,7 @@
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/people-notifications-sw.js?v=people-offline-v1-20260916", { scope: "/" }).catch(() => {});
+      navigator.serviceWorker.register("/people-notifications-sw.js?v=people-roles-render-fix-v3-20260919", { scope: "/" }).catch(() => {});
     }, { once: true });
   }
 

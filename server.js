@@ -13964,6 +13964,75 @@ app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, app: "People" });
 });
 
+// === PEOPLE_ROLES_RENDER_FIX_V3_START ===
+async function peopleVerifyServerRolesRenderV10() {
+  if (!peoplePool) {
+    console.log("[People] Roles Render V10 : stockage local.");
+    return;
+  }
+
+  const check = await peoplePool.query(
+    "SELECT " +
+      "to_regclass('public.people_server_roles') AS roles, " +
+      "to_regclass('public.people_server_member_roles') AS member_roles, " +
+      "to_regclass('public.people_server_role_channel_overrides') AS overrides, " +
+      "to_regclass('public.people_server_bans') AS bans"
+  );
+
+  const row = check.rows[0] || {};
+  if (!row.roles || !row.member_roles || !row.overrides || !row.bans) {
+    const err = new Error("ROLE_SCHEMA_NOT_READY");
+    err.code = "ROLE_SCHEMA_NOT_READY";
+    throw err;
+  }
+
+  console.log("[People] Roles Render V10 : schema PostgreSQL pret.");
+}
+
+app.get("/health/roles-v10", async (req, res) => {
+  res.set("Cache-Control", "no-store, max-age=0");
+
+  try {
+    if (!peoplePool) {
+      return res.status(200).json({
+        ok: true,
+        rolesPermissions: "v10-render-fix-v3",
+        storage: "local",
+        roleSchema: "local"
+      });
+    }
+
+    const check = await peoplePool.query(
+      "SELECT " +
+        "to_regclass('public.people_server_roles') AS roles, " +
+        "to_regclass('public.people_server_member_roles') AS member_roles, " +
+        "to_regclass('public.people_server_role_channel_overrides') AS overrides, " +
+        "to_regclass('public.people_server_bans') AS bans"
+    );
+
+    const row = check.rows[0] || {};
+    const ready = Boolean(row.roles) && Boolean(row.member_roles) &&
+      Boolean(row.overrides) && Boolean(row.bans);
+
+    return res.status(ready ? 200 : 503).json({
+      ok: ready,
+      rolesPermissions: "v10-render-fix-v3",
+      storage: "postgres",
+      roleSchema: ready ? "ready" : "missing"
+    });
+  } catch (err) {
+    console.error("[People roles/render-health]", err);
+    return res.status(500).json({
+      ok: false,
+      rolesPermissions: "v10-render-fix-v3",
+      storage: peoplePool ? "postgres" : "local",
+      roleSchema: "error",
+      error: String((err && (err.code || err.message)) || "ROLE_SCHEMA_ERROR")
+    });
+  }
+});
+// === PEOPLE_ROLES_RENDER_FIX_V3_END ===
+
 const users = new Map();
 const userIds = new Map();
 const socketServerIds = new Map();
@@ -18724,6 +18793,7 @@ peopleInitAccounts()
   .then(() => peopleInitServersV1())
   .then(() => peopleInitServerChannelsV2())
   .then(() => peopleInitServerRolesV1())
+  .then(() => peopleVerifyServerRolesRenderV10())
   .then(() => peopleInitServerE2eeV1())
   .then(() => peopleMigrateStoredMessageEncryption())
   // === PEOPLE_DELETE_EMPTY_ON_STARTUP_V1 ===
