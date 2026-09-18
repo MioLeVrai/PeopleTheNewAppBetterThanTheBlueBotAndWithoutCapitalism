@@ -2217,28 +2217,6 @@
         )
     };
   }
-  // === PEOPLE_E2EE_DEVICE_BRIDGE_V1_START ===
-  /*
-    Pont first-party vers la future couche E2EE des serveurs.
-    La clé privée reste une CryptoKey non exportable dans IndexedDB ;
-    aucun JWK privé n'est exposé.
-  */
-  window.PeopleE2EEDevice = Object.freeze({
-    async ensureDevice() {
-      const state = await peopleDmE2eeEnsureDevice();
-      return {
-        accountId: String(state.accountId || me?.id || ""),
-        deviceId: String(state.deviceId || ""),
-        privateKey: state.privateKey,
-        publicJwk: state.publicJwk
-      };
-    },
-    importPublicKey: peopleDmE2eeImportPublicKey,
-    bytesToBase64Url: peopleDmE2eeBytesToBase64Url,
-    base64UrlToBytes: peopleDmE2eeBase64UrlToBytes
-  });
-  // === PEOPLE_E2EE_DEVICE_BRIDGE_V1_END ===
-
   // === PEOPLE_DM_E2EE_CLIENT_V1_END ===
   // === PEOPLE_DM_SIDEBAR_PREVIEW_CLEAN_V1 ===
 

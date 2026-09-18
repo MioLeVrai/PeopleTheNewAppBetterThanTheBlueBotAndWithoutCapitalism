@@ -1,7 +1,7 @@
 "use strict";
 
-const PEOPLE_NOTIFICATIONS_SW_VERSION = "20260916-server-e2ee-v11a";
-const PEOPLE_SHELL_CACHE = "people-shell-20260916-server-e2ee-v11a";
+const PEOPLE_NOTIFICATIONS_SW_VERSION = "20260916-notification-prefs-v1";
+const PEOPLE_SHELL_CACHE = "people-shell-20260916-notification-prefs-v1";
 const PEOPLE_SHELL_ASSETS = [
   "/",
   "/index.html",
@@ -19,7 +19,6 @@ const PEOPLE_SHELL_ASSETS = [
   "/people-settings.js",
   "/people-notification-prefs.js",
   "/people-social.js",
-  "/people-server-e2ee.js",
   "/people-message-reactions.js",
   "/people-servers.js",
   "/people-server-channels.js",
