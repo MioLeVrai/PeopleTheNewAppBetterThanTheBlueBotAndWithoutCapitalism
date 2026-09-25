@@ -3379,29 +3379,37 @@
       const name = document.createElement("strong");
       name.textContent = conversation.user.username;
 
-      const preview = document.createElement("small");
-      preview.textContent =
-        conversation.lastMessage || "Message privé";
-
-      // === PEOPLE_DM_SIDEBAR_MP_PRIORITY_V1 ===
+      // === PEOPLE_DM_MINIMAL_LIST_V1_START ===
       /*
-        Dans la liste des MP, PP + pseudo font partie de la ligne
-        de conversation : tout clic ouvre le MP.
-        Les profils restent cliquables ailleurs dans People.
+        Liste MP minimaliste :
+        - jamais de preview du dernier message
+        - pseudo uniquement
+        - petite barre arrondie a droite si non-lu
       */
-      copy.append(name, preview);
+      copy.append(name);
 
       row.append(av, copy);
 
       if (conversation.unreadCount > 0) {
-        const badge = document.createElement("span");
-        badge.className = "dm-unread-badge";
-        badge.textContent =
+        row.classList.add("people-dm-has-unread");
+
+        const indicator = document.createElement("span");
+        indicator.className = "dm-unread-badge dm-unread-indicator";
+        indicator.title =
+          conversation.unreadCount > 1
+            ? `${conversation.unreadCount} messages non lus`
+            : "1 message non lu";
+        indicator.setAttribute(
+          "aria-label",
+          indicator.title
+        );
+        indicator.textContent =
           conversation.unreadCount > 99
             ? "99+"
             : String(conversation.unreadCount);
-        row.appendChild(badge);
+        row.appendChild(indicator);
       }
+      // === PEOPLE_DM_MINIMAL_LIST_V1_END ===
 
       fragment.appendChild(row);
     }

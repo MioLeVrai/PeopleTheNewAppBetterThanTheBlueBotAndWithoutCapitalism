@@ -172,3 +172,6 @@ body {
   line-height: 1 !important;
   align-self: center !important;
 }
+
+/* === PEOPLE_DM_MINIMAL_LIST_V1 === */
+.dm-conversation-row{position:relative;grid-template-columns:34px minmax(0,1fr) 6px;min-height:48px}.dm-sidebar-copy{min-width:0;display:flex;align-items:center;min-height:34px}.dm-sidebar-copy small{display:none !important}.dm-sidebar-copy strong{font-size:13px;color:rgba(242,239,248,.78);font-weight:720}.dm-conversation-row.people-dm-has-unread .dm-sidebar-copy strong,.dm-conversation-row:has(.dm-unread-indicator) .dm-sidebar-copy strong{color:var(--text,#f2eff8);font-weight:860}.dm-unread-badge.dm-unread-indicator{justify-self:end;align-self:center;width:4px;min-width:4px;height:24px;padding:0;border-radius:999px;background:linear-gradient(180deg,#8c7bff 0%,#b6adff 100%);box-shadow:0 2px 10px rgba(140,123,255,.28);color:transparent;font-size:0;line-height:0;overflow:hidden}.dm-conversation-row:not(.people-dm-has-unread) .dm-unread-indicator{display:none !important}@media (max-width:720px){.dm-conversation-row{grid-template-columns:34px minmax(0,1fr) 5px;padding:8px 7px}.dm-unread-badge.dm-unread-indicator{height:22px}}
