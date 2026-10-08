@@ -1054,9 +1054,11 @@ function peopleGeneralTextLine(
               data
             ),
           canDelete:
-            peopleGeneralOwnMessage(
-              data
-            ),
+            () => peopleGeneralOwnMessage(data) || Boolean(peopleActiveServerId && (
+              peopleServerPermissions?.owner ||
+              peopleServerPermissions?.names?.includes("ADMINISTRATOR") ||
+              peopleServerChannelById(data.channelId || peopleActiveTextChannelId)?.permissions?.includes("MANAGE_MESSAGES")
+            )),
           onReply:
             () =>
               peopleGeneralReplyController
@@ -4472,6 +4474,7 @@ updateScreenUi();
 // === PEOPLE_ONLINE_PANEL_V1_START ===
 const peopleAppRoot = document.querySelector(".app");
 const onlinePanel = document.getElementById("onlinePanel");
+socket.on("voice-disconnected-by-admin", () => { if (voiceJoined) leaveVoice(); });
 const onlinePanelToggle = document.getElementById("onlinePanelToggle");
 const onlinePanelClose = document.getElementById("onlinePanelClose");
 const onlinePanelCount = document.getElementById("onlinePanelCount");
@@ -4532,6 +4535,7 @@ const peopleMemberNameCollator =
   );
 
 function peopleRenderOnlineUsers(roster) {
+  window.PeoplePresence?.setRoster(roster);
   peoplePreloadAppAvatars(
     (
       Array.isArray(
@@ -4775,10 +4779,11 @@ function peopleRenderOnlineUsers(roster) {
           : "Hors ligne"
       );
 
-      info.append(
-        name,
-        status
-      );
+      const presence = user.status || (isOnline ? "online" : "offline");
+      status.textContent = window.PeoplePresence?.label(presence) || status.textContent;
+      dot.dataset.status = presence;
+      name.style.color = /^#[0-9a-f]{6}$/i.test(user.roleColor || "") ? user.roleColor : "";
+      info.append(name, status);
 
       row.append(
         av,

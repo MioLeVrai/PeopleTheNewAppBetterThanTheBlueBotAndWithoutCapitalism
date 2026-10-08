@@ -141,7 +141,7 @@
       );
     }
 
-    if (canDelete) {
+    if (typeof canDelete === "function" ? canDelete() : canDelete) {
       menu.appendChild(
         makeMenuButton(
           "🗑 Supprimer",
@@ -802,6 +802,31 @@
       );
     }
   );
+
+  let longPress = null;
+  let pressOrigin = null;
+  function cancelLongPress() {
+    clearTimeout(longPress);
+    longPress = null;
+    pressOrigin = null;
+  }
+  document.addEventListener("pointerdown", event => {
+    cancelLongPress();
+    if (event.pointerType !== "touch") return;
+    let node = event.target instanceof Element ? event.target : null;
+    while (node && !contextBindings.has(node)) node = node.parentElement;
+    if (!node) return;
+    pressOrigin = { x: event.clientX, y: event.clientY };
+    longPress = setTimeout(() => {
+      showMenu({ clientX: event.clientX, clientY: event.clientY, preventDefault() {}, stopPropagation() {} }, contextBindings.get(node));
+      longPress = null;
+    }, 550);
+  }, { passive: true });
+  document.addEventListener("pointermove", event => {
+    if (pressOrigin && Math.hypot(event.clientX - pressOrigin.x, event.clientY - pressOrigin.y) > 10) cancelLongPress();
+  }, { passive: true });
+  document.addEventListener("pointerup", cancelLongPress, { passive: true });
+  document.addEventListener("pointercancel", cancelLongPress, { passive: true });
 
   document.addEventListener(
     "pointerdown",

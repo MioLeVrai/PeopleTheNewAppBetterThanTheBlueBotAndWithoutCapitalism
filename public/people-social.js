@@ -4303,12 +4303,7 @@ function dmTextLine(
     );
 
     if (dmHeaderStatus) {
-      dmHeaderStatus.textContent =
-        activeDmUser.online === true
-          ? "En ligne"
-          : activeDmUser.online === false
-            ? "Hors ligne"
-            : "";
+      dmHeaderStatus.textContent = window.PeoplePresence?.label(activeDmUser.status || (activeDmUser.online ? "online" : "offline")) || (activeDmUser.online ? "En ligne" : "Hors ligne");
     }
 
     if (dmWelcomeTitle) {
@@ -5138,7 +5133,7 @@ function dmTextLine(
     try {
       const data = await api(
         "/api/profile/" +
-          encodeURIComponent(username)
+          encodeURIComponent(username) + (window.PeopleServerRuntime?.getActiveServerId?.() ? "?serverId=" + encodeURIComponent(window.PeopleServerRuntime.getActiveServerId()) : "")
       );
 
       currentProfile = data.profile;
@@ -5151,10 +5146,8 @@ function dmTextLine(
       profileModalName.textContent =
         currentProfile.username;
 
-      profileModalOnline.textContent =
-        currentProfile.online
-          ? "● En ligne"
-          : "Hors ligne";
+      profileModalOnline.textContent = window.PeoplePresence?.label(currentProfile.status) || (currentProfile.online ? "En ligne" : "Hors ligne");
+      window.PeoplePresence?.renderProfile(currentProfile);
 
       profileCreatedAt.textContent =
         profileDate(currentProfile.createdAt);
@@ -6581,10 +6574,8 @@ function dmTextLine(
           online;
 
         if (dmHeaderStatus) {
-          dmHeaderStatus.textContent =
-            online
-              ? "En ligne"
-              : "Hors ligne";
+          activeDmUser.status = payload.status || (online ? "online" : "offline");
+          dmHeaderStatus.textContent = window.PeoplePresence?.label(activeDmUser.status) || (online ? "En ligne" : "Hors ligne");
         }
       }
 
@@ -6603,10 +6594,8 @@ function dmTextLine(
           online;
 
         if (profileModalOnline) {
-          profileModalOnline.textContent =
-            online
-              ? "● En ligne"
-              : "Hors ligne";
+          currentProfile.status = payload.status || (online ? "online" : "offline");
+          profileModalOnline.textContent = window.PeoplePresence?.label(currentProfile.status) || (online ? "En ligne" : "Hors ligne");
         }
       }
     }

@@ -22,6 +22,20 @@ const cryptoAccounts = require("crypto");
 /* PEOPLE_SERVER_ICON_V1_JSON_LIMIT */
 app.use(express.json({ limit: "512kb" }));
 
+// Store successful administrative actions without message bodies or private keys.
+app.use((req, res, next) => {
+  const match = req.path.match(/^\/api\/servers\/([^/]+)(?:\/(roles(?:\/|$)|members\/[^/]+(?:\/roles)?$|bans(?:\/|$)|channels(?:\/|$)|icon$)|$)/);
+  if (match && ["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    res.on("finish", () => {
+      if (res.statusCode < 200 || res.statusCode >= 300) return;
+      const session = peopleSessionFromCookie(req.headers.cookie || "");
+      if (!session) return;
+      void peopleRecordAdminAction(decodeURIComponent(match[1]), session, req.method, req.path).catch(err => console.error("[People audit]", err));
+    });
+  }
+  next();
+});
+
 const PEOPLE_COOKIE = "people_session";
 const PEOPLE_DB_URL = String(process.env.DATABASE_URL || "").trim();
 const PEOPLE_PRODUCTION = process.env.NODE_ENV === "production";
@@ -1466,6 +1480,7 @@ function peoplePublicAccount(account) {
   return {
     id: String(account.id),
     username: peopleUsername(account.username),
+    status: peoplePublicStatus(account.id),
     description: String(account.description || ""),
     createdAt: account.created_at || account.createdAt || null
   };
@@ -3325,9 +3340,7 @@ async function peopleDmConversations(accountId) {
           account
         ),
         online:
-          peopleAccountIsOnline(
-            account.id
-          )
+          (peoplePublicStatus(account.id) !== "offline")
       },
       lastMessage:
         item.lastMessage,
@@ -5796,11 +5809,22 @@ app.get("/api/profile/:username", async (req, res) => {
       account.id
     );
 
+    let serverMember = null;
+    const serverId = String(req.query.serverId || "");
+    if (serverId) {
+      if (!(await peopleIsServerMember(session.id, serverId))) {
+        return res.status(403).json({ ok: false, error: "Accès refusé à ce serveur." });
+      }
+      const state = await peopleServerRoleState(account.id, serverId);
+      if (state) serverMember = { serverId, roles: state.assigned, roleColor: state.assigned[0]?.color || null, owner: state.owner };
+    }
+
     return res.json({
       ok: true,
       profile: {
         ...peoplePublicAccount(account),
-        online: peopleAccountIsOnline(account.id),
+        online: peoplePublicStatus(account.id) !== "offline",
+        serverMember,
         isFriend: relation.isFriend,
         friendRequest: relation.friendRequest,
         friendRequestId: relation.friendRequestId,
@@ -5994,9 +6018,7 @@ app.get("/api/social/people", async (req, res) => {
               account
             ),
             online:
-              peopleAccountIsOnline(
-                account.id
-              ),
+              (peoplePublicStatus(account.id) !== "offline"),
             isFriend:
               friendIds.has(id),
             friendRequest:
@@ -6030,9 +6052,7 @@ app.get("/api/social/friends", async (req, res) => {
       (account) => ({
         ...peoplePublicAccount(account),
         online:
-          peopleAccountIsOnline(
-            account.id
-          ),
+          (peoplePublicStatus(account.id) !== "offline"),
         isFriend: true
       })
     );
@@ -6115,7 +6135,7 @@ app.get("/api/social/friend-requests", async (req, res) => {
         user: {
           ...peoplePublicAccount(account),
           online:
-            peopleAccountIsOnline(account.id)
+            (peoplePublicStatus(account.id) !== "offline")
         }
       };
 
@@ -6826,9 +6846,7 @@ app.get("/api/dm/:username", async (req, res) => {
           target
         ),
         online:
-          peopleAccountIsOnline(
-            target.id
-          ),
+          (peoplePublicStatus(target.id) !== "offline"),
         isFriend
       },
       pageSize:
@@ -11108,7 +11126,8 @@ const PEOPLE_PERMISSION_DEFINITIONS = Object.freeze([
   { key: "KICK_MEMBERS", bit: 1 << 11, label: "Exclure des membres", group: "Modération" },
   { key: "BAN_MEMBERS", bit: 1 << 12, label: "Bannir des membres", group: "Modération" },
   { key: "MANAGE_SERVER", bit: 1 << 13, label: "Gérer le serveur", group: "Serveur" },
-  { key: "ADMINISTRATOR", bit: 1 << 14, label: "Administrateur", group: "Avancé" }
+  { key: "ADMINISTRATOR", bit: 1 << 14, label: "Administrateur", group: "Avancé" },
+  { key: "MOVE_MEMBERS", bit: 1 << 15, label: "Déconnecter les membres du vocal", group: "Modération" }
 ]);
 
 const PEOPLE_PERMISSION_BY_KEY = new Map(
@@ -11298,7 +11317,7 @@ async function peopleServerRoleState(accountId, serverId) {
     ? 1000000000
     : assigned.reduce((max, role) => Math.max(max, Number(role.position || 0)), 0);
 
-  return { server, roles, everyone, assigned, roleIds, owner, mask, highestRolePosition };
+  return { server, roles, everyone, assigned, roleIds: [...roleIds], owner, mask, highestRolePosition };
 }
 
 async function peopleListChannelRoleOverrides(serverId, channelId) {
@@ -11443,6 +11462,7 @@ async function peopleBroadcastServerPermissionRefresh(serverId) {
   if (!sid) return;
   await peopleServerE2eeRequestRotationAll(sid, "permissions");
   await peopleBroadcastServerChannels(sid);
+  await emitOnlineUsers(sid);
   const room = io.sockets.adapter.rooms.get(peopleServerRoom(sid));
   if (!room) return;
   const cache = new Map();
@@ -11578,6 +11598,12 @@ async function peopleSetMemberRoles(serverId, targetUserId, requestedRoleIds, ac
   const requested = [...new Set((Array.isArray(requestedRoleIds) ? requestedRoleIds : []).map(String))]
     .filter((id) => byId.has(id));
   const current = await peopleMemberRoleIds(sid, uid);
+  const targetState = await peopleServerRoleState(uid, sid);
+  if (!actorState?.owner && targetState &&
+      (targetState.owner || targetState.highestRolePosition >= actorState.highestRolePosition) &&
+      (current.some(id => !requested.includes(id)) || requested.some(id => !current.includes(id)))) {
+    const err = new Error("ROLE_HIERARCHY"); err.code = "ROLE_HIERARCHY"; throw err;
+  }
   const changed = new Set([...current, ...requested]);
   for (const rid of changed) {
     const inCurrent = current.includes(rid);
@@ -11915,7 +11941,9 @@ app.get("/api/servers/:id/permissions/me", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     if (!(await peopleIsServerMember(session.id, req.params.id))) return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
-    return res.json({ ok: true, permissions: await peoplePermissionSnapshot(session.id, req.params.id), catalog: peoplePermissionCatalog() });
+    const channelId = String(req.query.channelId || "") || null;
+    if (channelId && !(await peopleGetServerChannel(req.params.id, channelId))) return res.status(404).json({ ok: false, error: "Salon introuvable." });
+    return res.json({ ok: true, permissions: await peoplePermissionSnapshot(session.id, req.params.id, channelId), catalog: peoplePermissionCatalog() });
   } catch (err) {
     console.error("[People permissions/me]", err);
     return res.status(500).json({ ok: false, error: "Impossible de charger tes permissions." });
@@ -11991,6 +12019,7 @@ app.get("/api/servers/:id/member-roles", async (req, res) => {
         id,
         username: member.username || "Membre",
         owner: Boolean(server.ownerId && String(server.ownerId) === id),
+        highestRolePosition: (await peopleServerRoleState(id, server.id))?.highestRolePosition || 0,
         roleIds: await peopleMemberRoleIds(server.id, id)
       });
     }
@@ -12060,6 +12089,12 @@ app.delete("/api/servers/:id/channels/:channelId/role-overrides/:roleId", async 
     const state = await peopleServerRoleState(session.id, req.params.id);
     if (!state || !(peoplePermissionHas(state.mask, "MANAGE_ROLES") || peoplePermissionHas(state.mask, "MANAGE_CHANNELS"))) {
       return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les permissions de salon." });
+    }
+    const role = await peopleGetServerRole(req.params.id, req.params.roleId);
+    const channel = await peopleGetServerChannel(req.params.id, req.params.channelId);
+    if (!role || !channel) return res.status(404).json({ ok: false, error: "Salon ou rôle introuvable." });
+    if (!state.owner && !role.everyone && role.position >= state.highestRolePosition) {
+      return res.status(403).json({ ok: false, error: "Ce rôle est trop haut dans la hiérarchie." });
     }
     await peopleDeleteRoleChannelOverride(req.params.id, req.params.channelId, req.params.roleId);
     await peopleBroadcastServerPermissionRefresh(req.params.id);
@@ -13764,6 +13799,9 @@ app.get(
           id,
           accountId: id,
           username: entry.username || "Membre",
+          status: entry.status,
+          roles: entry.roles,
+          roleColor: entry.roleColor,
           online: Boolean(entry.online),
           connections: Number(entry.connections || 0),
           owner: Boolean(ownerId && id === ownerId),
@@ -14035,6 +14073,112 @@ app.get("/health/roles-v10", async (req, res) => {
 
 const users = new Map();
 const userIds = new Map();
+const peopleStatusPreferences = new Map();
+
+function peopleReadAdminAudit() {
+  const filename = pathAccounts.join(__dirname, "people-admin-audit.local.json");
+  if (!fsAccounts.existsSync(filename)) return [];
+  const entries = JSON.parse(fsAccounts.readFileSync(filename, "utf8"));
+  return Array.isArray(entries) ? entries : [];
+}
+
+async function peopleRecordAdminAction(serverId, actor, method, route) {
+  if (peoplePool) {
+    await peoplePool.query("INSERT INTO people_admin_audit (server_id, actor_id, actor_name, method, path) VALUES ($1, $2, $3, $4, $5)", [serverId, String(actor.id), actor.username, method, route]);
+  } else {
+    const entries = peopleReadAdminAudit();
+    entries.push({ server_id: serverId, actor_id: String(actor.id), actor_name: actor.username, method, path: route, created_at: new Date().toISOString() });
+    fsAccounts.writeFileSync(pathAccounts.join(__dirname, "people-admin-audit.local.json"), JSON.stringify(entries.slice(-5000)), "utf8");
+  }
+}
+
+app.get("/api/servers/:id/audit", async (req, res) => {
+  const session = peopleSessionForRequest(req, res); if (!session) return;
+  try {
+    if (!(await peopleCanServerPermission(session.id, req.params.id, "MANAGE_SERVER"))) {
+      return res.status(403).json({ ok: false, error: "Tu n'as pas accès au journal d'administration." });
+    }
+    const entries = peoplePool
+      ? (await peoplePool.query("SELECT actor_id, actor_name, method, path, created_at FROM people_admin_audit WHERE server_id = $1 ORDER BY id DESC LIMIT 100", [req.params.id])).rows
+      : peopleReadAdminAudit().filter(entry => String(entry.server_id) === req.params.id).slice(-100).reverse();
+    res.json({ ok: true, entries });
+  } catch (err) {
+    console.error("[People audit/read]", err);
+    res.status(500).json({ ok: false, error: "Impossible de charger le journal." });
+  }
+});
+
+app.delete("/api/servers/:id/members/:userId/voice", async (req, res) => {
+  const session = peopleSessionForRequest(req, res); if (!session) return;
+  try {
+    const check = await peopleServerCanModerate(session.id, req.params.id, req.params.userId, "MOVE_MEMBERS");
+    if (!check.ok) return res.status(403).json({ ok: false, error: check.reason });
+    for (const [socketId, user] of [...voiceUsers]) {
+      if (String(user.serverId) !== req.params.id || String(user.accountId || userIds.get(socketId)) !== req.params.userId) continue;
+      const target = io.sockets.sockets.get(socketId);
+      if (target) {
+        leaveVoice(target);
+        target.emit("voice-disconnected-by-admin", { serverId: req.params.id });
+      }
+    }
+    await peopleRecordAdminAction(req.params.id, session, "DELETE", req.path);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[People voice/moderation]", err);
+    res.status(500).json({ ok: false, error: "Impossible de déconnecter ce membre." });
+  }
+});
+
+function peoplePublicStatus(accountId) {
+  const uid = String(accountId);
+  if (!peopleAccountIsOnline(uid)) return "offline";
+  const preference = peopleStatusPreferences.get(uid) || "online";
+  return preference === "invisible" ? "offline" : preference;
+}
+
+async function peopleInitPresence() {
+  if (peoplePool) {
+    await peoplePool.query("CREATE TABLE IF NOT EXISTS people_admin_audit (id BIGSERIAL PRIMARY KEY, server_id BIGINT NOT NULL REFERENCES people_servers(id) ON DELETE CASCADE, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, method TEXT NOT NULL, path TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+    await peoplePool.query("CREATE TABLE IF NOT EXISTS people_presence_preferences (user_id BIGINT PRIMARY KEY REFERENCES people_accounts(id) ON DELETE CASCADE, status VARCHAR(12) NOT NULL DEFAULT 'online')");
+    const result = await peoplePool.query("SELECT user_id, status FROM people_presence_preferences");
+    for (const row of result.rows) peopleStatusPreferences.set(String(row.user_id), row.status);
+  } else {
+    for (const account of peopleReadLocalAccounts()) {
+      if (account.presenceStatus) peopleStatusPreferences.set(String(account.id), account.presenceStatus);
+    }
+  }
+}
+
+app.get("/api/presence/me", (req, res) => {
+  const session = peopleSessionForRequest(req, res); if (!session) return;
+  res.json({ ok: true, status: peopleStatusPreferences.get(String(session.id)) || "online" });
+});
+
+app.put("/api/presence/me", async (req, res) => {
+  const session = peopleSessionForRequest(req, res); if (!session) return;
+  const status = req.body?.status;
+  if (!["online", "idle", "dnd", "invisible"].includes(status)) {
+    return res.status(400).json({ ok: false, error: "Statut invalide." });
+  }
+  try {
+    const uid = String(session.id);
+    if (peoplePool) {
+      await peoplePool.query("INSERT INTO people_presence_preferences (user_id, status) VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE SET status = EXCLUDED.status", [uid, status]);
+    } else {
+      const accounts = peopleReadLocalAccounts();
+      const account = accounts.find(item => String(item.id) === uid);
+      if (!account) return res.status(401).json({ ok: false });
+      account.presenceStatus = status;
+      peopleWriteLocalAccounts(accounts);
+    }
+    peopleStatusPreferences.set(uid, status);
+    await peopleRefreshPresenceForAccount(uid);
+    res.json({ ok: true, status });
+  } catch (err) {
+    console.error("[People presence/update]", err);
+    res.status(500).json({ ok: false, error: "Impossible de modifier le statut." });
+  }
+});
 const socketServerIds = new Map();
 const socketTextChannelIds = new Map();
 const voiceUsers = new Map();
@@ -15662,6 +15806,33 @@ function peopleAccountConnectionCount(
 async function peopleServerPresenceRoster(
   serverId
 ) {
+  const roster = await peopleServerBaseRoster(serverId);
+  const roles = await peopleListServerRoles(serverId);
+  const assignments = new Map();
+  if (peoplePool) {
+    const result = await peoplePool.query("SELECT user_id, role_id FROM people_server_member_roles WHERE server_id = $1", [String(serverId)]);
+    for (const row of result.rows) {
+      const uid = String(row.user_id);
+      if (!assignments.has(uid)) assignments.set(uid, new Set());
+      assignments.get(uid).add(String(row.role_id));
+    }
+  } else {
+    for (const row of peopleReadLocalServers().memberRoles) {
+      if (String(row.serverId ?? row.server_id) !== String(serverId)) continue;
+      const uid = String(row.userId ?? row.user_id);
+      if (!assignments.has(uid)) assignments.set(uid, new Set());
+      assignments.get(uid).add(String(row.roleId ?? row.role_id));
+    }
+  }
+  return roster.map(member => {
+    const assigned = roles.filter(role => !role.everyone && assignments.get(member.accountId)?.has(String(role.id)));
+    const status = peoplePublicStatus(member.accountId);
+    return { ...member, status, online: status !== "offline", connections: undefined,
+      roles: assigned, roleColor: assigned[0]?.color || null };
+  });
+}
+
+async function peopleServerBaseRoster(serverId) {
   const sid =
     String(serverId || "");
 
@@ -15861,12 +16032,11 @@ function peopleEmitGlobalPresence(
   }
 
   const payload = {
+    status: peoplePublicStatus(uid),
     accountId:
       uid,
     online:
-      peopleAccountIsOnline(
-        uid
-      )
+      peoplePublicStatus(uid) !== "offline"
   };
 
   /*
@@ -18793,6 +18963,7 @@ peopleInitAccounts()
   .then(() => peopleInitServersV1())
   .then(() => peopleInitServerChannelsV2())
   .then(() => peopleInitServerRolesV1())
+  .then(() => peopleInitPresence())
   .then(() => peopleVerifyServerRolesRenderV10())
   .then(() => peopleInitServerE2eeV1())
   .then(() => peopleMigrateStoredMessageEncryption())

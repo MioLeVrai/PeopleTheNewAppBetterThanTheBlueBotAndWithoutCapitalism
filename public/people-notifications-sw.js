@@ -1,8 +1,13 @@
 "use strict";
 
-const PEOPLE_NOTIFICATIONS_SW_VERSION = "20260919-roles-render-fix-v3";
-const PEOPLE_SHELL_CACHE = "people-shell-20260919-roles-render-fix-v3";
+const PEOPLE_NOTIFICATIONS_SW_VERSION = "20261008-admin-presence";
+const PEOPLE_SHELL_CACHE = "people-shell-20261008-admin-presence";
 const PEOPLE_SHELL_ASSETS = [
+  "/people-presence.js",
+  "/people-presence.css",
+  "/manifest.webmanifest",
+  "/people-app-192.png",
+  "/people-app-512.png",
   "/",
   "/index.html",
   "/socket.io/socket.io.js",

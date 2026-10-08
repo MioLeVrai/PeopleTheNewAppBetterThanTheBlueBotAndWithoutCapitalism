@@ -5,7 +5,9 @@
   "description": "People - salon texte et vocal privé",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node tests/admin-presence.cjs",
+    "test:browser": "node tests/admin-presence.cjs --browser"
   },
   "dependencies": {
     "express": "^4.21.2",

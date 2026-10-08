@@ -279,6 +279,7 @@
   }
 
   function decide(scope = {}) {
+    if (window.PeoplePresence?.doNotDisturb) return { allowed: false, muted: true, mode: "none", sound: "none" };
     const config = resolved(scope);
     const muted = Boolean(activeMute(config.mutedUntil));
     const mentioned = Boolean(scope.mentioned);

@@ -411,6 +411,7 @@
     volume = 0.065
   ) {
     unlockCallAudio();
+    if (window.PeoplePresence?.doNotDisturb) return;
 
     if (
       !audioContext ||

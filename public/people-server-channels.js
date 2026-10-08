@@ -37,7 +37,8 @@
   function canServer(permission) {
     const server = activeServer();
     if (server?.ownerId && currentUserId && String(server.ownerId) === String(currentUserId)) return true;
-    return permissionNames(state.serverPermissions).has(String(permission));
+    const names = permissionNames(state.serverPermissions);
+    return names.has("ADMINISTRATOR") || names.has(String(permission));
   }
 
   function canChannel(channel, permission) {

@@ -52,7 +52,7 @@ let currentUserId = null;
 
   function hasPermission(permission, server = serverSnapshot) {
     if (isOwner(server) || serverPermissions?.owner) return true;
-    return Array.isArray(serverPermissions?.names) && serverPermissions.names.includes(String(permission));
+    return Array.isArray(serverPermissions?.names) && (serverPermissions.names.includes("ADMINISTRATOR") || serverPermissions.names.includes(String(permission)));
   }
 
   function initials(value) {
@@ -507,12 +507,20 @@ let currentUserId = null;
         identity.className = "people-server-settings-member-identity";
         const name = document.createElement("strong");
         name.textContent = member.username || "Membre";
+        if (/^#[0-9a-f]{6}$/i.test(member.roleColor || "")) name.style.color = member.roleColor;
         const state = document.createElement("span");
-        state.textContent = member.online ? "En ligne" : "Hors ligne";
+        state.textContent = window.PeoplePresence?.label(member.status) || (member.online ? "En ligne" : "Hors ligne");
         identity.append(name, state);
 
         const badges = document.createElement("div");
         badges.className = "people-server-settings-member-badges";
+        for (const role of member.roles || []) {
+          const badge = document.createElement("span");
+          badge.className = "people-role-badge";
+          badge.textContent = role.name;
+          if (/^#[0-9a-f]{6}$/i.test(role.color || "")) badge.style.setProperty("--role-color", role.color);
+          badges.append(badge);
+        }
         if (member.owner) {
           const owner = document.createElement("span");
           owner.className = "people-server-settings-member-badge owner";
@@ -530,6 +538,19 @@ let currentUserId = null;
         actions.className = "people-server-settings-member-actions";
         const targetId = String(member.id || member.accountId || "");
         const allowedTarget = canModerate(member);
+        if (hasPermission("MOVE_MEMBERS") && allowedTarget) {
+          const disconnect = document.createElement("button");
+          disconnect.type = "button";
+          disconnect.textContent = "Déconnecter du vocal";
+          disconnect.addEventListener("click", async () => {
+            disconnect.disabled = true;
+            try {
+              await api(`/api/servers/${encodeURIComponent(serverSnapshot.id)}/members/${encodeURIComponent(targetId)}/voice`, { method: "DELETE" });
+            } catch (err) { alert(err.message); }
+            finally { disconnect.disabled = false; }
+          });
+          actions.append(disconnect);
+        }
 
         if (canKick && allowedTarget) {
           const kick = document.createElement("button");
@@ -853,6 +874,7 @@ let currentUserId = null;
       const member = members.find((item) => String(item.id) === String(memberSelect.value));
       if (!member) return;
       const assigned = new Set(Array.isArray(member.roleIds) ? member.roleIds.map(String) : []);
+      const targetLocked = !me.owner && (member.owner || Number(member.highestRolePosition || 0) >= Number(me.highestRolePosition || 0));
       for (const role of sortedRoles.filter((item) => !item.everyone)) {
         const row = document.createElement("label");
         row.className = "people-role-member-check";
@@ -860,7 +882,7 @@ let currentUserId = null;
         check.type = "checkbox";
         check.value = String(role.id);
         check.checked = assigned.has(String(role.id));
-        const locked = !canManageRoles || (!me.owner && Number(role.position || 0) >= Number(me.highestRolePosition || 0));
+        const locked = targetLocked || !canManageRoles || (!me.owner && Number(role.position || 0) >= Number(me.highestRolePosition || 0));
         check.disabled = locked;
         const dot = document.createElement("span");
         dot.className = "people-role-color-dot";
@@ -870,10 +892,11 @@ let currentUserId = null;
         row.append(check, dot, text);
         memberChecks.appendChild(row);
       }
+      memberSave.disabled = !canManageRoles || targetLocked;
     }
     memberSelect.addEventListener("change", drawMemberRoles);
     drawMemberRoles();
-    memberSave.disabled = !canManageRoles || !members.length;
+    if (!members.length) memberSave.disabled = true;
     memberSave.addEventListener("click", async () => {
       const memberId = memberSelect.value;
       const roleIds = [...memberChecks.querySelectorAll('input[type="checkbox"]:checked')].map((item) => item.value);
@@ -1024,7 +1047,24 @@ let currentUserId = null;
     else if (id === "members") await renderMembers(content);
     else if (id === "invites") await renderInvites(content);
     else if (id === "roles") await renderRoles(content);
-    else renderPlaceholderSection(content, id);
+    else if (id === "moderation") {
+      await renderMembers(content);
+      if (hasPermission("MANAGE_SERVER")) {
+        content.append(sectionHeader("Journal d’administration", "Les dernières actions effectuées sur le serveur."));
+        try {
+          const result = await api(`/api/servers/${encodeURIComponent(serverSnapshot.id)}/audit`);
+          const actions = { POST: "Création", PUT: "Modification", PATCH: "Modification", DELETE: "Suppression / retrait" };
+          if (!result.entries.length) content.append(statusBox("Aucune action enregistrée."));
+          for (const entry of result.entries) {
+            const row = document.createElement("div");
+            row.className = "people-server-settings-card";
+            const kind = entry.path.includes("/roles") ? "rôle" : entry.path.includes("/bans") ? "bannissement" : entry.path.includes("/voice") ? "connexion vocale" : entry.path.includes("/members") ? "membre" : entry.path.includes("/channels") ? "salon" : "serveur";
+            row.textContent = `${new Date(entry.created_at).toLocaleString("fr-FR")} · ${entry.actor_name} · ${actions[entry.method] || entry.method} : ${kind}`;
+            content.append(row);
+          }
+        } catch (err) { content.append(statusBox(err.message, "error")); }
+      }
+    } else renderPlaceholderSection(content, id);
   }
 
   async function openSettings() {
