@@ -14137,6 +14137,7 @@ function peoplePublicStatus(accountId) {
 }
 
 async function peopleInitPresence() {
+  await peopleInitCallPrivacy();
   if (peoplePool) {
     await peoplePool.query("CREATE TABLE IF NOT EXISTS people_admin_audit (id BIGSERIAL PRIMARY KEY, server_id BIGINT NOT NULL REFERENCES people_servers(id) ON DELETE CASCADE, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, method TEXT NOT NULL, path TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())");
     await peoplePool.query("CREATE TABLE IF NOT EXISTS people_presence_preferences (user_id BIGINT PRIMARY KEY REFERENCES people_accounts(id) ON DELETE CASCADE, status VARCHAR(12) NOT NULL DEFAULT 'online')");
@@ -14182,6 +14183,76 @@ app.put("/api/presence/me", async (req, res) => {
 const socketServerIds = new Map();
 const socketTextChannelIds = new Map();
 const voiceUsers = new Map();
+
+// Only this serializer may expose double-call details. Hidden mode contains
+// no call, peer, socket, channel or server identifiers.
+const peopleCallPrivacy = new Map();
+const peopleCallPrivacyFile = pathAccounts.join(__dirname, "people-call-privacy.local.json");
+async function peopleInitCallPrivacy() {
+  if (peoplePool) {
+    await peoplePool.query("CREATE TABLE IF NOT EXISTS people_call_privacy (account_id TEXT PRIMARY KEY, show_peers BOOLEAN NOT NULL DEFAULT FALSE)");
+    const result = await peoplePool.query("SELECT account_id, show_peers FROM people_call_privacy");
+    for (const row of result.rows) peopleCallPrivacy.set(String(row.account_id), row.show_peers === true);
+  } else if (fsAccounts.existsSync(peopleCallPrivacyFile)) {
+    for (const [id, value] of Object.entries(JSON.parse(fsAccounts.readFileSync(peopleCallPrivacyFile, "utf8"))))
+      peopleCallPrivacy.set(id, value === true);
+  }
+}
+function peopleCallPresence(accountId) {
+  const aid = String(accountId);
+  const doubleCall = peopleAccountActiveVoiceCount(aid) >= 2;
+  const result = { doubleCall };
+  if (!doubleCall || peopleCallPrivacy.get(aid) !== true) return result;
+  const names = new Set();
+  for (const call of peopleDmCalls.values()) {
+    const role = peopleDmCallRoleForAccount(call, aid);
+    if (call.status !== "active" || !role || !peopleDmCallSocketForRole(call, role)) continue;
+    const other = peopleDmCallOtherRole(role);
+    if (peopleDmCallSocketForRole(call, other)) names.add(peopleDmCallUsernameForRole(call, other));
+  }
+  for (const voice of voiceUsers.values()) {
+    if (String(voice.accountId) !== aid) continue;
+    for (const peer of voiceUsers.values()) {
+      if (String(peer.accountId) !== aid && String(peer.serverId) === String(voice.serverId) && String(peer.channelId) === String(voice.channelId)) names.add(peer.username);
+    }
+  }
+  result.interlocutors = [...names].filter(Boolean);
+  return result;
+}
+function peopleScheduleCallPresence() {
+  // Synchronous snapshots ensure a finished call or privacy change cannot
+  // be followed by a delayed snapshot exposing stale details.
+  const accounts = new Map();
+  for (const [socketId, aid] of userIds) accounts.set(String(aid), users.get(socketId));
+  const states = [...accounts].map(([accountId, username]) => ({ accountId, username, ...peopleCallPresence(accountId) }));
+  for (const socketId of userIds.keys()) io.to(socketId).emit("people-call-presence", states);
+}
+app.get("/api/call-privacy", (req, res) => {
+  const session = peopleSessionForRequest(req, res); if (!session) return;
+  res.json({ ok: true, showInterlocutors: peopleCallPrivacy.get(String(session.id)) === true });
+});
+app.put("/api/call-privacy", async (req, res) => {
+  const session = peopleSessionForRequest(req, res); if (!session) return;
+  const value = req.body?.showInterlocutors;
+  if (typeof value !== "boolean") return res.status(400).json({ ok: false, error: "Réglage invalide." });
+  try {
+    const aid = String(session.id);
+    if (peoplePool) {
+      await peoplePool.query("INSERT INTO people_call_privacy (account_id, show_peers) VALUES ($1, $2) ON CONFLICT (account_id) DO UPDATE SET show_peers = EXCLUDED.show_peers", [aid, value]);
+    } else {
+      const prefs = Object.fromEntries(peopleCallPrivacy);
+      prefs[aid] = value;
+      fsAccounts.writeFileSync(peopleCallPrivacyFile, JSON.stringify(prefs), "utf8");
+    }
+    peopleCallPrivacy.set(aid, value);
+    for (const socketId of peopleDmCallAccountSocketIds(aid)) io.to(socketId).emit("people-call-privacy", { showInterlocutors: value });
+    peopleScheduleCallPresence();
+    res.json({ ok: true, showInterlocutors: value });
+  } catch (err) {
+    console.error("[People call privacy]", err);
+    res.status(500).json({ ok: false, error: "Impossible d'enregistrer ce réglage." });
+  }
+});
 
 // === PEOPLE_DM_CALLS_V1_START ===
 const peopleDmCalls =
@@ -16193,9 +16264,6 @@ function peopleVoiceChannelRoom(serverId, channelId) {
 // === PEOPLE_VOICE_NAVIGATION_V2_END ===
 
 // === PEOPLE_MULTI_VOICE_V1_START ===
-const PEOPLE_MAX_VOICE_ROOMS_PER_ACCOUNT =
-  1;
-
 function peopleVoiceAccountServerIds(
   accountId,
   exceptSocketId = ""
@@ -16259,7 +16327,7 @@ function peopleVoiceAccountServerIds(
 // === PEOPLE_UNIFIED_VOICE_LIMIT_V3_START ===
 // === PEOPLE_SINGLE_VOICE_GLOBAL_V4 ===
 const PEOPLE_MAX_SIMULTANEOUS_VOICES =
-  1;
+  2;
 
 function peopleAccountDmCallCount(
   accountId,
@@ -16315,13 +16383,16 @@ function peopleAccountDmCallCount(
   return count;
 }
 
+function peopleAccountServerVoiceCount(accountId, exceptSocketId = "") {
+  return [...voiceUsers.entries()].filter(([id, user]) =>
+    id !== exceptSocketId && String(user.accountId) === String(accountId)).length;
+}
+
 function peopleAccountActiveVoiceCount(
   accountId
 ) {
   return (
-    peopleVoiceAccountServerIds(
-      accountId
-    ).size +
+    peopleAccountServerVoiceCount(accountId) +
     peopleAccountDmCallCount(
       accountId
     )
@@ -16332,14 +16403,10 @@ function peopleAccountReservedVoiceCount(
   accountId
 ) {
   /*
-    Un appel qui sonne reserve deja l'unique place vocale.
-    On ne peut donc pas rejoindre un vocal serveur
-    pendant qu'un appel MP est en attente.
+    Un appel sortant, même en attente, réserve une des deux places vocales.
   */
   return (
-    peopleVoiceAccountServerIds(
-      accountId
-    ).size +
+    peopleAccountServerVoiceCount(accountId) +
     peopleAccountDmCallCount(
       accountId,
       {
@@ -16365,7 +16432,8 @@ function peopleAccountHasVoiceSlot(
 function peopleVoiceAccountInServer(
   accountId,
   serverId,
-  exceptSocketId = ""
+  exceptSocketId = "",
+  channelId = ""
 ) {
   const wantedAccount =
     String(
@@ -16412,7 +16480,8 @@ function peopleVoiceAccountInServer(
       String(
         user?.serverId ||
         ""
-      ) === wantedServer
+      ) === wantedServer &&
+      (!channelId || String(user.channelId) === String(channelId))
     ) {
       return true;
     }
@@ -16453,6 +16522,7 @@ function peopleVoiceRefreshAccount(
   accountId,
   extraServerIds = []
 ) {
+  peopleScheduleCallPresence();
   const rooms =
     peopleVoiceAccountServerIds(
       accountId
@@ -16736,6 +16806,7 @@ io.on("connection", (socket) => {
         accountId
       );
 
+      peopleScheduleCallPresence();
       peopleDmCallDeliverPendingForAccount(
         String(account.id),
         socket.id
@@ -16856,7 +16927,7 @@ io.on("connection", (socket) => {
                 joined.reason,
               error:
                 joined.reason === "limit"
-                  ? "Tu es déjà dans un vocal ou un autre appel."
+                  ? "Tu as atteint la limite de 2 appels simultanés."
                   : "Impossible de rejoindre cet appel."
             });
           }
@@ -16885,6 +16956,31 @@ io.on("connection", (socket) => {
               joined.peerScreen,
             initiator:
               joined.initiator
+          });
+        }
+
+        if (
+          !peopleAccountHasVoiceSlot(
+            callerAccountId
+          )
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Tu as atteint la limite de 2 appels simultanés."
+          });
+        }
+
+        if (
+          peopleAccountActiveVoiceCount(
+            target.id
+          ) >=
+          PEOPLE_MAX_SIMULTANEOUS_VOICES
+        ) {
+          return ack({
+            ok: false,
+            error:
+              "Cette personne a atteint la limite de 2 appels simultanés."
           });
         }
 
@@ -16917,31 +17013,6 @@ io.on("connection", (socket) => {
           ),
           now
         );
-
-        if (
-          !peopleAccountHasVoiceSlot(
-            callerAccountId
-          )
-        ) {
-          return ack({
-            ok: false,
-            error:
-              "Tu es déjà dans un vocal ou un appel."
-          });
-        }
-
-        if (
-          peopleAccountActiveVoiceCount(
-            target.id
-          ) >=
-          PEOPLE_MAX_SIMULTANEOUS_VOICES
-        ) {
-          return ack({
-            ok: false,
-            error:
-              "Cette personne est déjà dans un vocal ou un appel."
-          });
-        }
 
         const callId =
           cryptoAccounts
@@ -18157,8 +18228,7 @@ io.on("connection", (socket) => {
           );
 
         /*
-          Une seule session vocale People est autorisee
-          par compte, quel que soit l'onglet utilise.
+          Deux sessions vocales People maximum par compte, tous onglets confondus.
         */
         if (currentVoice) {
           if (
@@ -18208,7 +18278,8 @@ io.on("connection", (socket) => {
           peopleVoiceAccountInServer(
             aid,
             sid,
-            socket.id
+            socket.id,
+            voiceChannelId
           )
         ) {
           return ack({
@@ -18220,14 +18291,8 @@ io.on("connection", (socket) => {
           });
         }
 
-        const currentRooms =
-          peopleVoiceAccountServerIds(
-            aid,
-            socket.id
-          );
-
         const reservedElsewhere =
-          currentRooms.size +
+          peopleAccountServerVoiceCount(aid, socket.id) +
           peopleAccountDmCallCount(
             aid,
             {
@@ -18237,9 +18302,6 @@ io.on("connection", (socket) => {
           );
 
         if (
-          !currentRooms.has(
-            sid
-          ) &&
           reservedElsewhere >=
             PEOPLE_MAX_SIMULTANEOUS_VOICES
         ) {
@@ -18248,7 +18310,7 @@ io.on("connection", (socket) => {
             code:
               "VOICE_LIMIT",
             error:
-              "Tu es déjà dans un autre vocal ou un appel."
+              "Tu as atteint la limite de 2 appels simultanés."
           });
         }
 

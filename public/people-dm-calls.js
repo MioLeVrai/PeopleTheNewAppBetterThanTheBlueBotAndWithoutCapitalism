@@ -1,6 +1,7 @@
 /* ===== people-dm-calls.js — version stable d'origine ===== */
-(() => {
+function createPeopleDmCallSlot(suffix) {
   "use strict";
+  suffix = suffix || "";
 
   // === PEOPLE_DM_CALLS_V1_START ===
 
@@ -53,6 +54,7 @@
   };
 
   let call = null;
+  let starting = false;
   let joinableCall = null;
   let peer = null;
   let localStream = null;
@@ -94,7 +96,7 @@
     );
 
   callButton.id =
-    "peopleDmCallButton";
+    "peopleDmCallButton" + suffix;
 
   callButton.className =
     "people-dm-call-button";
@@ -123,7 +125,7 @@
     );
 
   overlay.id =
-    "peopleDmCallOverlay";
+    "peopleDmCallOverlay" + suffix;
 
   overlay.className =
     "people-dm-call-overlay hidden";
@@ -139,38 +141,38 @@
 
       <div class="people-dm-call-stage">
         <video
-          id="peopleDmCallRemoteVideo"
+          id="peopleDmCallRemoteVideo${suffix}"
           class="people-dm-call-remote-video hidden"
           autoplay
           playsinline
         ></video>
 
         <audio
-          id="peopleDmCallRemoteAudio"
+          id="peopleDmCallRemoteAudio${suffix}"
           autoplay
         ></audio>
 
         <div
-          id="peopleDmCallIdentity"
+          id="peopleDmCallIdentity${suffix}"
           class="people-dm-call-identity"
         >
           <div
-            id="peopleDmCallAvatar"
+            id="peopleDmCallAvatar${suffix}"
             class="people-dm-call-avatar"
           >?</div>
 
           <strong
-            id="peopleDmCallName"
+            id="peopleDmCallName${suffix}"
           >Appel People</strong>
 
           <span
-            id="peopleDmCallStatus"
+            id="peopleDmCallStatus${suffix}"
           >Connexion…</span>
 
         </div>
 
         <video
-          id="peopleDmCallLocalVideo"
+          id="peopleDmCallLocalVideo${suffix}"
           class="people-dm-call-local-video hidden"
           autoplay
           muted
@@ -179,11 +181,11 @@
       </div>
 
       <div
-        id="peopleDmCallIncomingActions"
+        id="peopleDmCallIncomingActions${suffix}"
         class="people-dm-call-incoming-actions hidden"
       >
         <button
-          id="peopleDmCallDecline"
+          id="peopleDmCallDecline${suffix}"
           class="people-dm-call-big-action decline"
           type="button"
         >
@@ -192,7 +194,7 @@
         </button>
 
         <button
-          id="peopleDmCallAccept"
+          id="peopleDmCallAccept${suffix}"
           class="people-dm-call-big-action accept"
           type="button"
         >
@@ -202,11 +204,11 @@
       </div>
 
       <div
-        id="peopleDmCallOutgoingActions"
+        id="peopleDmCallOutgoingActions${suffix}"
         class="people-dm-call-outgoing-actions hidden"
       >
         <button
-          id="peopleDmCallCancel"
+          id="peopleDmCallCancel${suffix}"
           class="people-dm-call-big-action decline"
           type="button"
         >
@@ -216,11 +218,11 @@
       </div>
 
       <div
-        id="peopleDmCallActiveActions"
+        id="peopleDmCallActiveActions${suffix}"
         class="people-dm-call-active-actions hidden"
       >
         <button
-          id="peopleDmCallMute"
+          id="peopleDmCallMute${suffix}"
           class="people-dm-call-control"
           type="button"
           title="Couper le micro"
@@ -230,7 +232,7 @@
         </button>
 
         <button
-          id="peopleDmCallCamera"
+          id="peopleDmCallCamera${suffix}"
           class="people-dm-call-control"
           type="button"
           title="Activer la caméra"
@@ -240,7 +242,7 @@
         </button>
 
         <button
-          id="peopleDmCallEffects"
+          id="peopleDmCallEffects${suffix}"
           class="people-dm-call-control people-dm-effects-control"
           type="button"
           title="Effets de visage"
@@ -251,7 +253,7 @@
         </button>
 
         <button
-          id="peopleDmCallScreen"
+          id="peopleDmCallScreen${suffix}"
           class="people-dm-call-control"
           type="button"
           title="Partager l'écran"
@@ -261,7 +263,7 @@
         </button>
 
         <button
-          id="peopleDmCallHangup"
+          id="peopleDmCallHangup${suffix}"
           class="people-dm-call-control danger"
           type="button"
           title="Raccrocher"
@@ -282,92 +284,92 @@
 
   const remoteVideo =
     document.getElementById(
-      "peopleDmCallRemoteVideo"
+      "peopleDmCallRemoteVideo" + suffix
     );
 
   const remoteAudio =
     document.getElementById(
-      "peopleDmCallRemoteAudio"
+      "peopleDmCallRemoteAudio" + suffix
     );
 
   const localVideo =
     document.getElementById(
-      "peopleDmCallLocalVideo"
+      "peopleDmCallLocalVideo" + suffix
     );
 
   const identity =
     document.getElementById(
-      "peopleDmCallIdentity"
+      "peopleDmCallIdentity" + suffix
     );
 
   const avatar =
     document.getElementById(
-      "peopleDmCallAvatar"
+      "peopleDmCallAvatar" + suffix
     );
 
   const callName =
     document.getElementById(
-      "peopleDmCallName"
+      "peopleDmCallName" + suffix
     );
 
   const callStatus =
     document.getElementById(
-      "peopleDmCallStatus"
+      "peopleDmCallStatus" + suffix
     );
 
   const incomingActions =
     document.getElementById(
-      "peopleDmCallIncomingActions"
+      "peopleDmCallIncomingActions" + suffix
     );
 
   const outgoingActions =
     document.getElementById(
-      "peopleDmCallOutgoingActions"
+      "peopleDmCallOutgoingActions" + suffix
     );
 
   const activeActions =
     document.getElementById(
-      "peopleDmCallActiveActions"
+      "peopleDmCallActiveActions" + suffix
     );
 
   const acceptButton =
     document.getElementById(
-      "peopleDmCallAccept"
+      "peopleDmCallAccept" + suffix
     );
 
   const declineButton =
     document.getElementById(
-      "peopleDmCallDecline"
+      "peopleDmCallDecline" + suffix
     );
 
   const cancelButton =
     document.getElementById(
-      "peopleDmCallCancel"
+      "peopleDmCallCancel" + suffix
     );
 
   const muteButton =
     document.getElementById(
-      "peopleDmCallMute"
+      "peopleDmCallMute" + suffix
     );
 
   const cameraButton =
     document.getElementById(
-      "peopleDmCallCamera"
+      "peopleDmCallCamera" + suffix
     );
 
   const effectsButton =
     document.getElementById(
-      "peopleDmCallEffects"
+      "peopleDmCallEffects" + suffix
     );
 
   const screenButton =
     document.getElementById(
-      "peopleDmCallScreen"
+      "peopleDmCallScreen" + suffix
     );
 
   const hangupButton =
     document.getElementById(
-      "peopleDmCallHangup"
+      "peopleDmCallHangup" + suffix
     );
 
   function unlockCallAudio() {
@@ -631,6 +633,7 @@
   // === PEOPLE_DM_CALL_GLOBAL_BRIDGE_V3 ===
   function peopleDmCallPublicState() {
     return {
+      callId: call?.id || "",
       exists:
         Boolean(call),
       phase:
@@ -663,7 +666,7 @@
   function peopleDmCallPublishState() {
     window.dispatchEvent(
       new CustomEvent(
-        "people-dm-call-state",
+        "people-dm-call-slot-state",
         {
           detail:
             peopleDmCallPublicState()
@@ -2558,7 +2561,7 @@
       unavailable:
         "Appel indisponible",
       limit:
-        "Tu es déjà dans un vocal ou un appel",
+        "Tu as atteint la limite de 2 appels simultanés",
       "joined-elsewhere":
         "Appel rejoint ailleurs",
       "answered-elsewhere":
@@ -2632,6 +2635,7 @@
     }
 
     call = null;
+    peopleDmCallPublishState();
     updateCallButtonLabel();
 
     showMode(
@@ -2646,7 +2650,7 @@
 
     const close =
       () => {
-        hideOverlay();
+        if (!call) hideOverlay();
       };
 
     if (
@@ -2665,7 +2669,7 @@
   function showIncoming(
     payload
   ) {
-    if (call) {
+    if (call || starting) {
       return;
     }
 
@@ -2967,6 +2971,7 @@
       return;
     }
 
+    starting = true;
     unlockCallAudio();
 
     callButton.disabled =
@@ -2978,6 +2983,7 @@
         targetUsername
       },
       (response) => {
+        starting = false;
         callButton.disabled =
           false;
 
@@ -3088,7 +3094,7 @@
 
   callButton.addEventListener(
     "click",
-    startCall
+    () => window.PeopleDmCalls.start()
   );
 
   acceptButton.addEventListener(
@@ -3267,10 +3273,7 @@
     }
   );
 
-  socket.on(
-    "dm-call-incoming",
-    showIncoming
-  );
+
 
   socket.on(
     "dm-call-accepted",
@@ -3598,7 +3601,11 @@
 
   updateCallButtonLabel();
 
-  window.PeopleDmCalls = {
+  const controller = {
+    start: startCall,
+    incoming: showIncoming,
+    available: () => !call && !starting,
+    show: showOverlay,
     getState() {
       return peopleDmCallPublicState();
     },
@@ -3703,7 +3710,50 @@
   updateMediaButtons();
   peopleDmCallPublishState();
 
+  if (suffix) {
+    callButton.hidden = true;
+    overlay.classList.add("people-dm-second-call");
+    overlay.querySelector("section").setAttribute("aria-modal", "false");
+  }
+  return controller;
   // === PEOPLE_DM_CALLS_V1_END ===
+
+}
+
+(() => {
+  const slots = [createPeopleDmCallSlot(), createPeopleDmCallSlot("Second")].filter(Boolean);
+  if (!slots.length) return;
+  const panels = ["peopleDmCallOverlay", "peopleDmCallOverlaySecond"].map(id => document.getElementById(id));
+  const syncPanels = () => document.body.classList.toggle("people-dm-dual-call", panels.every(panel => panel && !panel.classList.contains("hidden")));
+  const panelObserver = new MutationObserver(syncPanels);
+  for (const panel of panels) if (panel) panelObserver.observe(panel, { attributes: true, attributeFilter: ["class"] });
+  syncPanels();
+  const focused = () => {
+    const name = document.getElementById("dmHeaderName")?.textContent?.trim().toLocaleLowerCase();
+    return slots.find(slot => slot.getState().exists && slot.getState().username.toLocaleLowerCase() === name)
+      || slots.find(slot => slot.getState().exists) || slots[0];
+  };
+  window.PeopleDmCalls = {
+    getState: () => focused().getState(),
+    getStates: () => slots.map(slot => slot.getState()),
+    start() {
+      const name = document.getElementById("dmHeaderName")?.textContent?.trim().toLocaleLowerCase();
+      const existing = slots.find(slot => slot.getState().exists && slot.getState().username.toLocaleLowerCase() === name);
+      if (existing) return existing.show();
+      const free = slots.find(slot => slot.available());
+      if (free) return free.start();
+      window.alert("Tu as atteint la limite de 2 appels simultanés. Raccroche un appel pour continuer.");
+    }
+  };
+  for (const method of ["toggleMute", "toggleCamera", "toggleScreen", "openEffects", "end"])
+    window.PeopleDmCalls[method] = (...args) => focused()[method](...args);
+  socket.on("dm-call-incoming", payload => {
+    if (slots.some(slot => slot.getState().callId === String(payload.callId))) return;
+    slots.find(slot => slot.available())?.incoming(payload);
+  });
+  window.addEventListener("people-dm-call-slot-state", () => {
+    window.dispatchEvent(new CustomEvent("people-dm-call-state", { detail: window.PeopleDmCalls.getState() }));
+  });
 })();
 
 /* ===== people-dm-calls-v2.js — version stable d'origine ===== */

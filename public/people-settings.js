@@ -3174,6 +3174,7 @@
   }
 
   function openSettings() {
+    void loadCallPrivacy();
     activateTab(
       "profile"
     );
@@ -3196,6 +3197,39 @@
     void loadProfile();
     void loadAppearance();
   }
+
+  const callPrivacy = document.createElement("section");
+  callPrivacy.innerHTML = `<h3>Confidentialité des appels</h3>
+    <label><input type="checkbox"> Afficher avec qui je suis en double appel</label>
+    <p>Le double appel reste toujours visible. Désactivé, aucun interlocuteur n'est communiqué par cet indicateur.</p>
+    <p role="status"></p>`;
+  modal.querySelector('[data-settings-page="profile"]').append(callPrivacy);
+  const callPrivacyInput = callPrivacy.querySelector("input");
+  const callPrivacyFeedback = callPrivacy.querySelector('[role="status"]');
+  async function loadCallPrivacy() {
+    callPrivacyInput.disabled = true;
+    try {
+      const response = await fetch("/api/call-privacy");
+      if (!response.ok) throw new Error("Impossible de charger la confidentialité des appels.");
+      const data = await response.json();
+      callPrivacyInput.checked = data.showInterlocutors === true;
+      callPrivacyFeedback.textContent = "";
+      callPrivacyInput.disabled = false;
+    } catch (err) { callPrivacyFeedback.textContent = err.message; }
+  }
+  callPrivacyInput.addEventListener("change", async () => {
+    callPrivacyInput.disabled = true;
+    try {
+      const response = await fetch("/api/call-privacy", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ showInterlocutors: callPrivacyInput.checked }) });
+      if (!response.ok) throw new Error("Impossible d'enregistrer la confidentialité des appels.");
+      callPrivacyFeedback.textContent = "Réglage enregistré.";
+    } catch (err) {
+      callPrivacyInput.checked = !callPrivacyInput.checked;
+      callPrivacyFeedback.textContent = err.message;
+    } finally { callPrivacyInput.disabled = false; }
+  });
+  window.peopleSocket?.on("people-call-privacy", data => { callPrivacyInput.checked = data.showInterlocutors === true; });
+  window.peopleSocket?.on("connect", () => { if (!modal.classList.contains("hidden")) void loadCallPrivacy(); });
 
   settingsButton.addEventListener(
     "click",

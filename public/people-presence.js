@@ -2,6 +2,23 @@
   "use strict";
   const labels = { online: "En ligne", idle: "Absent", dnd: "Ne pas déranger", invisible: "Invisible", offline: "Hors ligne" };
   let roster = new Map();
+  const callPresence = document.createElement("section");
+  callPresence.setAttribute("aria-label", "Utilisateurs en double appel");
+  callPresence.setAttribute("aria-live", "polite");
+  callPresence.hidden = true;
+  document.querySelector(".profile")?.after(callPresence);
+  window.peopleSocket?.on("people-call-presence", states => {
+    callPresence.replaceChildren();
+    for (const state of states || []) {
+      if (!state.doubleCall) continue;
+      const row = document.createElement("p");
+      row.textContent = `${state.username} — En double appel`;
+      if (state.interlocutors?.length) row.textContent += ` avec ${state.interlocutors.join(", ")}`;
+      callPresence.append(row);
+    }
+    callPresence.hidden = !callPresence.childElementCount;
+  });
+  window.peopleSocket?.on("disconnect", () => { callPresence.replaceChildren(); callPresence.hidden = true; });
   let serverId = null;
   let currentUser = null;
   let visibleProfile = null;
