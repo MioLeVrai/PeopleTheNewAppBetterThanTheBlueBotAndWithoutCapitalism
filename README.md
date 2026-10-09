@@ -1,5 +1,12 @@
 # People
 
+La recherche rapide en haut de la navigation (Ctrl+K ou ⌘K) retrouve les
+serveurs, les salons texte du serveur actuel et les conversations privées.
+Les destinations avec des messages non lus apparaissent en premier. Les
+flèches parcourent les résultats, Entrée ouvre la destination et Échap ferme
+la recherche. Un bouton « Derniers messages » permet de revenir en bas de
+l'historique. Un compteur apparaît à l'approche de la limite de saisie.
+
 Les paramètres de serveur permettent de gérer le nom, l’image, les salons,
 les rôles et leurs permissions, les membres et les bannissements. Le rôle
 « Administrateur » donne toutes les permissions disponibles et ignore les

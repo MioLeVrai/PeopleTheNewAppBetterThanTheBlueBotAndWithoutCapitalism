@@ -56,6 +56,30 @@ module.exports = async ({ base, cookie, server }) => {
     await waitFor('Boolean(window.PeopleServers && window.PeoplePresence && window.peopleSocket?.connected && document.getElementById("joinScreen").classList.contains("hidden"))');
     await evaluate(`window.PeopleServers.openServer(${JSON.stringify(server)})`);
     await waitFor('Boolean(document.querySelector(".online-user-info strong") && document.getElementById("peopleServerChannelTree").children.length)');
+    await evaluate('document.querySelector(".people-quick-launch").click()');
+    await waitFor('document.querySelector(".people-quick-dialog").open');
+    assert.equal(await evaluate('document.activeElement.id'), "peopleQuickInput", "Search receives keyboard focus");
+    assert.equal(await evaluate('document.querySelector(".people-quick-dialog").getBoundingClientRect().right <= window.innerWidth'), true, "Search fits mobile viewport");
+    await evaluate('document.getElementById("peopleQuickInput").value = "inexistant-aucun-resultat"; document.getElementById("peopleQuickInput").dispatchEvent(new Event("input"))');
+    assert.equal(await evaluate('document.querySelectorAll(".people-quick-result").length'), 0, "Search filters destinations");
+    await evaluate('document.getElementById("peopleQuickInput").value = "amis"; document.getElementById("peopleQuickInput").dispatchEvent(new Event("input"))');
+    assert.equal(await evaluate('document.querySelectorAll(".people-quick-result").length'), 1, "Search finds friends");
+    await evaluate('document.getElementById("peopleQuickInput").dispatchEvent(new KeyboardEvent("keydown", {key:"Enter", bubbles:true}))');
+    await waitFor('!document.querySelector(".people-quick-dialog").open && !document.getElementById("friendsView").classList.contains("hidden")');
+    await evaluate(`window.PeopleServers.openServer(${JSON.stringify(server)})`);
+    await waitFor('Boolean(document.querySelector("#peopleMain .people-message-unit"))');
+    await evaluate('document.dispatchEvent(new KeyboardEvent("keydown", {key:"k", ctrlKey:true, bubbles:true}))');
+    assert.equal(await evaluate('document.querySelector(".people-quick-dialog").open'), true, "Ctrl K opens search");
+    await evaluate('document.querySelector(".people-quick-head button").click()');
+    await evaluate('document.getElementById("messageInput").value = "a".repeat(850); document.getElementById("messageInput").dispatchEvent(new Event("input"))');
+    assert.equal(await evaluate('document.getElementById("messageInputCount").hidden'), false, "Character limit feedback appears");
+    await evaluate('document.getElementById("messageInput").value = ""; document.getElementById("messageInput").dispatchEvent(new Event("input"))');
+    assert.equal(await evaluate('document.getElementById("messageInputCount").hidden'), true, "Character feedback clears");
+    await evaluate('const spacer = document.createElement("div"); spacer.id = "ergonomicsTestSpacer"; spacer.style.height = "2000px"; document.getElementById("messages").append(spacer); document.getElementById("messages").scrollTop = 0; document.getElementById("messages").dispatchEvent(new Event("scroll"))');
+    assert.equal(await evaluate('document.querySelector("#messageForm .people-jump-latest").hidden'), false, "Return button appears while reading history");
+    await evaluate('document.querySelector("#messageForm .people-jump-latest").click()');
+    assert.equal(await evaluate('document.querySelector("#messageForm .people-jump-latest").hidden'), true, "Return button scrolls to latest messages");
+    await evaluate('document.getElementById("ergonomicsTestSpacer").remove()');
     await evaluate('document.getElementById("onlinePanelToggle").click()');
     assert.equal(await evaluate('getComputedStyle([...document.querySelectorAll(".online-user-info strong")].find(el => el.textContent.startsWith("AdminTest"))).color'), "rgb(255, 51, 102)");
     await waitFor('Boolean(document.querySelector("#peopleMain .people-message-unit"))');
@@ -83,6 +107,12 @@ module.exports = async ({ base, cookie, server }) => {
       assert.deepEqual(overflow, [], `Settings overflow at ${width}px`);
     }
     await evaluate('document.querySelector(".people-server-settings-close").click()');
+    for (const width of [320, 768, 1280]) {
+      await command("Emulation.setDeviceMetricsOverride", { width, height: 844, deviceScaleFactor: 1, mobile: width < 780 });
+      await evaluate('document.querySelector(".people-quick-launch").click()');
+      assert.equal(await evaluate('document.querySelector(".people-quick-dialog").getBoundingClientRect().right <= window.innerWidth && document.querySelector(".people-quick-dialog").getBoundingClientRect().left >= 0'), true, `Search fits at ${width}px`);
+      await evaluate('document.querySelector(".people-quick-head button").click()');
+    }
     await command("Emulation.setDeviceMetricsOverride", { width: 390, height: 460, deviceScaleFactor: 1, mobile: true });
     await delay(200);
     assert.equal(await evaluate('document.querySelector(".composer").getBoundingClientRect().bottom <= window.innerHeight + 2'), true, "Composer below keyboard viewport");
