@@ -11,7 +11,7 @@
   launcher.title = "Retrouver un serveur, un salon ou une conversation (Ctrl / ⌘ K)";
   launcher.setAttribute("aria-label", "Rechercher un serveur, un salon ou une conversation");
   launcher.setAttribute("aria-haspopup", "dialog");
-  $(".sidebar").prepend(launcher);
+  $("#friendsView").prepend(launcher);
 
   const dialog = document.createElement("dialog");
   dialog.className = "people-quick-dialog";
@@ -151,11 +151,13 @@
     latest.hidden = true;
     form.append(latest);
     function updateLatest() {
-      latest.hidden = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 160;
+      const distance = messages.scrollHeight - messages.scrollTop - messages.clientHeight;
+      latest.hidden = messages.clientHeight === 0 || distance <= Math.max(320, messages.clientHeight * .75);
     }
     latest.addEventListener("click", () => { messages.scrollTop = messages.scrollHeight; updateLatest(); });
     messages.addEventListener("scroll", updateLatest, { passive: true });
     new ResizeObserver(updateLatest).observe(messages);
-    new MutationObserver(updateLatest).observe(messages, { childList: true, subtree: true });
+    new MutationObserver(() => requestAnimationFrame(updateLatest)).observe(messages, { childList: true, subtree: true });
+    updateLatest();
   }
 })();

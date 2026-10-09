@@ -56,6 +56,10 @@ module.exports = async ({ base, cookie, server }) => {
     await waitFor('Boolean(window.PeopleServers && window.PeoplePresence && window.peopleSocket?.connected && document.getElementById("joinScreen").classList.contains("hidden"))');
     await evaluate(`window.PeopleServers.openServer(${JSON.stringify(server)})`);
     await waitFor('Boolean(document.querySelector(".online-user-info strong") && document.getElementById("peopleServerChannelTree").children.length)');
+    await evaluate('window.PeopleSocialNavigation.setMode("server")');
+    assert.equal(await evaluate('document.querySelector(".people-quick-launch").getClientRects().length'), 0, "Search stays hidden outside the friends menu");
+    await evaluate('document.getElementById("friendsNavButton").click()');
+    assert.equal(await evaluate('document.querySelector("#friendsView .people-quick-launch").getClientRects().length > 0'), true, "Search is available in the friends menu");
     await evaluate('document.querySelector(".people-quick-launch").click()');
     await waitFor('document.querySelector(".people-quick-dialog").open');
     assert.equal(await evaluate('document.activeElement.id'), "peopleQuickInput", "Search receives keyboard focus");
@@ -77,8 +81,11 @@ module.exports = async ({ base, cookie, server }) => {
     assert.equal(await evaluate('document.getElementById("messageInputCount").hidden'), true, "Character feedback clears");
     await evaluate('const spacer = document.createElement("div"); spacer.id = "ergonomicsTestSpacer"; spacer.style.height = "2000px"; document.getElementById("messages").append(spacer); document.getElementById("messages").scrollTop = 0; document.getElementById("messages").dispatchEvent(new Event("scroll"))');
     assert.equal(await evaluate('document.querySelector("#messageForm .people-jump-latest").hidden'), false, "Return button appears while reading history");
+    assert.equal(await evaluate('document.querySelector("#messageForm .people-jump-latest").getBoundingClientRect().height'), 28, "Return button stays compact on mobile");
     await evaluate('document.querySelector("#messageForm .people-jump-latest").click()');
     assert.equal(await evaluate('document.querySelector("#messageForm .people-jump-latest").hidden'), true, "Return button scrolls to latest messages");
+    assert.equal(await evaluate('getComputedStyle(document.querySelector("#messageForm .people-jump-latest")).display'), "none", "Composer styles cannot reveal the hidden return button");
+    assert.equal(await evaluate('getComputedStyle(document.querySelector("#dmForm .people-jump-latest")).display'), "none", "DM return button stays hidden too");
     await evaluate('document.getElementById("ergonomicsTestSpacer").remove()');
     await evaluate('document.getElementById("onlinePanelToggle").click()');
     assert.equal(await evaluate('getComputedStyle([...document.querySelectorAll(".online-user-info strong")].find(el => el.textContent.startsWith("AdminTest"))).color'), "rgb(255, 51, 102)");
