@@ -104,7 +104,8 @@ async function main() {
     const sa = await connect(a.cookie), sb = await connect(b.cookie), sc = await connect(c.cookie), sd = await connect(d.cookie);
     if (process.argv.includes("--browser")) {
       const browserUser = await register("BrowserCaller");
-      await require("./simultaneous-calls-browser.cjs")({ base, cookie: browserUser.cookie, targets: [b.username, c.username, d.username], answer: async (index, callId) => {
+      const browserPeer = await register("BrowserVoicePeer");
+      await require("./simultaneous-calls-browser.cjs")({ base, cookie: browserUser.cookie, peerCookie: browserPeer.cookie, targets: [b.username, c.username, d.username], answer: async (index, callId) => {
         assert.equal((await [sb, sc][index].emit("dm-call-answer", { callId })).ok, true);
       } });
     }

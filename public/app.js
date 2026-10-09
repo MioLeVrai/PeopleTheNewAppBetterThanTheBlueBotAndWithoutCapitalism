@@ -1911,6 +1911,7 @@ function attachRemoteMedia(peerId, stream) {
     }
 
     audio.srcObject = new MediaStream(audioTracks);
+    audio.muted = Boolean(window.PeopleCallBar?.isServerSoundMuted());
 
     void window.PeopleAudioDevices
       ?.applyOutput?.(
@@ -2288,9 +2289,13 @@ window.PeopleServerRuntime = {
   async joinVoiceChannel(channelId) {
     const cid = String(channelId || "");
     if (!cid) return false;
+    if (window.PeopleCallBar?.hasSecondary(peopleActiveServerId, cid)) { window.PeopleCallBar.open("server-secondary"); return true; }
     peopleRequestedVoiceChannelId = cid;
 
     if (voiceJoined) {
+      if (window.PeopleCallBar && !(peopleVoiceSameServer(activeVoiceServerId, peopleActiveServerId) && String(activeVoiceChannelId || "") === cid)) {
+        return await window.PeopleCallBar.joinServer(peopleActiveServerId, cid);
+      }
       if (
         peopleVoiceSameServer(activeVoiceServerId, peopleActiveServerId) &&
         String(activeVoiceChannelId || "") === cid
@@ -4852,6 +4857,7 @@ peopleSetOnlinePanel(peopleOnlineOpenByDefault);
 
   function visible(el) {
     if (!el || !el.getBoundingClientRect) return false;
+    if (el.closest('#peopleCallBar, #peopleCallDetails, .people-dm-call-overlay')) return false;
     var r = el.getBoundingClientRect();
     var cs = getComputedStyle(el);
     return r.width > 150 && r.height > 10 && r.height < 100 && r.top < 100 && cs.display !== 'none' && cs.visibility !== 'hidden';

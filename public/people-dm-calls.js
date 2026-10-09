@@ -637,7 +637,7 @@ function createPeopleDmCallSlot(suffix) {
       exists:
         Boolean(call),
       phase:
-        call?.phase ||
+        (call?.phase === "active" && !socket.connected ? "reconnecting" : call?.phase) ||
         "none",
       username:
         String(
@@ -2686,6 +2686,10 @@ function createPeopleDmCallSlot(suffix) {
 
     updateCallButtonLabel();
 
+    // A silent invitation to rejoin a call we left is not a joined session.
+    // Keep the existing conversation button, without restoring a global chip.
+    if (payload?.rejoin && payload?.silent) return;
+
     call = {
       id:
         String(
@@ -3602,6 +3606,20 @@ function createPeopleDmCallSlot(suffix) {
   updateCallButtonLabel();
 
   const controller = {
+    resume(payload) {
+      if (!call || String(call.id) !== String(payload.callId) || call.phase !== "active") return;
+      socket.emit("dm-call-answer", { callId: call.id }, response => {
+        if (!call || String(call.id) !== String(payload.callId)) return;
+        if (!response?.ok) return finishCall(response?.reason || "unavailable", true);
+        void beginActiveCall({ callId: call.id, peerSocketId: response.peerSocketId, peerUsername: response.peerUsername || call.username, peerMuted: response.peerMuted, peerCamera: response.peerCamera, peerScreen: response.peerScreen, initiator: response.initiator });
+      });
+    },
+    toggleSound() {
+      remoteAudio.dataset.peopleCallMuted = String(remoteAudio.dataset.peopleCallMuted !== "true");
+      remoteAudio.muted = remoteAudio.dataset.peopleCallMuted === "true";
+      remoteVideo.muted = remoteAudio.muted;
+      return remoteAudio.muted;
+    },
     start: startCall,
     incoming: showIncoming,
     available: () => !call && !starting,
@@ -3723,23 +3741,21 @@ function createPeopleDmCallSlot(suffix) {
 (() => {
   const slots = [createPeopleDmCallSlot(), createPeopleDmCallSlot("Second")].filter(Boolean);
   if (!slots.length) return;
-  const panels = ["peopleDmCallOverlay", "peopleDmCallOverlaySecond"].map(id => document.getElementById(id));
-  const syncPanels = () => document.body.classList.toggle("people-dm-dual-call", panels.every(panel => panel && !panel.classList.contains("hidden")));
-  const panelObserver = new MutationObserver(syncPanels);
-  for (const panel of panels) if (panel) panelObserver.observe(panel, { attributes: true, attributeFilter: ["class"] });
-  syncPanels();
   const focused = () => {
+    const selected = slots.find(slot => slot.getState().exists && slot.getState().callId === window.PeopleCallBar?.selectedCallId);
+    if (selected) return selected;
     const name = document.getElementById("dmHeaderName")?.textContent?.trim().toLocaleLowerCase();
     return slots.find(slot => slot.getState().exists && slot.getState().username.toLocaleLowerCase() === name)
       || slots.find(slot => slot.getState().exists) || slots[0];
   };
   window.PeopleDmCalls = {
+    getSlot: callId => slots.find(slot => slot.getState().callId === callId),
     getState: () => focused().getState(),
     getStates: () => slots.map(slot => slot.getState()),
     start() {
       const name = document.getElementById("dmHeaderName")?.textContent?.trim().toLocaleLowerCase();
       const existing = slots.find(slot => slot.getState().exists && slot.getState().username.toLocaleLowerCase() === name);
-      if (existing) return existing.show();
+      if (existing) return window.PeopleCallBar ? window.PeopleCallBar.open(existing.getState().callId) : existing.show();
       const free = slots.find(slot => slot.available());
       if (free) return free.start();
       window.alert("Tu as atteint la limite de 2 appels simultanés. Raccroche un appel pour continuer.");
@@ -3748,7 +3764,8 @@ function createPeopleDmCallSlot(suffix) {
   for (const method of ["toggleMute", "toggleCamera", "toggleScreen", "openEffects", "end"])
     window.PeopleDmCalls[method] = (...args) => focused()[method](...args);
   socket.on("dm-call-incoming", payload => {
-    if (slots.some(slot => slot.getState().callId === String(payload.callId))) return;
+    const existing = slots.find(slot => slot.getState().callId === String(payload.callId));
+    if (existing) { if (payload.rejoin) existing.resume(payload); return; }
     slots.find(slot => slot.available())?.incoming(payload);
   });
   window.addEventListener("people-dm-call-slot-state", () => {
@@ -3908,6 +3925,12 @@ function createPeopleDmCallSlot(suffix) {
   }
 
   function syncPlacement() {
+    if (window.PeopleCallBar) {
+      if (overlay.parentElement !== document.body) document.body.appendChild(overlay);
+      inlineDock.classList.add("hidden");
+      dmView.classList.remove("people-dm-call-inline");
+      return;
+    }
     if (
       !overlayVisible()
     ) {
@@ -4238,7 +4261,7 @@ function createPeopleDmCallSlot(suffix) {
       );
 
     remoteAudio.muted =
-      pref.muted;
+      pref.muted || remoteAudio.dataset.peopleCallMuted === "true";
 
     volumeRange.value =
       String(

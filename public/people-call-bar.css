@@ -1,0 +1,74 @@
+/* One reserved row above every page, including settings. */
+#peopleCallBar {
+  position: fixed; inset: 0 0 auto; z-index: 5100;
+  height: 40px !important; min-height: 40px !important; max-height: 40px !important;
+  padding: 4px 8px; display: flex; align-items: center; gap: 6px;
+  background: var(--panel); border-bottom: 1px solid var(--people-border, #322b43);
+}
+#peopleCallBar[hidden], #peopleCallDetails[hidden] { display: none; }
+#peopleCallBar button {
+  flex: 0 1 280px; min-width: 0; height: 30px; padding: 0 10px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border: 1px solid transparent; border-radius: 7px;
+  background: transparent; color: var(--muted); font-size: 12px; text-align: left; cursor: pointer;
+}
+#peopleCallBar button:hover, #peopleCallBar button[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+#peopleCallBar button:focus-visible, #peopleCallDetails button:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.people-has-calls #peopleAppShell { margin-top: 40px; height: calc(var(--people-viewport-height, 100dvh) - 40px) !important; }
+.people-has-calls #peopleAppShell > * { max-height: calc(var(--people-viewport-height, 100dvh) - 40px) !important; }
+.people-has-calls #peopleAppShell > .main,
+.people-has-calls #peopleAppShell > .home-main,
+.people-has-calls #peopleAppShell > .sidebar,
+.people-has-calls #peopleAppShell > .online-panel,
+.people-has-calls #peopleAppShell > .server-rail { height: calc(var(--people-viewport-height, 100dvh) - 40px) !important; }
+.people-has-calls #peopleSettingsModal { top: 40px; }
+#peopleCallDetails {
+  position: fixed; z-index: 5150; top: 44px; right: 8px;
+  width: min(400px, calc(100vw - 16px)); padding: 8px;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  background: var(--panel); border: 1px solid var(--people-border, #322b43); border-radius: 10px; box-shadow: 0 8px 24px #0004;
+}
+#peopleCallDetails button { flex: 1 0 auto; min-height: 34px; border: 0; border-radius: 6px; background: var(--input); color: var(--text); font-size: 12px; cursor: pointer; }
+#peopleCallDetails button[aria-pressed="true"] { background: var(--brand); }
+#peopleCallDetails select { width: 100%; min-height: 30px; padding: 4px 8px; border: 1px solid var(--people-border, #322b43); border-radius: 6px; color: var(--text); background: var(--input); font-size: 12px; }
+.people-global-remote-media { position: fixed; width: 1px; height: 1px; left: -10px; pointer-events: none; }
+.people-global-media-host { flex: 1 1 100%; }
+.people-global-media-host .people-global-remote-media { position: static; width: 100%; height: auto; max-height: 180px; object-fit: contain; border-radius: 6px; }
+/* Keep the original controls/media alive; only the selected call is expanded. */
+body.people-global-calls #peopleDmCallOverlay,
+body.people-global-calls #peopleDmCallOverlaySecond,
+body.people-global-calls .people-dm-call-inline-dock,
+body.people-global-calls .people-dm-call-video-pip { display: none !important; }
+body.people-global-calls #peopleDmCallOverlay.people-global-expanded:not(.hidden),
+body.people-global-calls #peopleDmCallOverlaySecond.people-global-expanded:not(.hidden) {
+  display: block !important; position: fixed !important;
+  inset: 44px 8px auto auto !important; z-index: 5150;
+  width: min(400px, calc(100vw - 16px)) !important; height: auto !important;
+  max-height: calc(100dvh - 56px) !important; overflow: auto;
+}
+body.people-global-calls .people-global-expanded .people-dm-call-card {
+  width: 100% !important; height: auto !important; min-height: 0 !important;
+  max-height: none !important; display: flex !important; flex-direction: column !important;
+  border-radius: 10px !important; box-shadow: 0 8px 24px #0004 !important;
+}
+body.people-global-calls .people-global-expanded .people-dm-call-stage { min-height: 76px !important; max-height: 180px !important; flex: none !important; }
+body.people-global-calls .people-global-expanded .people-dm-call-avatar,
+body.people-global-calls .people-global-expanded .people-dm-call-glow,
+body.people-global-calls .people-global-expanded .people-dm-call-resize-handle { display: none !important; }
+body.people-global-calls .people-global-expanded .people-dm-call-identity strong { margin-top: 0 !important; font-size: 14px !important; }
+body.people-global-calls .people-global-expanded .people-dm-call-active-actions,
+body.people-global-calls .people-global-expanded .people-dm-call-incoming-actions,
+body.people-global-calls .people-global-expanded .people-dm-call-outgoing-actions {
+  min-height: 48px !important; min-width: 0 !important; padding: 8px !important; gap: 6px !important;
+  flex-direction: row !important; flex-wrap: wrap !important; border-left: 0 !important;
+}
+body.people-global-calls .people-global-expanded .people-dm-call-control { min-width: 52px !important; padding: 6px !important; border-radius: 7px; }
+body.people-global-calls .people-global-expanded .people-dm-call-control span { font-size: 16px; }
+.people-global-extra-controls { display: flex; justify-content: flex-end; padding: 4px 8px 8px; gap: 6px; }
+.people-global-extra-controls button { min-height: 30px; border: 0; border-radius: 6px; padding: 4px 12px; background: var(--input); color: var(--text); cursor: pointer; }
+@media (max-width: 480px) { #peopleCallBar button { flex: 1 1 0; padding: 0 5px; font-size: 11px; } }
+@media (max-width: 780px) {
+  .people-has-calls #peopleAppShell > .sidebar,
+  .people-has-calls #peopleAppShell > .online-panel { top: 40px !important; }
+  .people-has-calls .people-mobile-sidebar-toggle { top: calc(47px + env(safe-area-inset-top)) !important; }
+}

@@ -135,7 +135,8 @@
 
     const nextVolume = pref.volume / 100;
     if (audio.volume !== nextVolume) audio.volume = nextVolume;
-    if (audio.muted !== pref.muted) audio.muted = pref.muted;
+    const muted = pref.muted || Boolean(window.PeopleCallBar?.isServerSoundMuted());
+    if (audio.muted !== muted) audio.muted = muted;
   }
 
   function applyAllPrefs() {
@@ -150,6 +151,8 @@
       applyAllPrefs();
     });
   }
+
+  window.addEventListener("people-global-call-state", scheduleApplyAllPrefs);
 
   function updateControlsUi(controls, user) {
     if (!controls || !user) return;
