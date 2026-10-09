@@ -1,15 +1,6 @@
 /* ===== people-dm-calls.css — version stable d'origine ===== */
 /* === PEOPLE_DM_CALLS_V1_START === */
 #peopleDmCallButtonSecond { display: none !important; }
-.people-dm-call-overlay.people-dm-second-call {
-  position: fixed !important;
-  inset: auto 12px 84px auto !important;
-  width: min(360px, calc(100vw - 24px));
-  max-height: 55vh;
-  overflow: auto;
-  z-index: 3010;
-}
-.people-dm-second-call .people-dm-call-card { width: 100%; }
 
 .people-dm-call-button {
   margin-left: auto;

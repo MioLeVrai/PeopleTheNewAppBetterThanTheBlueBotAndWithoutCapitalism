@@ -1,7 +1,7 @@
 /* === PEOPLE_SERVER_VOICE_UI_V1 === */
 
 /* Le vocal serveur devient une vraie carte d'appel, proche de l'UI des MP. */
-#videoStage.people-server-call-stage:not(.hidden) {
+.people-server-call-stage:not(.hidden) {
   position: relative;
   width: min(1180px, calc(100% - 28px));
   max-height: min(68vh, 760px);
@@ -16,7 +16,7 @@
   box-shadow: 0 18px 48px rgba(0, 0, 0, .24);
 }
 
-#videoStage.people-server-call-stage .video-grid.people-server-call-grid {
+.people-server-call-stage .video-grid.people-server-call-grid {
   width: 100%;
   max-width: none;
   grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
@@ -24,7 +24,7 @@
   margin: 0;
 }
 
-#videoStage.people-server-call-stage .video-tile {
+.people-server-call-stage .video-tile {
   min-height: 190px;
   border: 1px solid rgba(255, 255, 255, .07);
   border-radius: 14px;
@@ -32,7 +32,7 @@
   box-shadow: 0 12px 30px rgba(0, 0, 0, .24);
 }
 
-#videoStage.people-server-call-stage .video-label {
+.people-server-call-stage .video-label {
   left: 12px;
   bottom: 12px;
   padding: 7px 10px;
@@ -175,7 +175,7 @@
 }
 
 @media (max-width: 760px) {
-  #videoStage.people-server-call-stage:not(.hidden) {
+  .people-server-call-stage:not(.hidden) {
     width: calc(100% - 12px);
     margin-top: 6px;
     padding: 7px 7px 74px;
@@ -211,3 +211,19 @@
 @media (prefers-reduced-motion: reduce) {
   .people-server-call-control { transition: none; }
 }
+
+.people-server-call-participants { padding: 8px 4px 14px; color: var(--text); font-size: 14px; }
+
+/* Keep the original toolbar reachable when five controls wrap on mobile. */
+.people-server-call-stage:not(.hidden) { padding-bottom: 12px; min-width: 0; overflow-wrap: anywhere; }
+.people-server-call-stage .people-server-call-controls {
+  position: relative; left: auto; bottom: auto; transform: none;
+  flex-wrap: wrap; width: fit-content; margin: 12px auto 0;
+}
+.people-server-call-move {
+  display: block; width: 100%; min-width: 0; max-width: 100%; margin-top: 8px; min-height: 32px;
+  background: var(--input); color: var(--text); border: 1px solid var(--panel); border-radius: 6px;
+}
+
+/* The native stage shares one column with the server messages. */
+.main { grid-template-columns: minmax(0, 1fr); }

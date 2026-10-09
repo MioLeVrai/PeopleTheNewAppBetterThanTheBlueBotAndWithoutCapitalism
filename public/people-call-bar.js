@@ -10,11 +10,7 @@
   bar.id = "peopleCallBar";
   bar.setAttribute("aria-label", "Appels en cours");
   bar.hidden = true;
-  const detail = document.createElement("section");
-  detail.id = "peopleCallDetails";
-  detail.setAttribute("aria-label", "Commandes de l'appel vocal");
-  detail.hidden = true;
-  document.body.append(bar, detail);
+  document.body.append(bar);
   document.body.classList.add("people-global-calls");
   document.querySelectorAll(".people-dm-call-card").forEach(card => card.setAttribute("aria-modal", "false"));
 
@@ -27,8 +23,9 @@
   function createSecondVoice(serverId, channelId, name) {
     const connection = io({ autoConnect: false });
     const pcs = new Map(), candidates = new Map(), media = new Map();
-    let stream, videoTrack, roster = [], ended = false, generation = 0;
+    let stream, videoTrack, roster = [], ended = false, generation = 0, videoBusy = false;
     const state = { id: "server-secondary", serverId, channelId, name, phase: "connecting", muted: false, soundMuted: false, camera: false, screen: false };
+    const outgoingVideo = () => state.camera ? (window.PeopleCameraEffects?.getOutputTrack?.(videoTrack) || videoTrack) : videoTrack;
     function closePeer(id) {
       const pc = pcs.get(id);
       pcs.delete(id); pc?.close(); candidates.delete(id);
@@ -41,13 +38,13 @@
       for (const track of stream?.getAudioTracks() || []) pc.addTrack(track, stream);
       const transceiver = pc.addTransceiver("video", { direction: videoTrack ? "sendrecv" : "recvonly" });
       peoplePreferCompatibleVideoCodec(pc, transceiver);
-      if (videoTrack) void transceiver.sender.replaceTrack(videoTrack);
+      if (videoTrack) void transceiver.sender.replaceTrack(outgoingVideo());
       pc.onicecandidate = event => { if (event.candidate) connection.emit("webrtc-ice-candidate", { target: id, candidate: event.candidate }); };
       pc.ontrack = event => {
         let node = media.get(id);
         if (!node) {
           node = document.createElement("video"); node.autoplay = true; node.playsInline = true;
-          node.className = "people-global-remote-media";
+          node.className = "people-global-remote-media"; node.dataset.peerId = id;
           document.body.append(node); media.set(id, node);
         }
         const remote = node.srcObject || new MediaStream();
@@ -104,6 +101,7 @@
     connection.on("voice-state", payload => {
       if (String(payload?.serverId) !== String(serverId)) return;
       roster = (payload.users || payload.roster || []).filter(user => String(user.channelId) === String(channelId));
+      notify();
       for (const id of pcs.keys()) if (!roster.some(user => user.id === id)) closePeer(id);
     });
     connection.on("disconnect", () => { if (!ended) { generation++; state.phase = "reconnecting"; closePeers(); notify(); } });
@@ -122,26 +120,34 @@
     connection.on("voice-disconnected-by-admin", () => controller.end());
     connection.on("server-membership-left", payload => { if (String(payload.serverId) === String(serverId)) controller.end(); });
     async function video(kind) {
-      if (ended || state.phase !== "active") return;
+      if (ended || state.phase !== "active" || videoBusy) return;
+      videoBusy = true;
+      try {
       const stopping = state[kind];
       const next = stopping ? null : await (kind === "screen"
         ? navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
         : navigator.mediaDevices.getUserMedia({ video: window.PeopleAudioDevices?.getCameraConstraints?.() || true, audio: false }));
       if (ended) { next?.getTracks().forEach(track => track.stop()); return; }
+      if (state.camera) window.PeopleCameraEffects?.detachSource?.(videoTrack);
       videoTrack?.stop(); videoTrack = next?.getVideoTracks()[0] || null;
       state.camera = kind === "camera" && Boolean(videoTrack); state.screen = kind === "screen" && Boolean(videoTrack);
+      if (state.camera) await window.PeopleCameraEffects?.attachSource?.(videoTrack);
       if (videoTrack) videoTrack.onended = () => { if (!ended) void video(kind).catch(console.warn); };
       connection.emit("voice-camera", { camera: state.camera }); connection.emit("voice-screen", { screen: state.screen });
       for (const [id, pc] of pcs) {
         const transceiver = peopleFindVideoTransceiver(pc);
-        await transceiver.sender.replaceTrack(videoTrack); transceiver.direction = videoTrack ? "sendrecv" : "recvonly";
+        await transceiver.sender.replaceTrack(outgoingVideo()); transceiver.direction = videoTrack ? "sendrecv" : "recvonly";
         await offer(id);
       }
       notify();
+      } finally { videoBusy = false; }
     }
     const controller = {
       state,
       getMedia: () => [...media.values()],
+      getRoster: () => roster,
+      getLocalVideo: () => outgoingVideo() ? new MediaStream([outgoingVideo()]) : null,
+      getSocketId: () => connection.id,
       reconnect() { if (!ended) { connection.disconnect(); connection.connect(); } },
       async move(nextServerId, nextChannelId, nextName) {
         const result = await request(connection, "voice-join", { serverId: nextServerId, channelId: nextChannelId, muted: state.muted, camera: state.camera, screen: state.screen });
@@ -163,11 +169,22 @@
       sound() { state.soundMuted = !state.soundMuted; for (const node of media.values()) node.muted = state.soundMuted; notify(); },
       camera: () => video("camera"), screen: () => video("screen"),
       end() {
-        ended = true; generation++; connection.emit("voice-leave"); connection.disconnect(); closePeers();
+        ended = true; generation++;
+        window.removeEventListener("people-camera-effect-track-changed", refreshEffects);
+        if (state.camera) window.PeopleCameraEffects?.detachSource?.(videoTrack);
+        connection.emit("voice-leave"); connection.disconnect(); closePeers();
         stream?.getTracks().forEach(track => track.stop()); videoTrack?.stop();
         if (second === controller) second = null; notify();
       }
     };
+    function refreshEffects() {
+      if (ended || !state.camera || videoBusy) return;
+      void Promise.allSettled([...pcs].map(async ([id, pc]) => {
+        await peopleFindVideoTransceiver(pc).sender.replaceTrack(outgoingVideo());
+        await offer(id);
+      })).then(notify);
+    }
+    window.addEventListener("people-camera-effect-track-changed", refreshEffects);
     return controller;
   }
 
@@ -184,7 +201,14 @@
       notify();
     },
     camera: () => cameraEnabled ? disableCamera() : enableCamera(),
-    move: (serverId, channelId) => peopleSwitchVoiceChannel(channelId),
+    async move(serverId, channelId) {
+      const result = await peopleVoiceJoinRequest(serverId, channelId);
+      if (!result?.ok) throw new Error(result?.error || "Impossible de changer de vocal.");
+      for (const id of [...peers.keys()]) closePeer(id);
+      activeVoiceServerId = String(serverId); activeVoiceChannelId = String(channelId);
+      peopleSetActiveVoiceRoster(result.roster || []);
+      await peopleConnectActiveVoicePeers(); notify();
+    },
     screen: () => screenEnabled ? disableScreenShare() : enableScreenShare(),
     end: () => { leaveVoice(); primarySoundMuted = false; notify(); }
   };
@@ -215,67 +239,42 @@
       if (node.textContent !== text) node.textContent = text;
       node.title = text; node.setAttribute("aria-expanded", String(selected === call.id));
       const slot = window.PeopleDmCalls.getStates().findIndex(state => state.callId === call.id);
-      node.setAttribute("aria-controls", call.type === "server" ? "peopleCallDetails" : "peopleDmCallOverlay" + (slot ? "Second" : ""));
+      node.setAttribute("aria-controls", call.type === "server" ? (call.id === "server-primary" ? "videoStage" : "videoStageSecond") : "peopleDmCallOverlay" + (slot ? "Second" : ""));
     });
     if (selected && !calls.some(call => call.id === selected)) close();
-    for (const [index, state] of (window.PeopleDmCalls?.getStates() || []).entries()) {
-      const overlay = document.getElementById("peopleDmCallOverlay" + (index ? "Second" : ""));
-      const expanded = state.exists && selected === state.callId;
-      overlay?.classList.toggle("people-global-expanded", expanded);
-    }
-    const call = calls.find(call => call.id === selected);
-    if (call?.type === "server") {
-      detail.hidden = false;
-      for (const node of detail.querySelectorAll("[data-state]")) node.setAttribute("aria-pressed", String(Boolean(call[node.dataset.state])));
-    } else detail.hidden = true;
-    for (const node of second?.getMedia() || []) {
-      const host = call?.id === "server-secondary" && node.srcObject?.getVideoTracks().some(track => track.readyState === "live")
-        ? detail.querySelector(".people-global-media-host") : document.body;
-      if (host && node.parentElement !== host) host.append(node);
-    }
+    window.PeopleServerVoiceUi?.sync();
   }
-  function close() { selected = ""; detail.hidden = true; render(); }
-  function open(id) {
-    if (selected === id) return close();
-    selected = id;
+  function close() { selected = ""; render(); }
+  let navigationVersion = 0;
+  async function open(id) {
+    const version = ++navigationVersion;
     const call = states().find(call => call.id === id);
-    detail.replaceChildren();
-    if (call?.type === "dm") {
+    if (!call) return;
+    selected = id;
+    document.getElementById("peopleSettingsModal")?.classList.add("hidden");
+    if (call.type === "dm") {
+      await window.PeopleSocialNavigation.openDm(call.username);
+      if (version !== navigationVersion) return;
       window.PeopleDmCalls.getSlot(id)?.show();
-      const index = window.PeopleDmCalls.getStates().findIndex(state => state.callId === id);
-      const overlay = document.getElementById("peopleDmCallOverlay" + (index ? "Second" : ""));
-      if (overlay && !overlay.querySelector(".people-global-extra-controls")) {
-        const controls = document.createElement("div"); controls.className = "people-global-extra-controls";
-        controls.append(button("Son", () => {
-          const currentId = window.PeopleDmCalls.getStates()[index]?.callId;
-          const muted = window.PeopleDmCalls.getSlot(currentId)?.toggleSound();
-          controls.firstChild.setAttribute("aria-pressed", String(muted));
-        }), button("Fermer", close));
-        overlay.querySelector("section").append(controls);
+      window.dispatchEvent(new CustomEvent("people-call-restore", { detail: call }));
+    } else {
+      if (String(peopleActiveServerId) !== String(call.serverId) || document.getElementById("peopleMain").classList.contains("hidden")) {
+        const response = await fetch("/api/servers");
+        const data = await response.json();
+        if (version !== navigationVersion) return;
+        const server = data.servers?.find(server => String(server.id) === String(call.serverId));
+        if (!server) return;
+        await window.PeopleServers.openServer(server);
       }
-    } else if (call) {
-      const controller = id === "server-primary" ? primary : second;
-      for (const [label, method, state] of [["Micro", "mute", "muted"], ["Son", "sound", "soundMuted"], ["Caméra", "camera", "camera"], ["Écran", "screen", "screen"], ["Quitter", "end"]]) {
-        const node = button(label, () => controller[method](), state ? call[state] : undefined);
-        if (state) node.dataset.state = state;
-        detail.append(node);
-      }
-      detail.append(button("Fermer", close));
-      const channels = window.PeopleServerRuntime.getChannels().filter(channel => channel.type === "voice");
-      if (channels.length) {
-        const move = document.createElement("select"); move.setAttribute("aria-label", "Déplacer cet appel vers un salon vocal");
-        const placeholder = document.createElement("option"); placeholder.value = ""; placeholder.textContent = "Déplacer cet appel…"; move.append(placeholder);
-        for (const channel of channels) { const option = document.createElement("option"); option.value = channel.id; option.textContent = channel.name; move.append(option); }
-        move.onchange = () => { const channel = channels.find(channel => String(channel.id) === move.value); if (channel) void Promise.resolve(controller.move(peopleActiveServerId, channel.id, channel.name)).catch(error => window.alert(error.message)); move.value = ""; };
-        detail.append(move);
-      }
-      const host = document.createElement("div"); host.className = "people-global-media-host"; detail.append(host);
+      if (version !== navigationVersion) return;
+      window.PeopleServerVoiceUi.show(call.serverId, call.channelId);
     }
     render();
   }
   window.PeopleCallBar = {
     get selectedCallId() { return selected; }, getStates: states, open, close,
     isServerSoundMuted: () => primarySoundMuted,
+    getServerController: id => id === "server-primary" ? primary : second,
     hasSecondary: (serverId, channelId) => second && String(second.state.serverId) === String(serverId) && String(second.state.channelId) === String(channelId),
     reconnectSecond: () => second?.reconnect(),
     async joinServer(serverId, channelId) {
@@ -285,7 +284,7 @@
       joining = true;
       try {
         const name = window.PeopleServerRuntime.getChannels().find(channel => String(channel.id) === String(channelId))?.name || "Salon vocal";
-        second = createSecondVoice(serverId, channelId, name); render(); await second.start(); return true;
+        second = createSecondVoice(serverId, channelId, name); render(); await second.start(); window.PeopleServerVoiceUi.show(serverId, channelId); return true;
       } finally { joining = false; }
     }
   };
@@ -301,7 +300,6 @@
   socket.on("connect", privacy);
   document.getElementById("logoutButton")?.addEventListener("click", () => { second?.end(); for (const state of window.PeopleDmCalls.getStates()) if (state.exists) window.PeopleDmCalls.getSlot(state.callId)?.end(); close(); });
   document.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
-  document.addEventListener("click", event => { if (!bar.contains(event.target) && !detail.contains(event.target) && !event.target.closest(".people-dm-call-overlay,.people-camera-effects-picker")) close(); });
   // Only observe the original runtime's controls, never the bar itself.
   const observer = new MutationObserver(render);
   for (const id of ["voiceStatus", "muteButton", "cameraButton", "screenButton", "leaveVoiceQuickButton"]) {

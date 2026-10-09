@@ -836,7 +836,7 @@ function createPeopleDmCallSlot(suffix) {
   window.addEventListener("people-camera-effect-changed", peopleDmUpdateEffectsButton);
   window.addEventListener("people-camera-effect-track-changed", (event) => {
     if (!call || !cameraEnabled) return;
-    const track = event?.detail?.track || peopleDmCameraOutputTrack();
+    const track = peopleDmCameraOutputTrack();
     void peopleDmInstallCameraOutputTrack(track);
   });
   // === PEOPLE_DM_CAMERA_FACE_EFFECTS_V1_END ===
@@ -3742,8 +3742,6 @@ function createPeopleDmCallSlot(suffix) {
   const slots = [createPeopleDmCallSlot(), createPeopleDmCallSlot("Second")].filter(Boolean);
   if (!slots.length) return;
   const focused = () => {
-    const selected = slots.find(slot => slot.getState().exists && slot.getState().callId === window.PeopleCallBar?.selectedCallId);
-    if (selected) return selected;
     const name = document.getElementById("dmHeaderName")?.textContent?.trim().toLocaleLowerCase();
     return slots.find(slot => slot.getState().exists && slot.getState().username.toLocaleLowerCase() === name)
       || slots.find(slot => slot.getState().exists) || slots[0];
@@ -3774,14 +3772,14 @@ function createPeopleDmCallSlot(suffix) {
 })();
 
 /* ===== people-dm-calls-v2.js — version stable d'origine ===== */
-(() => {
+for (const suffix of ["", "Second"]) (() => {
   "use strict";
 
   // === PEOPLE_DM_CALLS_V2_CLIENT_START ===
 
   const overlay =
     document.getElementById(
-      "peopleDmCallOverlay"
+      "peopleDmCallOverlay" + suffix
     );
 
   const card =
@@ -3806,17 +3804,17 @@ function createPeopleDmCallSlot(suffix) {
 
   const callName =
     document.getElementById(
-      "peopleDmCallName"
+      "peopleDmCallName" + suffix
     );
 
   const activeActions =
     document.getElementById(
-      "peopleDmCallActiveActions"
+      "peopleDmCallActiveActions" + suffix
     );
 
   const remoteAudio =
     document.getElementById(
-      "peopleDmCallRemoteAudio"
+      "peopleDmCallRemoteAudio" + suffix
     );
 
   if (
@@ -3852,7 +3850,7 @@ function createPeopleDmCallSlot(suffix) {
     );
 
   inlineDock.id =
-    "peopleDmCallInlineDock";
+    "peopleDmCallInlineDock" + suffix;
 
   inlineDock.className =
     "people-dm-call-inline-dock hidden";
@@ -3868,7 +3866,7 @@ function createPeopleDmCallSlot(suffix) {
     );
 
   floatingDock.id =
-    "peopleDmCallFloatingDock";
+    "peopleDmCallFloatingDock" + suffix;
 
   floatingDock.className =
     "people-dm-call-floating-dock";
@@ -3895,6 +3893,7 @@ function createPeopleDmCallSlot(suffix) {
   }
 
   function currentDmMatchesCall() {
+    if (document.getElementById("homeMain")?.classList.contains("hidden")) return false;
     if (
       dmView.classList
         .contains(
@@ -3925,16 +3924,10 @@ function createPeopleDmCallSlot(suffix) {
   }
 
   function syncPlacement() {
-    if (window.PeopleCallBar) {
-      if (overlay.parentElement !== document.body) document.body.appendChild(overlay);
-      inlineDock.classList.add("hidden");
-      dmView.classList.remove("people-dm-call-inline");
-      return;
-    }
     if (
       !overlayVisible()
     ) {
-      dmView.classList.remove(
+      if (!dmView.querySelector(".people-dm-call-docked:not(.hidden)")) dmView.classList.remove(
         "people-dm-call-inline"
       );
 
@@ -3997,7 +3990,7 @@ function createPeopleDmCallSlot(suffix) {
       "hidden"
     );
 
-    dmView.classList.remove(
+    if (!dmView.querySelector(".people-dm-call-docked:not(.hidden)")) dmView.classList.remove(
       "people-dm-call-inline"
     );
   }
@@ -4029,6 +4022,7 @@ function createPeopleDmCallSlot(suffix) {
 
   function placementSignature() {
     return [
+      document.getElementById("homeMain")?.classList.contains("hidden") ? "0" : "1",
       overlay.classList
         .contains(
           "hidden"
@@ -4106,6 +4100,8 @@ function createPeopleDmCallSlot(suffix) {
       ]
     }
   );
+
+  placementObserver.observe(document.getElementById("homeMain"), { attributes: true, attributeFilter: ["class"] });
 
   placementObserver.observe(
     dmHeaderName,
@@ -4379,14 +4375,14 @@ function createPeopleDmCallSlot(suffix) {
 })();
 
 /* ===== people-dm-calls-v3.js — version stable d'origine ===== */
-(() => {
+for (const suffix of ["", "Second"]) (() => {
   "use strict";
 
   // === PEOPLE_DM_CALLS_V3_CLIENT_START ===
 
   const overlay =
     document.getElementById(
-      "peopleDmCallOverlay"
+      "peopleDmCallOverlay" + suffix
     );
 
   const card =
@@ -4406,17 +4402,17 @@ function createPeopleDmCallSlot(suffix) {
 
   const callName =
     document.getElementById(
-      "peopleDmCallName"
+      "peopleDmCallName" + suffix
     );
 
   const activeActions =
     document.getElementById(
-      "peopleDmCallActiveActions"
+      "peopleDmCallActiveActions" + suffix
     );
 
   const remoteVideo =
     document.getElementById(
-      "peopleDmCallRemoteVideo"
+      "peopleDmCallRemoteVideo" + suffix
     );
 
   if (
@@ -4442,6 +4438,7 @@ function createPeopleDmCallSlot(suffix) {
   }
 
   function currentDmMatchesCall() {
+    if (document.getElementById("homeMain")?.classList.contains("hidden")) return false;
     if (
       dmView.classList
         .contains(
@@ -4504,7 +4501,7 @@ function createPeopleDmCallSlot(suffix) {
   */
   const inlineDock =
     document.getElementById(
-      "peopleDmCallInlineDock"
+      "peopleDmCallInlineDock" + suffix
     );
 
   const miniButton =
@@ -4513,7 +4510,7 @@ function createPeopleDmCallSlot(suffix) {
     );
 
   miniButton.id =
-    "peopleDmCallMini";
+    "peopleDmCallMini" + suffix;
 
   miniButton.type =
     "button";
@@ -4554,7 +4551,7 @@ function createPeopleDmCallSlot(suffix) {
     );
 
   resizeHandle.id =
-    "peopleDmCallResizeHandle";
+    "peopleDmCallResizeHandle" + suffix;
 
   resizeHandle.className =
     "people-dm-call-resize-handle";
@@ -4581,7 +4578,7 @@ function createPeopleDmCallSlot(suffix) {
   );
 
   const HEIGHT_KEY =
-    "people-dm-call-inline-height-v1";
+    "people-dm-call-inline-height-v1" + suffix;
 
   function maxInlineHeight() {
     return Math.max(
@@ -4810,7 +4807,7 @@ function createPeopleDmCallSlot(suffix) {
     );
 
   pip.id =
-    "peopleDmCallVideoPip";
+    "peopleDmCallVideoPip" + suffix;
 
   pip.className =
     "people-dm-call-video-pip hidden";
@@ -4906,7 +4903,7 @@ function createPeopleDmCallSlot(suffix) {
       pipForced
     );
 
-    dmView.classList.toggle(
+    if (currentDmMatchesCall()) dmView.classList.toggle(
       "people-dm-call-manual-mini-active",
       pipForced
     );
@@ -4945,6 +4942,10 @@ function createPeopleDmCallSlot(suffix) {
         ? "Agrandir l'appel"
         : "Réduire l'appel";
   }
+
+  window.addEventListener("people-call-restore", event => {
+    if (normalized(event.detail?.username) === normalized(callName.textContent)) setManualMini(false);
+  });
 
   function syncPipVideoSource() {
     const source =
@@ -5051,6 +5052,7 @@ function createPeopleDmCallSlot(suffix) {
 
     const callHere =
       currentDmMatchesCall();
+    if (callHere) dmView.classList.toggle("people-dm-call-manual-mini-active", pipForced);
     // V2.2 : le mode Reduire reste visible partout dans People tant que l appel est actif.
     // La fleche restaure le grand appel ; raccrocher supprime naturellement la mini-fenetre.
 
@@ -5327,6 +5329,7 @@ function createPeopleDmCallSlot(suffix) {
     const element of [
       overlay,
       dmView,
+      document.getElementById("homeMain"),
       activeActions,
       remoteVideo
     ]

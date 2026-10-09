@@ -394,7 +394,7 @@ function peopleUpdateServerEffectsButton() {
 window.addEventListener("people-camera-effect-changed", peopleUpdateServerEffectsButton);
 window.addEventListener("people-camera-effect-track-changed", (event) => {
   if (!voiceJoined || !cameraEnabled) return;
-  const track = event?.detail?.track || peopleCameraOutputTrack();
+  const track = peopleCameraOutputTrack();
   void peopleInstallCameraOutputTrack(track);
 });
 // === PEOPLE_CAMERA_FACE_EFFECTS_V1_END ===
@@ -1673,8 +1673,8 @@ function renderVoiceUsers(roster) {
   syncVideoTilesWithRoster();
 }
 
-function ensureVideoTile(peerId, displayName, isLocal = false) {
-  const tileId = isLocal ? "video-local" : `video-${peerId}`;
+function ensureVideoTile(peerId, displayName, isLocal = false, host = videoGrid, prefix = "") {
+  const tileId = prefix + (isLocal ? "video-local" : `video-${peerId}`);
   let tile = document.getElementById(tileId);
 
   if (!tile) {
@@ -1706,7 +1706,7 @@ function ensureVideoTile(peerId, displayName, isLocal = false) {
 
     if (isLocal) {
       const effectsButton = document.createElement("button");
-      effectsButton.id = "peopleServerVideoEffects";
+      effectsButton.id = prefix + "peopleServerVideoEffects";
       effectsButton.className = "people-video-effects-button";
       effectsButton.type = "button";
       effectsButton.textContent = "✨";
@@ -1719,7 +1719,7 @@ function ensureVideoTile(peerId, displayName, isLocal = false) {
       tile.appendChild(effectsButton);
     }
 
-    videoGrid.appendChild(tile);
+    host.appendChild(tile);
     window.PeopleCameraEffects?.ensureControls?.();
   }
 
@@ -1762,6 +1762,7 @@ function removeVideoTile(peerId, isLocal = false) {
 }
 
 function syncVideoStageVisibility() {
+  if (window.PeopleServerVoiceUi?.sync) { window.PeopleServerVoiceUi.sync(); return; }
   const viewingActiveVoice =
     voiceJoined &&
     activeVoiceServerId &&
@@ -2300,14 +2301,16 @@ window.PeopleServerRuntime = {
         peopleVoiceSameServer(activeVoiceServerId, peopleActiveServerId) &&
         String(activeVoiceChannelId || "") === cid
       ) {
-        leaveVoice();
+        window.PeopleServerVoiceUi?.show(peopleActiveServerId, cid);
         return true;
       }
 
       return await peopleSwitchVoiceChannel(cid);
     }
 
-    return await joinVoice(cid);
+    const joined = await joinVoice(cid);
+    if (joined) window.PeopleServerVoiceUi?.show(peopleActiveServerId, cid);
+    return joined;
   },
 
   leaveVoiceChannel() {

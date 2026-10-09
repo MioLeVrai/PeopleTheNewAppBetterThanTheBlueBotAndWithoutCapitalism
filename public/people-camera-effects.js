@@ -977,7 +977,7 @@
     const tile = document.querySelector(".video-tile.local");
     if (!tile) return null;
 
-    let button = document.getElementById("peopleServerVideoEffects");
+    let button = tile.querySelector(".people-video-effects-button");
     if (!button) {
       button = buildEffectsButton({
         id: "peopleServerVideoEffects",
