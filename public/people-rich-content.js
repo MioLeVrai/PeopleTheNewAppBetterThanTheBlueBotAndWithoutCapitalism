@@ -134,7 +134,7 @@
       .composer-image-remove{position:absolute!important;top:5px!important;right:5px!important;width:24px!important;min-width:24px!important;height:24px!important;min-height:24px!important;padding:0!important;border:0;border-radius:7px;cursor:pointer;align-self:start!important}
       .people-attachment-drop-zone{position:relative}
       .people-attachment-drop-zone.people-attachment-drop-active::after{
-        content:"Dépose tes fichiers ici";
+        content:"Drop your files here";
         position:absolute;
         inset:12px;
         z-index:9999;
@@ -280,7 +280,7 @@
     wrap.className = "people-youtube-preview";
     const iframe = document.createElement("iframe");
     iframe.src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id);
-    iframe.title = "Prévisualisation YouTube";
+    iframe.title = ("" + window.PeopleI18n.t("ui_9787d6f419") + "");
     iframe.loading = "lazy";
     iframe.referrerPolicy = "strict-origin-when-cross-origin";
     iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
@@ -320,7 +320,7 @@
       credentials: "same-origin",
       cache: "no-store"
     });
-    if (!response.ok) throw new Error("Impossible de charger la pièce jointe.");
+    if (!response.ok) throw new Error(("" + window.PeopleI18n.t("ui_0b1ccd2307") + ""));
     const mime = normalizeMime(response.headers.get("Content-Type"));
     const size = Number(response.headers.get("X-People-Original-Size") || response.headers.get("Content-Length") || 0);
     return {
@@ -343,7 +343,7 @@
     const mime = info.mime;
     let sourceUrl = info.url;
     if (info.blob) sourceUrl = addObjectUrl(wrap, info.blob);
-    if (!sourceUrl) throw new Error("Pièce jointe vide.");
+    if (!sourceUrl) throw new Error(("" + window.PeopleI18n.t("ui_b6f8ff3d77") + ""));
 
     wrap.replaceChildren();
     wrap.className = "people-message-attachment";
@@ -356,7 +356,7 @@
       link.rel = "noopener noreferrer";
       const image = document.createElement("img");
       image.className = "people-message-image";
-      image.alt = info.name || "Image envoyée";
+      image.alt = info.name || ("" + window.PeopleI18n.t("ui_3bc57ef154") + "");
       image.loading = "lazy";
       image.decoding = "async";
       image.fetchPriority = "low";
@@ -382,7 +382,7 @@
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.download = info.name || "video";
-      link.textContent = info.name || "Vidéo";
+      link.textContent = info.name || ("" + window.PeopleI18n.t("ui_d534be829e") + "");
       meta.appendChild(link);
       if (info.size) meta.appendChild(document.createTextNode(" · " + formatBytes(info.size)));
       wrap.appendChild(meta);
@@ -442,37 +442,37 @@
 
   async function unpackAttachmentBundle(blob) {
     if (!(blob instanceof Blob) || blob.size <= ATTACHMENT_BUNDLE_MAGIC.length + 8) {
-      throw new Error("Conteneur de pièces jointes invalide.");
+      throw new Error(("" + window.PeopleI18n.t("ui_d035aab3ec") + ""));
     }
 
     const bytes = new Uint8Array(await blob.arrayBuffer());
     if (bytes.byteLength > MAX_ATTACHMENT_TRANSPORT_BYTES) {
-      throw new Error("Conteneur de pièces jointes trop lourd.");
+      throw new Error(("" + window.PeopleI18n.t("ui_a3765e3e64") + ""));
     }
 
     for (let index = 0; index < ATTACHMENT_BUNDLE_MAGIC.length; index += 1) {
       if (bytes[index] !== ATTACHMENT_BUNDLE_MAGIC[index]) {
-        throw new Error("Format de pièces jointes inconnu.");
+        throw new Error(("" + window.PeopleI18n.t("ui_cda7a911b4") + ""));
       }
     }
 
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const headerLength = view.getUint32(ATTACHMENT_BUNDLE_MAGIC.length, false);
     if (headerLength < 16 || headerLength > ATTACHMENT_BUNDLE_MAX_HEADER_BYTES) {
-      throw new Error("En-tête de pièces jointes invalide.");
+      throw new Error(("" + window.PeopleI18n.t("ui_91f5fbc331") + ""));
     }
 
     const headerStart = ATTACHMENT_BUNDLE_MAGIC.length + 4;
     const headerEnd = headerStart + headerLength;
     if (headerEnd > bytes.byteLength) {
-      throw new Error("Conteneur de pièces jointes tronqué.");
+      throw new Error(("" + window.PeopleI18n.t("ui_4e856a9cfb") + ""));
     }
 
     let header;
     try {
       header = JSON.parse(new TextDecoder().decode(bytes.subarray(headerStart, headerEnd)));
     } catch {
-      throw new Error("Métadonnées de pièces jointes invalides.");
+      throw new Error(("" + window.PeopleI18n.t("ui_0079824559") + ""));
     }
 
     if (
@@ -481,7 +481,7 @@
       header.files.length < 2 ||
       header.files.length > MAX_ATTACHMENT_FILES
     ) {
-      throw new Error("Liste de pièces jointes invalide.");
+      throw new Error(("" + window.PeopleI18n.t("ui_424d8c4292") + ""));
     }
 
     const files = [];
@@ -497,7 +497,7 @@
         size > MAX_ATTACHMENT_BYTES ||
         cursor + size > bytes.byteLength
       ) {
-        throw new Error("Pièce jointe du conteneur invalide.");
+        throw new Error(("" + window.PeopleI18n.t("ui_d30ad44a41") + ""));
       }
 
       const part = bytes.slice(cursor, cursor + size);
@@ -512,7 +512,7 @@
     }
 
     if (cursor !== bytes.byteLength) {
-      throw new Error("Taille du conteneur de pièces jointes incohérente.");
+      throw new Error(("" + window.PeopleI18n.t("ui_5b762f4582") + ""));
     }
     return files;
   }
@@ -530,10 +530,10 @@
         credentials: "same-origin",
         cache: "no-store"
       });
-      if (!response.ok) throw new Error("Impossible de charger les pièces jointes.");
+      if (!response.ok) throw new Error(("" + window.PeopleI18n.t("ui_148f12a267") + ""));
       bundleBlob = await response.blob();
     }
-    if (!bundleBlob) throw new Error("Conteneur de pièces jointes vide.");
+    if (!bundleBlob) throw new Error(("" + window.PeopleI18n.t("ui_56c580e129") + ""));
 
     const files = await unpackAttachmentBundle(bundleBlob);
     wrap.replaceChildren();
@@ -553,7 +553,7 @@
 
     const wrap = document.createElement("div");
     wrap.className = "people-message-attachment people-message-attachment-loading";
-    wrap.textContent = "📎 Chargement de la pièce jointe…";
+    wrap.textContent = ("" + window.PeopleI18n.t("ui_dfe09c7f35") + "");
     container.appendChild(wrap);
 
     Promise.resolve(
@@ -567,7 +567,7 @@
       console.warn("[People attachment/load]", err);
       if (!wrap.isConnected) return;
       wrap.className = "people-message-attachment people-message-attachment-error";
-      wrap.textContent = "⚠️ Pièce jointe indisponible";
+      wrap.textContent = ("" + window.PeopleI18n.t("ui_84379de2a6") + "");
     });
   }
 
@@ -586,17 +586,17 @@
   }
 
   function validateImage(file) {
-    if (!file) throw new Error("Aucun fichier sélectionné.");
+    if (!file) throw new Error(("" + window.PeopleI18n.t("ui_6c9e897619") + ""));
     if (file.size <= 0 || file.size > MAX_ATTACHMENT_BYTES) {
-      throw new Error("Chaque pièce jointe doit faire moins de 25 Mo.");
+      throw new Error(("" + window.PeopleI18n.t("ui_ab0836dcd4") + ""));
     }
   }
 
   function validateFiles(files) {
     const list = Array.from(files || []).filter(Boolean);
-    if (!list.length) throw new Error("Aucun fichier sélectionné.");
+    if (!list.length) throw new Error(("" + window.PeopleI18n.t("ui_6c9e897619") + ""));
     if (list.length > MAX_ATTACHMENT_FILES) {
-      throw new Error(`Tu peux envoyer ${MAX_ATTACHMENT_FILES} fichiers maximum dans un message.`);
+      throw new Error(`${window.PeopleI18n.t("ui_793e34c49d")} ${MAX_ATTACHMENT_FILES} files maximum per message.`);
     }
 
     let total = 0;
@@ -605,7 +605,7 @@
       total += Number(file.size) || 0;
     }
     if (total > MAX_ATTACHMENT_BYTES) {
-      throw new Error("Les pièces jointes doivent faire moins de 25 Mo au total par message.");
+      throw new Error(("" + window.PeopleI18n.t("ui_15a12390d6") + ""));
     }
     return list;
   }
@@ -624,7 +624,7 @@
       files: metadata
     }));
     if (headerBytes.byteLength > ATTACHMENT_BUNDLE_MAX_HEADER_BYTES) {
-      throw new Error("Trop de métadonnées dans les pièces jointes.");
+      throw new Error(("" + window.PeopleI18n.t("ui_c597ba10f3") + ""));
     }
 
     const lengthBytes = new Uint8Array(4);
@@ -650,14 +650,14 @@
     }
 
     if (bundle.size > MAX_ATTACHMENT_BYTES) {
-      throw new Error("Les pièces jointes doivent faire moins de 25 Mo au total par message.");
+      throw new Error(("" + window.PeopleI18n.t("ui_15a12390d6") + ""));
     }
     return bundle;
   }
 
   async function uploadImagePayload(payload, contentType, fileName = "") {
     if (!payload || typeof payload.size !== "number" || payload.size <= 0 || payload.size > MAX_ATTACHMENT_TRANSPORT_BYTES) {
-      throw new Error("La pièce jointe chiffrée est trop lourde.");
+      throw new Error(("" + window.PeopleI18n.t("ui_dff0a49704") + ""));
     }
 
     const originalType = normalizeMime(contentType || payload.type || "application/octet-stream");
@@ -677,7 +677,7 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.ok === false || !data.imageId) {
-      throw new Error(data.error || "Impossible d'envoyer la pièce jointe.");
+      throw new Error(data.error || ("" + window.PeopleI18n.t("ui_13a2398a19") + ""));
     }
     return String(data.imageId);
   }
@@ -709,7 +709,7 @@
     const close = document.createElement("button");
     close.type = "button";
     close.className = "people-local-preview-close";
-    close.setAttribute("aria-label", "Fermer l'aperçu");
+    close.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_359d2adb29") + ""));
     close.textContent = "×";
     const body = document.createElement("div");
     body.className = "people-local-preview-body";
@@ -741,7 +741,7 @@
     const backdrop = ensureLocalPreview();
     const state = backdrop._peoplePreview;
     state.body.replaceChildren();
-    state.title.textContent = cleanFileName(file.name, "Aperçu");
+    state.title.textContent = cleanFileName(file.name, ("" + window.PeopleI18n.t("ui_324b134f57") + ""));
 
     let media = null;
     if (INLINE_IMAGE_TYPES.has(mime)) {
@@ -798,13 +798,13 @@
       const visualButton = document.createElement("button");
       visualButton.type = "button";
       visualButton.className = "people-composer-preview-visual " + kind;
-      visualButton.title = kind === "image" ? "Agrandir l'image" : "Prévisualiser la vidéo";
+      visualButton.title = kind === "image" ? "Agrandir l'image" : ("" + window.PeopleI18n.t("ui_1b346e6538") + "");
       visualButton.setAttribute("aria-label", visualButton.title);
 
       let media;
       if (kind === "image") {
         media = document.createElement("img");
-        media.alt = "Aperçu de " + cleanFileName(file.name, "l'image");
+        media.alt = ("" + window.PeopleI18n.t("ui_5156d1fa49") + " ") + cleanFileName(file.name, "l'image");
       } else {
         media = document.createElement("video");
         media.muted = true;
@@ -843,8 +843,8 @@
         const remove = document.createElement("button");
         remove.type = "button";
         remove.className = "composer-image-remove";
-        remove.title = "Retirer cette pièce jointe";
-        remove.setAttribute("aria-label", `Retirer ${safeName}`);
+        remove.title = ("" + window.PeopleI18n.t("ui_67469df01f") + "");
+        remove.setAttribute("aria-label", `${window.PeopleI18n.t("ui_c3812fc4ac")} ${safeName}`);
         remove.textContent = "×";
         remove.addEventListener("click", () => {
           if (busy) return;
@@ -872,8 +872,8 @@
           const action = document.createElement("span");
           action.className = "people-composer-attachment-size";
           action.textContent = INLINE_IMAGE_TYPES.has(mime)
-            ? "Clique pour agrandir"
-            : "Clique pour lire";
+            ? ("" + window.PeopleI18n.t("ui_2478da4117") + "")
+            : ("" + window.PeopleI18n.t("ui_6a52640791") + "");
           copy.append(name, size, action);
           row.append(visual, copy, remove);
         } else if (isInlineAudio(mime)) {
@@ -915,7 +915,7 @@
           size.textContent = `${formatBytes(file.size)} · ${mime}`;
           const note = document.createElement("span");
           note.className = "people-composer-attachment-size";
-          note.textContent = "Envoyé chiffré";
+          note.textContent = ("" + window.PeopleI18n.t("ui_bcb6c7266e") + "");
           copy.append(name, size, note);
           row.append(icon, copy, remove);
         }
@@ -953,7 +953,7 @@
         try {
           addFiles(files);
         } catch (err) {
-          alert(err.message || "Impossible d'ajouter ces fichiers.");
+          alert(err.message || ("" + window.PeopleI18n.t("ui_9cbe7a7da6") + ""));
         }
       });
     }
@@ -973,7 +973,7 @@
         addFiles(files);
         event.preventDefault();
       } catch (err) {
-        alert(err.message || "Impossible de coller ces fichiers.");
+        alert(err.message || ("" + window.PeopleI18n.t("ui_f7ad4c412d") + ""));
       }
     });
 
@@ -1014,7 +1014,7 @@
         try {
           addFiles(files);
         } catch (err) {
-          alert(err.message || "Impossible d'ajouter ces fichiers.");
+          alert(err.message || ("" + window.PeopleI18n.t("ui_9cbe7a7da6") + ""));
         }
       });
     }

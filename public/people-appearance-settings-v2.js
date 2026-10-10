@@ -65,13 +65,13 @@
     const palette = source?.palette;
 
     if (!palette || typeof palette !== "object" || Array.isArray(palette)) {
-      throw new Error("Ce fichier ne contient pas de palette People.");
+      throw new Error(("" + window.PeopleI18n.t("ui_fe70ea05c8") + ""));
     }
 
     const normalized = {};
     for (const key of PALETTE_KEYS) {
       const color = normalizeHex(palette[key]);
-      if (!color) throw new Error(`Couleur invalide ou manquante : ${key}.`);
+      if (!color) throw new Error(`${window.PeopleI18n.t("ui_3fbe5ca5c2")} ${key}.`);
       normalized[key] = color;
     }
 
@@ -103,7 +103,7 @@
       name:
         typeof value?.name === "string" && value.name.trim()
           ? value.name.trim().slice(0, 80)
-          : "Thème importé",
+          : "Imported theme",
       palette: normalized
     };
   }
@@ -132,10 +132,10 @@
       ".people-settings-section-title span"
     );
 
-    if (themeTitle) themeTitle.textContent = "Thèmes prêts à l'emploi";
+    if (themeTitle) themeTitle.textContent = ("" + window.PeopleI18n.t("ui_84dd8f4bfe") + "");
     if (themeCopy) {
       themeCopy.textContent =
-        "Choisis un thème prêt à l'emploi. Les réglages précis restent disponibles juste en dessous.";
+        ("" + window.PeopleI18n.t("ui_be170b59b1") + "");
     }
 
     const customCard = themes.querySelector('[data-appearance-theme="custom"]');
@@ -151,10 +151,10 @@
     const editorDescription = editorTitle?.querySelector("div > span");
     const oldBadge = document.getElementById("peopleSettingsCustomBadge");
 
-    if (editorStrong) editorStrong.textContent = "Personnalisation avancée";
+    if (editorStrong) editorStrong.textContent = ("" + window.PeopleI18n.t("ui_fa9dc1c4a3") + "");
     if (editorDescription) {
       editorDescription.textContent =
-        "Importe, exporte ou règle précisément chaque couleur de l'interface.";
+        ("" + window.PeopleI18n.t("ui_2e9b7b97f2") + "");
     }
     if (oldBadge) oldBadge.classList.add("people-appearance-legacy-badge");
 
@@ -162,7 +162,7 @@
     toggle.type = "button";
     toggle.className = "people-appearance-advanced-toggle";
     toggle.setAttribute("aria-expanded", "false");
-    toggle.innerHTML = `<span>Ouvrir</span><b aria-hidden="true">⌄</b>`;
+    toggle.innerHTML = `<span>${window.PeopleI18n.t("ui_ed077f3d81")}</span><b aria-hidden="true">⌄</b>`;
     editorTitle?.appendChild(toggle);
 
     const preview = document.getElementById("peopleSettingsPalettePreview");
@@ -179,28 +179,28 @@
     gradientControls.innerHTML = `
       <div class="people-appearance-gradient-head">
         <div>
-          <strong>Dégradé du thème</strong>
-          <span>Ajoute un dégradé doux aux fonds, comme les thèmes colorés de Discord.</span>
+          <strong>${window.PeopleI18n.t("ui_e64fda527d")}</strong>
+          <span>${window.PeopleI18n.t("ui_8d0234fb81")}</span>
         </div>
         <label class="people-appearance-gradient-switch">
           <input type="checkbox" data-appearance-gradient-enabled />
-          <span>Actif</span>
+          <span>${window.PeopleI18n.t("ui_1300117561")}</span>
         </label>
       </div>
       <div class="people-appearance-gradient-colors">
-        <span class="people-appearance-gradient-colors-label">Couleurs</span>
+        <span class="people-appearance-gradient-colors-label">${window.PeopleI18n.t("ui_88c45d9e52")}</span>
         <div class="people-appearance-gradient-colorbar" data-appearance-gradient-preview>
-          <label class="people-appearance-gradient-color people-gradient-color-start" title="Couleur de gauche">
-            <input type="color" value="#5865F2" data-appearance-gradient-color="start" aria-label="Couleur gauche du dégradé" />
-            <span>Gauche</span>
+          <label class="people-appearance-gradient-color people-gradient-color-start" title="${window.PeopleI18n.t("ui_5dcce30b47")}">
+            <input type="color" value="#5865F2" data-appearance-gradient-color="start" aria-label="${window.PeopleI18n.t("ui_eb5fdd369e")}" />
+            <span>${window.PeopleI18n.t("ui_58eb9032e3")}</span>
           </label>
-          <label class="people-appearance-gradient-color people-gradient-color-middle" title="Couleur du milieu">
-            <input type="color" value="#8B5CF6" data-appearance-gradient-color="middle" aria-label="Couleur centrale du dégradé" />
-            <span>Milieu</span>
+          <label class="people-appearance-gradient-color people-gradient-color-middle" title="${window.PeopleI18n.t("ui_aa06d8dcab")}">
+            <input type="color" value="#8B5CF6" data-appearance-gradient-color="middle" aria-label="${window.PeopleI18n.t("ui_15fd05edbc")}" />
+            <span>${window.PeopleI18n.t("ui_d93006ec2e")}</span>
           </label>
-          <label class="people-appearance-gradient-color people-gradient-color-end" title="Couleur de droite">
-            <input type="color" value="#EB459E" data-appearance-gradient-color="end" aria-label="Couleur droite du dégradé" />
-            <span>Droite</span>
+          <label class="people-appearance-gradient-color people-gradient-color-end" title="${window.PeopleI18n.t("ui_25232cbd7a")}">
+            <input type="color" value="#EB459E" data-appearance-gradient-color="end" aria-label="${window.PeopleI18n.t("ui_07c8dac7a6")}" />
+            <span>${window.PeopleI18n.t("ui_883361d5d6")}</span>
           </label>
         </div>
       </div>
@@ -209,7 +209,7 @@
         <input type="range" min="0" max="360" step="1" value="135" data-appearance-gradient-direction />
       </label>
       <label class="people-appearance-gradient-control">
-        <span>Intensité <b data-appearance-gradient-intensity-value>46%</b></span>
+        <span>${window.PeopleI18n.t("ui_a6d01dcff3")} <b data-appearance-gradient-intensity-value>46%</b></span>
         <input type="range" min="0" max="100" step="1" value="46" data-appearance-gradient-intensity />
       </label>
     `;
@@ -227,12 +227,12 @@
       "people-appearance-portable people-appearance-advanced-content";
     portable.innerHTML = `
       <div class="people-appearance-portable-copy">
-        <strong>Importer / exporter un thème</strong>
-        <span>Partage une palette personnalisée au format JSON ou importe celle de quelqu'un d'autre.</span>
+        <strong>${window.PeopleI18n.t("ui_392ca0e654")}</strong>
+        <span>${window.PeopleI18n.t("ui_31a84fe339")}</span>
       </div>
       <div class="people-appearance-portable-actions">
-        <button id="peopleAppearanceImport" class="people-settings-secondary" type="button">Importer</button>
-        <button id="peopleAppearanceExport" class="people-settings-secondary" type="button">Exporter</button>
+        <button id="peopleAppearanceImport" class="people-settings-secondary" type="button">${window.PeopleI18n.t("ui_2cff9baabf")}</button>
+        <button id="peopleAppearanceExport" class="people-settings-secondary" type="button">${window.PeopleI18n.t("ui_3664895579")}</button>
         <input id="peopleAppearanceImportFile" type="file" accept="application/json,.json" hidden />
       </div>
       <div id="peopleAppearancePortableStatus" class="people-appearance-portable-status" aria-live="polite"></div>
@@ -248,7 +248,7 @@
     function setAdvancedOpen(open) {
       editor.classList.toggle("people-appearance-advanced-open", !!open);
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
-      toggle.querySelector("span").textContent = open ? "Réduire" : "Ouvrir";
+      toggle.querySelector("span").textContent = open ? ("" + window.PeopleI18n.t("ui_be6eb1fc3b") + "") : ("" + window.PeopleI18n.t("ui_ed077f3d81") + "");
       toggle.querySelector("b").textContent = open ? "⌃" : "⌄";
     }
 
@@ -327,14 +327,14 @@
       const appearance = activeAppearance();
       const palette = appearance?.palette || activePalette();
       if (!palette) {
-        setStatus(portableStatus, "Impossible de lire le thème actuel.", "error");
+        setStatus(portableStatus, ("" + window.PeopleI18n.t("ui_cc786c0c6a") + ""), "error");
         return;
       }
 
       const payload = {
         format: "people-theme",
         version: 2,
-        name: "Thème personnalisé People",
+        name: "Custom People theme",
         exportedAt: new Date().toISOString(),
         appearance: {
           theme: appearance?.theme || "custom",
@@ -343,7 +343,7 @@
       };
 
       downloadJson(payload);
-      setStatus(portableStatus, "Thème exporté ✓", "success");
+      setStatus(portableStatus, ("" + window.PeopleI18n.t("ui_e95760eff1") + ""), "success");
     });
 
     importButton?.addEventListener("click", () => {
@@ -357,7 +357,7 @@
 
       try {
         if (file.size > 128 * 1024) {
-          throw new Error("Ce fichier est trop volumineux pour être un thème People.");
+          throw new Error(("" + window.PeopleI18n.t("ui_77366af200") + ""));
         }
         const parsed = JSON.parse(await file.text());
         const imported = parseImportedTheme(parsed);
@@ -365,13 +365,13 @@
         setAdvancedOpen(true);
         setStatus(
           portableStatus,
-          `${imported.name} importé — vérifie l'aperçu puis clique sur Enregistrer.`,
+          `${imported.name} ${window.PeopleI18n.t("ui_987fe8a79e")}`,
           "success"
         );
       } catch (error) {
         setStatus(
           portableStatus,
-          error?.message || "Impossible d'importer ce thème.",
+          error?.message || ("" + window.PeopleI18n.t("ui_88bf597378") + ""),
           "error"
         );
       }

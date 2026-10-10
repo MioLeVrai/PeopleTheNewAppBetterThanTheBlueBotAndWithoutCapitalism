@@ -91,7 +91,7 @@
 
           reject(
             new Error(
-              "Impossible de lire l'image recadrée."
+              ("" + window.PeopleI18n.t("ui_c1c097ac2b") + "")
             )
           );
         };
@@ -123,7 +123,7 @@
 
     if (!ctx) {
       throw new Error(
-        "Canvas indisponible."
+        "Canvas is unavailable."
       );
     }
 
@@ -162,7 +162,7 @@
       croppedBlob.size <= 0
     ) {
       throw new Error(
-        "Le recadrage n'a produit aucune image."
+        ("" + window.PeopleI18n.t("ui_1df0706692") + "")
       );
     }
 
@@ -225,7 +225,7 @@
 
       if (!smallest) {
         throw new Error(
-          "Impossible de compresser la photo."
+          ("" + window.PeopleI18n.t("ui_1e65514fd7") + "")
         );
       }
 
@@ -256,7 +256,7 @@
           if (comma < 0) {
             reject(
               new Error(
-                "Conversion de la photo impossible."
+                ("" + window.PeopleI18n.t("ui_4397093136") + "")
               )
             );
 
@@ -273,7 +273,7 @@
         reader.onerror = () => {
           reject(
             new Error(
-              "Conversion de la photo impossible."
+              ("" + window.PeopleI18n.t("ui_4397093136") + "")
             )
           );
         };
@@ -389,7 +389,7 @@
           "people-avatar-image";
 
         image.alt =
-          "Photo de profil de " +
+          "Profile picture of " +
           username;
 
         image.decoding =

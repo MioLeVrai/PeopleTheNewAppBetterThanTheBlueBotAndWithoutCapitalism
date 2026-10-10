@@ -19,13 +19,13 @@
   });
 
   const EFFECTS = Object.freeze([
-    { id: "none", label: "Aucun", icon: "✕", cover: "none" },
+    { id: "none", label: "None", icon: "✕", cover: "none" },
     { id: "glasses", label: "Lunettes", icon: "😎", cover: "light" },
     { id: "pixel-glasses", label: "Pixel", icon: "🕶️", cover: "light" },
     { id: "crown", label: "Couronne", icon: "👑", cover: "light" },
     { id: "cat", label: "Chat", icon: "🐱", cover: "light" },
     { id: "censor", label: "Censure", icon: "▬", cover: "medium" },
-    { id: "pixel-face", label: "Mosaïque", icon: "▓", cover: "strong" },
+    { id: "pixel-face", label: "Mosaic", icon: "▓", cover: "strong" },
     { id: "emoji", label: "Emoji", icon: "🙂", cover: "strong" },
     { id: "robot", label: "Robot", icon: "🤖", cover: "strong" },
     { id: "full-mask", label: "Masque", icon: "🎭", cover: "strong" }
@@ -96,7 +96,7 @@
     if (detectorPromise) return detectorPromise;
 
     detectorError = "";
-    updatePickerStatus("Chargement du suivi du visage…", "loading");
+    updatePickerStatus(("" + window.PeopleI18n.t("ui_ccfd65a96d") + ""), "loading");
 
     detectorPromise = (async () => {
       try {
@@ -112,7 +112,7 @@
           minSuppressionThreshold: 0.3
         });
         detectorError = "";
-        updatePickerStatus("Suivi visage actif", "ready");
+        updatePickerStatus(("" + window.PeopleI18n.t("ui_97f586111b") + ""), "ready");
         return detector;
       } catch (firstError) {
         try {
@@ -128,10 +128,10 @@
             minSuppressionThreshold: 0.3
           });
           detectorError = "";
-          updatePickerStatus("Suivi visage actif", "ready");
+          updatePickerStatus(("" + window.PeopleI18n.t("ui_97f586111b") + ""), "ready");
           return detector;
         } catch (error) {
-          detectorError = "Impossible de charger le suivi du visage";
+          detectorError = ("" + window.PeopleI18n.t("ui_5e78a64d65") + "");
           updatePickerStatus(detectorError, "error");
           console.warn("[People effets caméra] MediaPipe indisponible", error || firstError);
           emit("people-camera-effect-error", {
@@ -700,7 +700,7 @@
     if (!context || typeof canvas.captureStream !== "function") {
       outputTrack = sourceTrack;
       emitTrackChanged(outputTrack);
-      throw new Error("Le navigateur ne permet pas les effets caméra.");
+      throw new Error(("" + window.PeopleI18n.t("ui_fc95242d8c") + ""));
     }
 
     captureStream = canvas.captureStream(24);
@@ -762,7 +762,7 @@
       stopProcessedOutput();
       outputTrack = sourceTrack;
       emitTrackChanged(outputTrack);
-      updatePickerStatus("Effets désactivés", "ready");
+      updatePickerStatus(("" + window.PeopleI18n.t("ui_9205fad220") + ""), "ready");
       return selectedEffect;
     }
 
@@ -775,7 +775,7 @@
     }
 
     updatePickerStatus(
-      detector ? "Suivi visage actif" : "Chargement du suivi du visage…",
+      detector ? ("" + window.PeopleI18n.t("ui_97f586111b") + "") : ("" + window.PeopleI18n.t("ui_ccfd65a96d") + ""),
       detector ? "ready" : "loading"
     );
     return selectedEffect;
@@ -803,15 +803,15 @@
     picker.id = "peopleCameraEffectsPicker";
     picker.className = "people-camera-effects-picker hidden";
     picker.setAttribute("role", "dialog");
-    picker.setAttribute("aria-label", "Effets de visage");
+    picker.setAttribute("aria-label", "Face effects");
 
     picker.innerHTML = `
       <div class="people-camera-effects-head">
         <div>
-          <strong>Effets visage</strong>
-          <span>Appliqués à ta caméra en appel</span>
+          <strong>${window.PeopleI18n.t("ui_254f8fa174")}</strong>
+          <span>${window.PeopleI18n.t("ui_88c7bc4c50")}</span>
         </div>
-        <button class="people-camera-effects-close" type="button" aria-label="Fermer">✕</button>
+        <button class="people-camera-effects-close" type="button" aria-label="${window.PeopleI18n.t("ui_7d9eb7acb1")}">✕</button>
       </div>
       <div class="people-camera-effects-grid">
         ${EFFECTS.map((effect) => `
@@ -846,8 +846,8 @@
     updatePickerSelection();
     updatePickerStatus(
       selectedEffect === "none"
-        ? "Choisis un effet — la caméra brute reste disponible"
-        : (detector ? "Suivi visage actif" : "L'effet sera chargé avec la caméra"),
+        ? ("" + window.PeopleI18n.t("ui_b08512f8e9") + "")
+        : (detector ? ("" + window.PeopleI18n.t("ui_97f586111b") + "") : ("" + window.PeopleI18n.t("ui_af452fdaff") + "")),
       detector ? "ready" : "idle"
     );
 
@@ -891,7 +891,7 @@
     } else if (detectorError) {
       updatePickerStatus(detectorError, "error");
     } else if (detector) {
-      updatePickerStatus("Suivi visage actif", "ready");
+      updatePickerStatus(("" + window.PeopleI18n.t("ui_97f586111b") + ""), "ready");
     }
   }
 
@@ -924,13 +924,13 @@
     button.id = id;
     button.className = className;
     button.type = "button";
-    button.title = "Effets de visage";
-    button.setAttribute("aria-label", "Effets de visage");
+    button.title = "Face effects";
+    button.setAttribute("aria-label", "Face effects");
 
     if (compact) {
       button.textContent = "✨";
     } else {
-      button.innerHTML = "<span>✨</span><small>Effets</small>";
+      button.innerHTML = "<span>✨</span><small>Effects</small>";
     }
 
     button.addEventListener("click", (event) => {
@@ -949,8 +949,8 @@
     button.classList.toggle("hidden", Boolean(hidden));
     button.disabled = !cameraActive;
     button.title = cameraActive
-      ? `Effets de visage${selectedEffect !== "none" ? ` • ${info?.label || selectedEffect}` : ""}`
-      : "Active la caméra pour utiliser les effets de visage";
+      ? `Face effects${selectedEffect !== "none" ? ` • ${info?.label || selectedEffect}` : ""}`
+      : ("" + window.PeopleI18n.t("ui_e5a325cef9") + "");
   }
 
   function ensureDmEffectsControl() {

@@ -1,9 +1,9 @@
 (() => {
   "use strict";
-  const labels = { online: "En ligne", idle: "Absent", dnd: "Ne pas déranger", invisible: "Invisible", offline: "Hors ligne" };
+  const labels = { online: "Online", idle: "Idle", dnd: "Do Not Disturb", invisible: "Invisible", offline: "Offline" };
   let roster = new Map();
   const callPresence = document.createElement("section");
-  callPresence.setAttribute("aria-label", "Utilisateurs en double appel");
+  callPresence.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_970c91b5c4") + ""));
   callPresence.setAttribute("aria-live", "polite");
   callPresence.hidden = true;
   document.querySelector(".profile")?.after(callPresence);
@@ -12,8 +12,8 @@
     for (const state of states || []) {
       if (!state.doubleCall) continue;
       const row = document.createElement("p");
-      row.textContent = `${state.username} — En double appel`;
-      if (state.interlocutors?.length) row.textContent += ` avec ${state.interlocutors.join(", ")}`;
+      row.textContent = `${state.username} ${window.PeopleI18n.t("ui_ab35c1c55c")}`;
+      if (state.interlocutors?.length) row.textContent += ` with ${state.interlocutors.join(", ")}`;
       callPresence.append(row);
     }
     callPresence.hidden = !callPresence.childElementCount;
@@ -61,13 +61,13 @@
     wrap.hidden = !profile.serverMember;
     if (!profile.serverMember) return;
     const title = document.createElement("strong");
-    title.textContent = "Rôles sur ce serveur";
+    title.textContent = ("" + window.PeopleI18n.t("ui_08c7953c57") + "");
     wrap.append(title);
     const roles = profile.serverMember.roles || [];
     if (profile.serverMember.owner) {
       const owner = document.createElement("span");
       owner.className = "people-role-badge";
-      owner.textContent = "Propriétaire";
+      owner.textContent = ("" + window.PeopleI18n.t("ui_4b1b8aa360") + "");
       wrap.append(owner);
     }
     for (const role of roles) {
@@ -79,7 +79,7 @@
     }
     if (!roles.length && !profile.serverMember.owner) {
       const empty = document.createElement("span");
-      empty.textContent = "Aucun rôle attribué";
+      empty.textContent = ("" + window.PeopleI18n.t("ui_0d59908d2b") + "");
       wrap.append(empty);
     }
   }
@@ -87,7 +87,7 @@
   const select = document.createElement("select");
   select.id = "peoplePresenceSelect";
   select.className = "people-presence-select";
-  select.setAttribute("aria-label", "Ton statut");
+  select.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_3aa6d93718") + ""));
   for (const status of ["online", "idle", "dnd", "invisible"]) {
     const option = document.createElement("option");
     option.value = status;
@@ -119,7 +119,7 @@
         body: JSON.stringify({ status: select.value })
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Statut non enregistré.");
+      if (!response.ok) throw new Error(data.error || ("" + window.PeopleI18n.t("ui_432576e4fe") + ""));
       select.dataset.saved = data.status;
     } catch (err) {
       select.value = select.dataset.saved || "online";
@@ -158,7 +158,7 @@
   const install = document.createElement("button");
   install.type = "button";
   install.className = "people-install-app";
-  install.textContent = "Installer People";
+  install.textContent = ("" + window.PeopleI18n.t("ui_527db7d4db") + "");
   install.hidden = true;
   controls.append(install);
   window.addEventListener("beforeinstallprompt", event => {

@@ -567,7 +567,7 @@
 
     if (!response.ok || data?.ok === false || !data?.appearance) {
       throw new Error(
-        data?.error || "Impossible de charger l'apparence."
+        data?.error || ("" + window.PeopleI18n.t("ui_adc0c643cf") + "")
       );
     }
 
@@ -619,7 +619,7 @@
 
       if (!response.ok || data?.ok === false) {
         throw new Error(
-          data?.error || "Impossible d'enregistrer l'apparence."
+          data?.error || ("" + window.PeopleI18n.t("ui_1fae17339e") + "")
         );
       }
 

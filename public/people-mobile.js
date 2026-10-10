@@ -38,11 +38,11 @@
     "☰";
 
   toggle.title =
-    "Ouvrir la navigation";
+    ("" + window.PeopleI18n.t("ui_7ae1976ad5") + "");
 
   toggle.setAttribute(
     "aria-label",
-    "Ouvrir la navigation"
+    ("" + window.PeopleI18n.t("ui_7ae1976ad5") + "")
   );
 
   toggle.setAttribute(
@@ -134,8 +134,8 @@
 
       toggle.title =
         open
-          ? "Fermer la navigation"
-          : "Ouvrir la navigation";
+          ? ("" + window.PeopleI18n.t("ui_186d58d77e") + "")
+          : ("" + window.PeopleI18n.t("ui_7ae1976ad5") + "");
 
       toggle.setAttribute(
         "aria-label",

@@ -135,7 +135,7 @@ function createPeopleDmCallSlot(suffix) {
       class="people-dm-call-card"
       role="dialog"
       aria-modal="true"
-      aria-label="Appel People"
+      aria-label="${window.PeopleI18n.t("ui_4ab7ff582f")}"
     >
       <div class="people-dm-call-glow"></div>
 
@@ -163,11 +163,11 @@ function createPeopleDmCallSlot(suffix) {
 
           <strong
             id="peopleDmCallName${suffix}"
-          >Appel People</strong>
+          >${window.PeopleI18n.t("ui_4ab7ff582f")}</strong>
 
           <span
             id="peopleDmCallStatus${suffix}"
-          >Connexion…</span>
+          >${window.PeopleI18n.t("ui_5f04ae9ed6")}</span>
 
         </div>
 
@@ -190,7 +190,7 @@ function createPeopleDmCallSlot(suffix) {
           type="button"
         >
           <span>📵</span>
-          <small>Refuser</small>
+          <small>${window.PeopleI18n.t("ui_a2d285b352")}</small>
         </button>
 
         <button
@@ -199,7 +199,7 @@ function createPeopleDmCallSlot(suffix) {
           type="button"
         >
           <span>📞</span>
-          <small>Accepter</small>
+          <small>${window.PeopleI18n.t("ui_89713b9c9c")}</small>
         </button>
       </div>
 
@@ -213,7 +213,7 @@ function createPeopleDmCallSlot(suffix) {
           type="button"
         >
           <span>📵</span>
-          <small>Annuler</small>
+          <small>${window.PeopleI18n.t("ui_19766ed6cc")}</small>
         </button>
       </div>
 
@@ -225,51 +225,51 @@ function createPeopleDmCallSlot(suffix) {
           id="peopleDmCallMute${suffix}"
           class="people-dm-call-control"
           type="button"
-          title="Couper le micro"
+          title="${window.PeopleI18n.t("ui_5bc000c230")}"
         >
           <span>🎙️</span>
-          <small>Micro</small>
+          <small>${window.PeopleI18n.t("ui_186352a881")}</small>
         </button>
 
         <button
           id="peopleDmCallCamera${suffix}"
           class="people-dm-call-control"
           type="button"
-          title="Activer la caméra"
+          title="${window.PeopleI18n.t("ui_e9e96a7d12")}"
         >
           <span>📷</span>
-          <small>Caméra</small>
+          <small>${window.PeopleI18n.t("ui_03494b0d1f")}</small>
         </button>
 
         <button
           id="peopleDmCallEffects${suffix}"
           class="people-dm-call-control people-dm-effects-control"
           type="button"
-          title="Effets de visage"
+          title="Face effects"
           disabled
         >
           <span>✨</span>
-          <small>Effets</small>
+          <small>Effects</small>
         </button>
 
         <button
           id="peopleDmCallScreen${suffix}"
           class="people-dm-call-control"
           type="button"
-          title="Partager l'écran"
+          title="${window.PeopleI18n.t("ui_94601469e0")}"
         >
           <span>🖥️</span>
-          <small>Écran</small>
+          <small>${window.PeopleI18n.t("ui_6e56137e21")}</small>
         </button>
 
         <button
           id="peopleDmCallHangup${suffix}"
           class="people-dm-call-control danger"
           type="button"
-          title="Raccrocher"
+          title="${window.PeopleI18n.t("ui_a7ee8300ef")}"
         >
           <span>📞</span>
-          <small>Raccrocher</small>
+          <small>${window.PeopleI18n.t("ui_a7ee8300ef")}</small>
         </button>
       </div>
     </section>
@@ -600,7 +600,7 @@ function createPeopleDmCallSlot(suffix) {
     const name =
       String(
         username ||
-        "Utilisateur"
+        "User"
       );
 
     callName.textContent =
@@ -731,7 +731,7 @@ function createPeopleDmCallSlot(suffix) {
     if (
       !username ||
       username ===
-        "Message privé"
+        ("" + window.PeopleI18n.t("ui_cd3e16057d") + "")
     ) {
       return "";
     }
@@ -769,7 +769,7 @@ function createPeopleDmCallSlot(suffix) {
 
     const label =
       canRejoin
-        ? "Rejoindre"
+        ? ("" + window.PeopleI18n.t("ui_fd30fe681b") + "")
         : "Appeler";
 
     callButton.title = label;
@@ -806,8 +806,8 @@ function createPeopleDmCallSlot(suffix) {
     effectsButton.disabled = !cameraEnabled;
     effectsButton.classList.toggle("people-face-effects-active", selected !== "none");
     effectsButton.title = cameraEnabled
-      ? `Effets de visage${selected !== "none" ? ` • ${info?.label || selected}` : ""}`
-      : "Active la caméra pour utiliser les effets";
+      ? `Face effects${selected !== "none" ? ` • ${info?.label || selected}` : ""}`
+      : ("" + window.PeopleI18n.t("ui_32ffe4daca") + "");
   }
 
   async function peopleDmInstallCameraOutputTrack(track) {
@@ -859,12 +859,12 @@ function createPeopleDmCallSlot(suffix) {
     ).textContent =
       micMuted
         ? "Muet"
-        : "Micro";
+        : ("" + window.PeopleI18n.t("ui_186352a881") + "");
 
     muteButton.title =
       micMuted
-        ? "Réactiver le micro"
-        : "Couper le micro";
+        ? ("" + window.PeopleI18n.t("ui_1764712907") + "")
+        : ("" + window.PeopleI18n.t("ui_5bc000c230") + "");
 
     cameraButton.classList.toggle(
       "active",
@@ -883,12 +883,12 @@ function createPeopleDmCallSlot(suffix) {
     ).textContent =
       cameraEnabled
         ? "Cam active"
-        : "Caméra";
+        : ("" + window.PeopleI18n.t("ui_03494b0d1f") + "");
 
     cameraButton.title =
       cameraEnabled
-        ? "Couper la caméra"
-        : "Activer la caméra";
+        ? ("" + window.PeopleI18n.t("ui_1ad85c324f") + "")
+        : ("" + window.PeopleI18n.t("ui_e9e96a7d12") + "");
 
     screenButton.classList.toggle(
       "active",
@@ -907,12 +907,12 @@ function createPeopleDmCallSlot(suffix) {
     ).textContent =
       screenEnabled
         ? "Stop"
-        : "Écran";
+        : ("" + window.PeopleI18n.t("ui_6e56137e21") + "");
 
     screenButton.title =
       screenEnabled
-        ? "Arrêter le partage d'écran"
-        : "Partager l'écran";
+        ? ("" + window.PeopleI18n.t("ui_4fa4028bb8") + "")
+        : ("" + window.PeopleI18n.t("ui_94601469e0") + "");
 
     peopleDmUpdateEffectsButton();
     peopleDmCallPublishState();
@@ -985,9 +985,7 @@ function createPeopleDmCallSlot(suffix) {
         remoteAudio
       );
 
-    remoteAudio
-      .play()
-      .catch(() => {});
+    void window.PeopleCallMedia?.play(remoteAudio);
 
     const videoTracks =
       remoteStream
@@ -1190,7 +1188,7 @@ function createPeopleDmCallSlot(suffix) {
           );
 
           setStatus(
-            "Micro indisponible — tu peux quand même écouter"
+            ("" + window.PeopleI18n.t("ui_fb35ea6d22") + "")
           );
 
           return ensureEmptyLocalStream();
@@ -1251,7 +1249,7 @@ function createPeopleDmCallSlot(suffix) {
       );
 
       setStatus(
-        "Connexion… micro en attente"
+        ("" + window.PeopleI18n.t("ui_e01924fdfb") + "")
       );
 
       return ensureEmptyLocalStream();
@@ -1404,7 +1402,7 @@ function createPeopleDmCallSlot(suffix) {
           }
 
           setStatus(
-            "Appel en cours"
+            ("" + window.PeopleI18n.t("ui_ffdb91e67b") + "")
           );
         }
 
@@ -1413,7 +1411,7 @@ function createPeopleDmCallSlot(suffix) {
             "failed"
         ) {
           setStatus(
-            "Connexion impossible — nouvelle tentative…"
+            ("" + window.PeopleI18n.t("ui_3c1f16e636") + "")
           );
 
           if (
@@ -1453,7 +1451,7 @@ function createPeopleDmCallSlot(suffix) {
             "disconnected"
         ) {
           setStatus(
-            "Connexion instable…"
+            ("" + window.PeopleI18n.t("ui_f13338e737") + "")
           );
         }
       };
@@ -1734,7 +1732,7 @@ function createPeopleDmCallSlot(suffix) {
       }
 
       setStatus(
-        "Micro changé ✓"
+        ("" + window.PeopleI18n.t("ui_b7e97c9641") + "")
       );
 
       setTimeout(
@@ -1745,7 +1743,7 @@ function createPeopleDmCallSlot(suffix) {
               "active"
           ) {
             setStatus(
-              "Appel en cours"
+              ("" + window.PeopleI18n.t("ui_ffdb91e67b") + "")
             );
           }
         },
@@ -1760,7 +1758,7 @@ function createPeopleDmCallSlot(suffix) {
       );
 
       setStatus(
-        "Impossible d'utiliser ce micro"
+        ("" + window.PeopleI18n.t("ui_a820fa889f") + "")
       );
     }
   }
@@ -1900,7 +1898,7 @@ function createPeopleDmCallSlot(suffix) {
 
       if (!track) {
         throw new Error(
-          "Aucune caméra disponible."
+          ("" + window.PeopleI18n.t("ui_4640c62993") + "")
         );
       }
 
@@ -1978,7 +1976,7 @@ function createPeopleDmCallSlot(suffix) {
       );
 
       setStatus(
-        "Caméra indisponible"
+        ("" + window.PeopleI18n.t("ui_06cc3b14a4") + "")
       );
     }
   }
@@ -2035,7 +2033,7 @@ function createPeopleDmCallSlot(suffix) {
 
       if (!newTrack) {
         throw new Error(
-          "Aucune caméra disponible."
+          ("" + window.PeopleI18n.t("ui_4640c62993") + "")
         );
       }
 
@@ -2085,7 +2083,7 @@ function createPeopleDmCallSlot(suffix) {
       syncLocalPreview();
       updateMediaButtons();
       setStatus(
-        "Caméra changée ✓"
+        ("" + window.PeopleI18n.t("ui_45b2613ed5") + "")
       );
 
       setTimeout(
@@ -2097,8 +2095,8 @@ function createPeopleDmCallSlot(suffix) {
           ) {
             setStatus(
               screenEnabled
-                ? "Appel en cours • partage d'écran"
-                : "Appel en cours"
+                ? ("" + window.PeopleI18n.t("ui_18069053d3") + "")
+                : ("" + window.PeopleI18n.t("ui_ffdb91e67b") + "")
             );
           }
         },
@@ -2111,7 +2109,7 @@ function createPeopleDmCallSlot(suffix) {
       );
 
       setStatus(
-        "Impossible d'utiliser cette caméra"
+        ("" + window.PeopleI18n.t("ui_6eeaccffa9") + "")
       );
     }
   }
@@ -2205,7 +2203,7 @@ function createPeopleDmCallSlot(suffix) {
 
     if (!navigator.mediaDevices?.getDisplayMedia) {
       setStatus(
-        "Partage d'écran indisponible"
+        ("" + window.PeopleI18n.t("ui_f4f7a9f35d") + "")
       );
       return;
     }
@@ -2227,7 +2225,7 @@ function createPeopleDmCallSlot(suffix) {
 
       if (!track) {
         throw new Error(
-          "Aucun écran sélectionné."
+          ("" + window.PeopleI18n.t("ui_d9f3f97c8e") + "")
         );
       }
 
@@ -2270,7 +2268,7 @@ function createPeopleDmCallSlot(suffix) {
       );
 
       setStatus(
-        "Appel en cours • partage d'écran"
+        ("" + window.PeopleI18n.t("ui_18069053d3") + "")
       );
     } catch (err) {
       console.warn(
@@ -2284,7 +2282,7 @@ function createPeopleDmCallSlot(suffix) {
 
       if (err?.name !== "NotAllowedError") {
         setStatus(
-          "Partage d'écran indisponible"
+          ("" + window.PeopleI18n.t("ui_f4f7a9f35d") + "")
         );
       }
     }
@@ -2342,7 +2340,7 @@ function createPeopleDmCallSlot(suffix) {
     );
 
     setStatus(
-      "Appel en cours"
+      ("" + window.PeopleI18n.t("ui_ffdb91e67b") + "")
     );
   }
 
@@ -2543,29 +2541,29 @@ function createPeopleDmCallSlot(suffix) {
   ) {
     const map = {
       declined:
-        "Appel refusé",
+        "Call declined",
       cancelled:
-        "Appel annulé",
+        "Call cancelled",
       timeout:
-        "Pas de réponse",
+        "No answer",
       hangup:
-        "Appel terminé",
+        ("" + window.PeopleI18n.t("ui_00ff74289a") + ""),
       left:
-        "Tu as quitté l'appel",
+        "You left the call",
       empty:
-        "Appel terminé",
+        ("" + window.PeopleI18n.t("ui_00ff74289a") + ""),
       "alone-timeout":
-        "Appel fermé après 3 min seul",
+        "Call ended after three minutes alone",
       disconnected:
-        "Connexion quittée",
+        "Disconnected",
       unavailable:
-        "Appel indisponible",
+        "Call unavailable",
       limit:
-        "Tu as atteint la limite de 2 appels simultanés",
+        "You have reached the limit of two simultaneous calls",
       "joined-elsewhere":
-        "Appel rejoint ailleurs",
+        "Call joined on another device",
       "answered-elsewhere":
-        "Appel pris ailleurs"
+        "Call answered on another device"
     };
 
     return (
@@ -2575,7 +2573,7 @@ function createPeopleDmCallSlot(suffix) {
           ""
         )
       ] ||
-      "Appel terminé"
+      ("" + window.PeopleI18n.t("ui_00ff74289a") + "")
     );
   }
 
@@ -2680,7 +2678,7 @@ function createPeopleDmCallSlot(suffix) {
       ),
       username: String(
         payload?.caller?.username ||
-        "Utilisateur"
+        "User"
       )
     };
 
@@ -2701,7 +2699,7 @@ function createPeopleDmCallSlot(suffix) {
       username:
         String(
           payload?.caller?.username ||
-          "Utilisateur"
+          "User"
         ),
       peerSocketId:
         null,
@@ -2723,8 +2721,8 @@ function createPeopleDmCallSlot(suffix) {
 
     setStatus(
       call.rejoin
-        ? "Appel en cours • tu peux rejoindre"
-        : "Appel entrant…"
+        ? ("" + window.PeopleI18n.t("ui_f5a57e2f9b") + "")
+        : ("" + window.PeopleI18n.t("ui_2f1c6814f3") + "")
     );
 
     showMode(
@@ -2748,7 +2746,7 @@ function createPeopleDmCallSlot(suffix) {
           "granted"
       ) {
         new Notification(
-          "People — appel entrant",
+          ("" + window.PeopleI18n.t("ui_0670a5dda2") + ""),
           {
             body:
               call.username +
@@ -2878,9 +2876,9 @@ function createPeopleDmCallSlot(suffix) {
 
     if (!call.peerSocketId) {
       setStatus(
-        "En attente de " +
+        "Waiting for " +
         call.username +
-        "… • fermeture après 3 min seul"
+        ("" + window.PeopleI18n.t("ui_9b6b6a4853") + "")
       );
 
       return;
@@ -2889,7 +2887,7 @@ function createPeopleDmCallSlot(suffix) {
     stopRinging();
 
     setStatus(
-      "Connexion…"
+      ("" + window.PeopleI18n.t("ui_5f04ae9ed6") + "")
     );
 
     createPeer();
@@ -2927,7 +2925,7 @@ function createPeopleDmCallSlot(suffix) {
               "connected"
           ) {
             setStatus(
-              "Connexion réseau impossible — vérifie le réseau/TURN"
+              ("" + window.PeopleI18n.t("ui_585e671011") + "")
             );
 
             console.warn(
@@ -2996,7 +2994,7 @@ function createPeopleDmCallSlot(suffix) {
         ) {
           const message =
             response?.error ||
-            "Impossible de lancer l'appel.";
+            ("" + window.PeopleI18n.t("ui_39654ea614") + "");
 
           setCallPerson(
             targetUsername
@@ -3115,7 +3113,7 @@ function createPeopleDmCallSlot(suffix) {
       stopRinging();
 
       setStatus(
-        "Connexion…"
+        ("" + window.PeopleI18n.t("ui_5f04ae9ed6") + "")
       );
 
       acceptButton.disabled =
@@ -3323,10 +3321,10 @@ function createPeopleDmCallSlot(suffix) {
 
       setStatus(
         call.role === "joiner"
-          ? "Appel en cours • tu peux rejoindre"
-          : "En attente de " +
+          ? ("" + window.PeopleI18n.t("ui_f5a57e2f9b") + "")
+          : "Waiting for " +
             call.username +
-            "… • fermeture après 3 min seul"
+            ("" + window.PeopleI18n.t("ui_9b6b6a4853") + "")
       );
     }
   );
@@ -3373,7 +3371,7 @@ function createPeopleDmCallSlot(suffix) {
 
       setStatus(
         call.username +
-        " a quitté • fermeture dans 3 min s'il ne revient pas"
+        (" " + window.PeopleI18n.t("ui_27e672dd52") + "")
       );
     }
   );
@@ -3396,7 +3394,7 @@ function createPeopleDmCallSlot(suffix) {
       if (!call.peerSocketId) {
         setStatus(
           call.username +
-          " a refusé • tu restes dans l'appel jusqu'à 3 min"
+          (" " + window.PeopleI18n.t("ui_48679fba25") + "")
         );
       }
     }
@@ -3545,18 +3543,18 @@ function createPeopleDmCallSlot(suffix) {
       if (payload?.screen) {
         setStatus(
           payload?.muted
-            ? "Appel en cours • partage d'écran • micro distant coupé"
-            : "Appel en cours • partage d'écran"
+            ? ("" + window.PeopleI18n.t("ui_d8b6a84bcb") + "")
+            : ("" + window.PeopleI18n.t("ui_18069053d3") + "")
         );
       } else if (
         payload?.muted
       ) {
         setStatus(
-          "Appel en cours • micro distant coupé"
+          ("" + window.PeopleI18n.t("ui_ae5349df68") + "")
         );
       } else {
         setStatus(
-          "Appel en cours"
+          ("" + window.PeopleI18n.t("ui_ffdb91e67b") + "")
         );
       }
     }
@@ -3606,6 +3604,8 @@ function createPeopleDmCallSlot(suffix) {
   updateCallButtonLabel();
 
   const controller = {
+    getLocalAudio: () => localStream,
+    getAudioSamples: () => call ? [{ username, stream: localStream }, { username: call.username, stream: remoteStream }] : [],
     resume(payload) {
       if (!call || String(call.id) !== String(payload.callId) || call.phase !== "active") return;
       socket.emit("dm-call-answer", { callId: call.id }, response => {
@@ -3756,7 +3756,7 @@ function createPeopleDmCallSlot(suffix) {
       if (existing) return window.PeopleCallBar ? window.PeopleCallBar.open(existing.getState().callId) : existing.show();
       const free = slots.find(slot => slot.available());
       if (free) return free.start();
-      window.alert("Tu as atteint la limite de 2 appels simultanés. Raccroche un appel pour continuer.");
+      window.alert("You have reached the limit of two simultaneous calls. End a call to continue.");
     }
   };
   for (const method of ["toggleMute", "toggleCamera", "toggleScreen", "openEffects", "end"])
@@ -3917,7 +3917,7 @@ for (const suffix of ["", "Second"]) (() => {
       current &&
       partner &&
       current !==
-        "message privé" &&
+        ("" + window.PeopleI18n.t("ui_029adcf07d") + "") &&
       current ===
         partner
     );
@@ -4182,7 +4182,7 @@ for (const suffix of ["", "Second"]) (() => {
       "people-local-audio:" +
       normalized(
         callName.textContent ||
-        "utilisateur"
+        "user"
       )
     );
   }
@@ -4281,8 +4281,8 @@ for (const suffix of ["", "Second"]) (() => {
 
     volumeMute.title =
       pref.muted
-        ? "Réactiver le son de la personne"
-        : "Couper le son de la personne";
+        ? ("" + window.PeopleI18n.t("ui_098cdce7d6") + "")
+        : ("" + window.PeopleI18n.t("ui_2367829a4a") + "");
   }
 
   volumeMute.addEventListener(
@@ -4462,7 +4462,7 @@ for (const suffix of ["", "Second"]) (() => {
       current &&
       partner &&
       current !==
-        "message privé" &&
+        ("" + window.PeopleI18n.t("ui_029adcf07d") + "") &&
       current ===
         partner
     );
@@ -4519,15 +4519,15 @@ for (const suffix of ["", "Second"]) (() => {
     "people-dm-call-control people-dm-call-mini-control";
 
   miniButton.title =
-    "Réduire l'appel";
+    ("" + window.PeopleI18n.t("ui_6028381ee0") + "");
 
   miniButton.setAttribute(
     "aria-label",
-    "Réduire l'appel"
+    ("" + window.PeopleI18n.t("ui_6028381ee0") + "")
   );
 
   miniButton.innerHTML =
-    "<span>↘️</span><small>Réduire</small>";
+    "<span>↘️</span><small>Minimize</small>";
 
   miniButton.disabled =
     true;
@@ -4557,11 +4557,11 @@ for (const suffix of ["", "Second"]) (() => {
     "people-dm-call-resize-handle";
 
   resizeHandle.title =
-    "Glisser pour régler la hauteur de l'appel";
+    ("" + window.PeopleI18n.t("ui_1d6b9a9261") + "");
 
   resizeHandle.setAttribute(
     "aria-label",
-    "Régler la hauteur de l'appel"
+    ("" + window.PeopleI18n.t("ui_50f7b5aa6c") + "")
   );
 
   const resizeGrip =
@@ -4826,7 +4826,7 @@ for (const suffix of ["", "Second"]) (() => {
     );
 
   pipTitle.textContent =
-    "Caméra";
+    ("" + window.PeopleI18n.t("ui_03494b0d1f") + "");
 
   const pipRestore =
     document.createElement(
@@ -4840,11 +4840,11 @@ for (const suffix of ["", "Second"]) (() => {
     "people-dm-call-video-pip-restore hidden";
 
   pipRestore.title =
-    "Agrandir l'appel";
+    ("" + window.PeopleI18n.t("ui_e6b0ef3893") + "");
 
   pipRestore.setAttribute(
     "aria-label",
-    "Agrandir l'appel"
+    ("" + window.PeopleI18n.t("ui_e6b0ef3893") + "")
   );
 
   pipRestore.textContent =
@@ -4934,13 +4934,13 @@ for (const suffix of ["", "Second"]) (() => {
       label.textContent =
         pipForced
           ? "Agrandir"
-          : "Réduire";
+          : ("" + window.PeopleI18n.t("ui_be6eb1fc3b") + "");
     }
 
     miniButton.title =
       pipForced
-        ? "Agrandir l'appel"
-        : "Réduire l'appel";
+        ? ("" + window.PeopleI18n.t("ui_e6b0ef3893") + "")
+        : ("" + window.PeopleI18n.t("ui_6028381ee0") + "");
   }
 
   window.addEventListener("people-call-restore", event => {
@@ -5109,10 +5109,10 @@ for (const suffix of ["", "Second"]) (() => {
     pipTitle.textContent =
       callName.textContent
         ? (
-            "Caméra • " +
+            ("" + window.PeopleI18n.t("ui_189cffb693") + " ") +
             callName.textContent
           )
-        : "Caméra";
+        : ("" + window.PeopleI18n.t("ui_03494b0d1f") + "");
 
     if (shouldShow) {
       requestAnimationFrame(

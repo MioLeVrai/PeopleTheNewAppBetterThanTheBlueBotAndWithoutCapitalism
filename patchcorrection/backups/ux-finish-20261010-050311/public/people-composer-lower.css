@@ -1,0 +1,7 @@
+/* PEOPLE_COMPOSER_LOWER_V1 */
+@media (min-width: 781px) {
+  .composer {
+    padding-top: 6px !important;
+    padding-bottom: 12px !important;
+  }
+}

@@ -178,7 +178,7 @@
     ) {
       throw new Error(
         data.error ||
-        "Une erreur est survenue."
+        ("" + window.PeopleI18n.t("ui_cf03797adc") + "")
       );
     }
 
@@ -240,7 +240,7 @@
         } catch (err) {
           alert(
             err?.message ||
-            "Action impossible."
+            ("" + window.PeopleI18n.t("ui_4a47d829df") + "")
           );
         }
       }
@@ -254,7 +254,7 @@
   ) {
     if (!server?.id) {
       throw new Error(
-        "Serveur invalide."
+        ("" + window.PeopleI18n.t("ui_01fa56bf10") + "")
       );
     }
 
@@ -304,7 +304,7 @@
 
     const accepted =
       confirm(
-        "Quitter « " +
+        ("" + window.PeopleI18n.t("ui_24d4860e01") + " ") +
           server.name +
           " » ?"
       );
@@ -365,7 +365,7 @@
 
     menu.appendChild(
       makeServerMenuItem(
-        "🔗 Copier le lien",
+        ("" + window.PeopleI18n.t("ui_52c4f7b631") + ""),
         "copy",
         () =>
           copyServerInvite(
@@ -376,7 +376,7 @@
 
     menu.appendChild(
       makeServerMenuItem(
-        "🚪 Quitter le serveur",
+        ("" + window.PeopleI18n.t("ui_8fe7ab2184") + ""),
         "danger",
         () =>
           leaveServer(
@@ -526,7 +526,7 @@
 
       button.setAttribute(
         "aria-label",
-        "Ouvrir " +
+        ("" + window.PeopleI18n.t("ui_ed077f3d81") + " ") +
           server.name
       );
 
@@ -548,7 +548,7 @@
         "•";
 
       empty.title =
-        "Tu n'as rejoint aucun serveur";
+        ("" + window.PeopleI18n.t("ui_14e5d188a1") + "");
 
       fragment.appendChild(
         empty
@@ -636,13 +636,13 @@
 
     if (subtitle) {
       subtitle.textContent =
-        "Salon général de " +
+        ("" + window.PeopleI18n.t("ui_1dcf7c2f22") + " ") +
         server.name;
     }
 
     if (welcomeText) {
       welcomeText.textContent =
-        "Le salon texte général de " +
+        ("" + window.PeopleI18n.t("ui_3bafefce3d") + " ") +
         server.name +
         ".";
     }
@@ -741,7 +741,7 @@
 
       if (result && result.ok === false) {
         throw new Error(
-          result.error || "Impossible d'ouvrir ce serveur."
+          result.error || ("" + window.PeopleI18n.t("ui_125f76b74b") + "")
         );
       }
     } catch (err) {
@@ -865,14 +865,14 @@
             invitePreview.memberCount ||
             0
           ) === 1
-            ? " membre"
+            ? (" " + window.PeopleI18n.t("ui_e31ab643c4") + "")
             : " membres"
         );
 
       inviteJoin.textContent =
         invitePreview.joined
-          ? "Ouvrir le serveur"
-          : "Rejoindre le serveur";
+          ? ("" + window.PeopleI18n.t("ui_61b1b775a0") + "")
+          : ("" + window.PeopleI18n.t("ui_1639f9466c") + "");
 
       inviteError.textContent =
         "";
@@ -933,7 +933,7 @@
 
       if (!server) {
         throw new Error(
-          "Le serveur a été rejoint mais n'a pas pu être ouvert."
+          ("" + window.PeopleI18n.t("ui_1be96d1ce2") + "")
         );
       }
 
@@ -1103,4 +1103,16 @@
       return activeServer;
     }
   };
+  window.addEventListener("people-server-updated", event => {
+    const updated = event.detail?.server;
+    if (!updated?.id) return;
+    const id = String(updated.id);
+    servers = servers.map(server => String(server.id) === id ? { ...server, ...updated } : server);
+    if (serverById.has(id)) serverById.set(id, { ...serverById.get(id), ...updated });
+    if (String(activeServer?.id) === id) {
+      activeServer = { ...activeServer, ...updated };
+      updateServerChrome(activeServer);
+    }
+    renderRail();
+  });
 })();

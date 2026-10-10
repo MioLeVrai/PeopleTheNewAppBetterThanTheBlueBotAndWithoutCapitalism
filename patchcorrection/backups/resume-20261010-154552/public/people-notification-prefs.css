@@ -1,0 +1,200 @@
+.people-notif-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+}
+
+.people-notif-modal.hidden {
+  display: none;
+}
+
+.people-notif-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 4, 10, 0.72);
+  backdrop-filter: blur(5px);
+}
+
+.people-notif-card {
+  position: relative;
+  z-index: 1;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  background: var(--people-panel, #181524);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46);
+  padding: 24px;
+  color: var(--people-text, #f2eff8);
+}
+
+.people-notif-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  cursor: pointer;
+}
+
+.people-notif-head > span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--people-accent, #8b5cf6);
+}
+
+.people-notif-head h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.people-notif-head p {
+  margin: 8px 44px 20px 0;
+  color: var(--people-muted, #aea7bc);
+  line-height: 1.45;
+}
+
+.people-notif-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.people-notif-field > span,
+.people-notif-default-grid label > span {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--people-muted, #aea7bc);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.people-notif-field select,
+.people-notif-default-grid select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  padding: 0 12px;
+}
+
+.people-notif-sound-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.people-notif-sound-row button,
+.people-notif-mute-grid button,
+.people-notif-actions button {
+  min-height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.people-notif-mute-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.people-notif-mute-grid .people-notif-unmute {
+  color: #f0b7bd;
+}
+
+#peopleNotifMuteStatus {
+  min-height: 18px;
+  color: var(--people-muted, #aea7bc);
+}
+
+.people-notif-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.people-notif-actions .people-notif-primary {
+  background: var(--people-accent, #67589d);
+  border-color: transparent;
+  font-weight: 800;
+}
+
+.people-notif-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.people-notif-settings-section {
+  display: grid;
+  gap: 14px;
+}
+
+.people-notif-default-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.people-notif-default-grid label {
+  display: grid;
+  gap: 8px;
+}
+
+.people-notif-muted-badge {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.dynamic-server-button > .people-notif-muted-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: 50%;
+  background: #15121f;
+  font-size: 10px;
+}
+
+.people-notif-context-action {
+  color: inherit;
+}
+
+@media (max-width: 640px) {
+  .people-notif-card {
+    width: calc(100vw - 20px);
+    padding: 20px 16px;
+  }
+
+  .people-notif-mute-grid,
+  .people-notif-default-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .people-notif-actions {
+    flex-direction: column-reverse;
+  }
+}

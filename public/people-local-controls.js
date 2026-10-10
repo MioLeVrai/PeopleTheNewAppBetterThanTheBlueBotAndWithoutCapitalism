@@ -35,7 +35,7 @@
 
   function currentUsername() {
     const name = (profileName?.textContent || "").trim();
-    return name && name !== "Invité" ? name : "";
+    return name && name !== ("" + window.PeopleI18n.t("ui_5ed8944a85") + "") ? name : "";
   }
 
   function normalizeName(displayName) {
@@ -183,7 +183,7 @@
   function createControls(user) {
     const controls = document.createElement("div");
     controls.className = "people-local-audio-controls";
-    controls.title = "Ce réglage ne change le son que pour toi";
+    controls.title = ("" + window.PeopleI18n.t("ui_a6f536ee05") + "");
 
     const mute = document.createElement("button");
     mute.type = "button";
@@ -213,10 +213,10 @@
     const range = controls.querySelector(".people-local-volume");
 
     if (mute) {
-      mute.setAttribute("aria-label", `Mute local de ${user.username}`);
+      mute.setAttribute("aria-label", `Local mute for ${user.username}`);
     }
     if (range) {
-      range.setAttribute("aria-label", `Volume local de ${user.username}`);
+      range.setAttribute("aria-label", `Local volume for ${user.username}`);
     }
 
     updateControlsUi(controls, user);
@@ -476,8 +476,8 @@ peopleSocket.on("voice-state", (payload) => {
 
     const title = document.createElement("strong");
     title.textContent = mentioned
-      ? `@ Ping de ${sender}`
-      : `Message de ${sender}`;
+      ? `@ Mention from ${sender}`
+      : `Message from ${sender}`;
 
     const body = document.createElement("span");
     body.textContent = String(text).slice(0, 180);
@@ -659,12 +659,12 @@ peopleSocket.on("voice-state", (payload) => {
           const timer = setTimeout(() => {
             finish({
               ok: false,
-              error: "Service Worker sans réponse (ancienne version ou timeout)"
+              error: "Service Worker did not respond (outdated version or timeout)"
             });
           }, 2500);
 
           channel.port1.onmessage = (event) => {
-            finish(event.data || { ok: false, error: "Réponse vide du Service Worker" });
+            finish(event.data || { ok: false, error: "Empty Service Worker response" });
           };
 
           try {
@@ -729,7 +729,7 @@ peopleSocket.on("voice-state", (payload) => {
         window.PeopleDesktopNotifications.show({
           title: mentioned
             ? `People — ${sender} t'a ping`
-            : `People — message de ${sender}`,
+            : `People — message from ${sender}`,
           body: String(text).slice(0, 220),
           silent: true
         });
@@ -754,7 +754,7 @@ peopleSocket.on("voice-state", (payload) => {
         notificationDeniedLogged = true;
         console.warn(
           "[People notifications] Notifications système refusées. " +
-          "Réactive-les dans les permissions du site/navigateur ou dans Windows."
+          ("" + window.PeopleI18n.t("ui_751a3eda40") + "")
         );
       }
       return false;
@@ -780,7 +780,7 @@ peopleSocket.on("voice-state", (payload) => {
     return showBrowserNotification(
       mentioned
         ? `People — ${sender} t'a ping`
-        : `People — message de ${sender}`,
+        : `People — message from ${sender}`,
       browserNotificationOptions(text, {
         tag: notificationTag,
         renotify: true,
@@ -834,12 +834,12 @@ peopleSocket.on("voice-state", (payload) => {
 
     playPingSound(decision.sound);
     showToast(
-      data.username || "Quelqu'un",
+      data.username || "Someone",
       data.text || "",
       mentioned
     );
     void showSystemNotification(
-      data.username || "Quelqu'un",
+      data.username || "Someone",
       data.text || "",
       mentioned,
       decision.sound
@@ -895,7 +895,7 @@ peopleSocket.on("voice-state", (payload) => {
 
       return showBrowserNotification(
         "People — test",
-        browserNotificationOptions("Les notifications système fonctionnent.", {
+        browserNotificationOptions("System notifications are working.", {
           tag: `people-test-${Date.now()}`,
           renotify: true,
           data: { url: window.location.href }

@@ -186,14 +186,14 @@
         class="people-avatar-cropper-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Recadrer la photo de profil"
+        aria-label="${window.PeopleI18n.t("ui_2e3e86b0a9")}"
       >
         <h3 class="people-avatar-cropper-title">
-          Recadrer la photo
+          ${window.PeopleI18n.t("ui_e29e4eefd4")}
         </h3>
 
         <p class="people-avatar-cropper-subtitle">
-          Glisse l’image pour la déplacer, puis ajuste le zoom.
+          ${window.PeopleI18n.t("ui_d17dff5b14")}
         </p>
 
         <div class="people-avatar-cropper-stage">
@@ -226,14 +226,14 @@
             type="button"
             class="people-avatar-cropper-cancel"
           >
-            Annuler
+            ${window.PeopleI18n.t("ui_19766ed6cc")}
           </button>
 
           <button
             type="button"
             class="people-avatar-cropper-save"
           >
-            Enregistrer
+            ${window.PeopleI18n.t("ui_35322b5bb5")}
           </button>
         </div>
       </section>
@@ -385,7 +385,7 @@
         cancelButton.disabled = true;
 
         info.textContent =
-          "Préparation...";
+          ("" + window.PeopleI18n.t("ui_74a6b5348c") + "");
 
         try {
           const blob =
@@ -393,7 +393,7 @@
 
           if (!blob) {
             throw new Error(
-              "Impossible de préparer cette image."
+              ("" + window.PeopleI18n.t("ui_9ab22836ad") + "")
             );
           }
 
@@ -413,7 +413,7 @@
         } catch (err) {
           info.textContent =
             err?.message ||
-            "Erreur de préparation.";
+            ("" + window.PeopleI18n.t("ui_8f46646a84") + "");
 
           confirmButton.disabled = false;
           cancelButton.disabled = false;
@@ -615,7 +615,7 @@
 
     if (!jpegCtx) {
       throw new Error(
-        "Canvas indisponible."
+        "Canvas is unavailable."
       );
     }
 
@@ -685,7 +685,7 @@
           URL.revokeObjectURL(url);
           reject(
             new Error(
-              "Impossible de lire cette image."
+              ("" + window.PeopleI18n.t("ui_e47c1352d3") + "")
             )
           );
         };
@@ -731,7 +731,7 @@
         .startsWith("image/")
     ) {
       throw new Error(
-        "Ce fichier n’est pas une image."
+        ("" + window.PeopleI18n.t("ui_62d5206131") + "")
       );
     }
 
@@ -740,7 +740,7 @@
       MAX_SOURCE_BYTES
     ) {
       throw new Error(
-        "L’image source est trop lourde (25 Mo maximum)."
+        "The source image is too large (25 MB maximum)."
       );
     }
 
@@ -770,7 +770,7 @@
       !imageHeight
     ) {
       throw new Error(
-        "Dimensions de l’image invalides."
+        "Invalid image dimensions."
       );
     }
 
@@ -785,7 +785,7 @@
       imageWidth +
       "×" +
       imageHeight +
-      " • sera compressée avant l’envoi";
+      (" " + window.PeopleI18n.t("ui_44d57fd3cd") + "");
 
     overlay.classList.remove(
       "hidden"

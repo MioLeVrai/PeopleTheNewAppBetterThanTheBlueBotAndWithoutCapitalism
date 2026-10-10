@@ -18,6 +18,7 @@ const { Pool } = require("pg");
 const fsAccounts = require("fs");
 const pathAccounts = require("path");
 const cryptoAccounts = require("crypto");
+const peopleText = require(pathAccounts.join(fsAccounts.existsSync(pathAccounts.join(__dirname, "public")) ? __dirname : process.cwd(), "public/people-i18n.js")).t;
 
 /* PEOPLE_SERVER_ICON_V1_JSON_LIMIT */
 app.use(express.json({ limit: "512kb" }));
@@ -86,7 +87,7 @@ function peopleSessionSecret() {
 
   if (PEOPLE_PRODUCTION) {
     throw new Error(
-      "DATABASE_URL manque. Configure PostgreSQL dans Render avant le deploiement."
+      ("" + peopleText("ui_1292f9f79e") + "")
     );
   }
 
@@ -395,7 +396,7 @@ function peopleDecryptMessageText(
   ) {
     const err =
       new Error(
-        "Message chiffré invalide."
+        ("" + peopleText("ui_5dbec142f4") + "")
       );
 
     err.code =
@@ -430,7 +431,7 @@ function peopleDecryptMessageText(
         16
     ) {
       throw new Error(
-        "Format AES-GCM invalide."
+        ("" + peopleText("ui_072d2b949f") + "")
       );
     }
 
@@ -460,8 +461,8 @@ function peopleDecryptMessageText(
   } catch (cause) {
     const err =
       new Error(
-        "Impossible de déchiffrer un message. " +
-        "Vérifie PEOPLE_MESSAGE_ENCRYPTION_KEY."
+        ("" + peopleText("ui_d4c2bc1082") + " ") +
+        ("" + peopleText("ui_8f4a350168") + "")
       );
 
     err.code =
@@ -495,7 +496,7 @@ function peopleSimpleAdminAuthorized(
     res.status(503).json({
       ok: false,
       error:
-        "PEOPLE_SIMPLE_ADMIN_TOKEN n'est pas configuré sur Render."
+        ("" + peopleText("ui_2811357f9b") + "")
     });
 
     return false;
@@ -537,7 +538,7 @@ function peopleSimpleAdminAuthorized(
     res.status(403).json({
       ok: false,
       error:
-        "Accès admin refusé."
+        ("" + peopleText("ui_f301775c4b") + "")
     });
 
     return false;
@@ -554,7 +555,7 @@ function peopleSimpleAdminAuthorized(
       res.status(403).json({
         ok: false,
         error:
-          "Accès admin refusé."
+          ("" + peopleText("ui_f301775c4b") + "")
       });
 
       return false;
@@ -563,7 +564,7 @@ function peopleSimpleAdminAuthorized(
     res.status(403).json({
       ok: false,
       error:
-        "Accès admin refusé."
+        ("" + peopleText("ui_f301775c4b") + "")
     });
 
     return false;
@@ -602,6 +603,7 @@ function peopleSessionFromCookie(header) {
 
     const payload = jwt.verify(token, PEOPLE_SESSION_SECRET);
     if (!payload || !payload.sub || !payload.username) return null;
+    if (peopleSimpleDeletedAccounts.has(String(payload.sub))) return null;
 
     return {
       id: String(payload.sub),
@@ -664,6 +666,9 @@ function peopleWriteLocalAccounts(accounts) {
 
 async function peopleInitAccounts() {
   if (!PEOPLE_DB_URL) {
+    for (const account of peopleReadLocalAccounts()) {
+      if (String(account.password_hash || "").startsWith("!deleted:")) peopleSimpleDeletedAccounts.add(String(account.id));
+    }
     if (PEOPLE_PRODUCTION) {
       throw new Error(
         "People Accounts : DATABASE_URL absent. " +
@@ -693,6 +698,8 @@ async function peopleInitAccounts() {
   );
 
   console.log("[People] Base comptes PostgreSQL connectee.");
+  const deleted = await peoplePool.query("SELECT id FROM people_accounts WHERE password_hash LIKE '!deleted:%'");
+  for (const account of deleted.rows) peopleSimpleDeletedAccounts.add(String(account.id));
 }
 
 async function peopleFindAccount(username) {
@@ -717,6 +724,7 @@ async function peopleFindAccount(username) {
 
 async function peopleCreateAccount(username, passwordHash) {
   const name = peopleUsername(username);
+  if (/^Deleted User \d+$/i.test(name)) { const error = new Error("Reserved username."); error.code = "USERNAME_EXISTS"; throw error; }
   const key = peopleUsernameKey(name);
 
   if (peoplePool) {
@@ -800,7 +808,7 @@ app.post("/api/auth/register", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error:
-          "Pseudo : 3 a 24 caracteres, lettres/chiffres/_/./- uniquement."
+          ("" + peopleText("ui_1077937ce3") + "")
       });
     }
 
@@ -808,7 +816,7 @@ app.post("/api/auth/register", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error:
-          "Le mot de passe doit contenir entre 8 et 128 caracteres."
+          ("" + peopleText("ui_5aaed57e08") + "")
       });
     }
 
@@ -817,7 +825,7 @@ app.post("/api/auth/register", async (req, res) => {
     if (existing) {
       return res.status(409).json({
         ok: false,
-        error: "Ce pseudo est deja pris."
+        error: ("" + peopleText("ui_da2c9d394a") + "")
       });
     }
 
@@ -834,7 +842,7 @@ app.post("/api/auth/register", async (req, res) => {
       ) {
         return res.status(409).json({
           ok: false,
-          error: "Ce pseudo est deja pris."
+          error: ("" + peopleText("ui_da2c9d394a") + "")
         });
       }
 
@@ -855,7 +863,7 @@ app.post("/api/auth/register", async (req, res) => {
 
     return res.status(500).json({
       ok: false,
-      error: "Impossible de creer le compte."
+      error: ("" + peopleText("ui_f10e0a6472") + "")
     });
   }
 });
@@ -869,7 +877,7 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(429).json({
         ok: false,
         error:
-          "Trop d'essais pour ce pseudo. Reessaie dans quelques minutes."
+          ("" + peopleText("ui_86c062a837") + "")
       });
     }
 
@@ -880,7 +888,7 @@ app.post("/api/auth/login", async (req, res) => {
 
       return res.status(401).json({
         ok: false,
-        error: "Pseudo ou mot de passe incorrect."
+        error: ("" + peopleText("ui_2420afe3a6") + "")
       });
     }
 
@@ -894,7 +902,7 @@ app.post("/api/auth/login", async (req, res) => {
 
       return res.status(401).json({
         ok: false,
-        error: "Pseudo ou mot de passe incorrect."
+        error: ("" + peopleText("ui_2420afe3a6") + "")
       });
     }
 
@@ -913,7 +921,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     return res.status(500).json({
       ok: false,
-      error: "Connexion impossible."
+      error: ("" + peopleText("ui_709269b6bc") + "")
     });
   }
 });
@@ -962,7 +970,7 @@ app.post(
         return res.status(400).json({
           ok: false,
           error:
-            "Pseudo invalide."
+            ("" + peopleText("ui_e2859d06a6") + "")
         });
       }
 
@@ -975,7 +983,7 @@ app.post(
         return res.status(404).json({
           ok: false,
           error:
-            "Compte introuvable."
+            ("" + peopleText("ui_e9b1e0403a") + "")
         });
       }
 
@@ -992,7 +1000,7 @@ app.post(
       return res.status(500).json({
         ok: false,
         error:
-          "Impossible de supprimer ce compte."
+          ("" + peopleText("ui_91d91b3444") + "")
       });
     }
   }
@@ -1480,6 +1488,7 @@ function peoplePublicAccount(account) {
   return {
     id: String(account.id),
     username: peopleUsername(account.username),
+    deleted: peopleSimpleDeletedAccounts.has(String(account.id)),
     status: peoplePublicStatus(account.id),
     description: String(account.description || ""),
     createdAt: account.created_at || account.createdAt || null
@@ -1492,7 +1501,7 @@ function peopleSessionForRequest(req, res) {
   if (!session) {
     res.status(401).json({
       ok: false,
-      error: "Connexion requise."
+      error: ("" + peopleText("ui_0566618cc9") + "")
     });
     return null;
   }
@@ -1534,7 +1543,7 @@ app.post(
           .json({
             ok: false,
             error:
-              "Clé E2EE de l'appareil invalide."
+              ("" + peopleText("ui_699e8c1a30") + "")
           });
       }
 
@@ -1548,7 +1557,7 @@ app.post(
         .json({
           ok: false,
           error:
-            "Impossible d'enregistrer la clé E2EE."
+            ("" + peopleText("ui_82836d0392") + "")
         });
     }
   }
@@ -1579,7 +1588,7 @@ app.get(
           .json({
             ok: false,
             error:
-              "Utilisateur introuvable."
+              ("" + peopleText("ui_f412be4314") + "")
           });
       }
 
@@ -1592,7 +1601,7 @@ app.get(
           .json({
             ok: false,
             error:
-              "Conversation E2EE invalide."
+              ("" + peopleText("ui_505c25dcef") + "")
           });
       }
 
@@ -1633,7 +1642,7 @@ app.get(
         .json({
           ok: false,
           error:
-            "Impossible de charger les clés E2EE."
+            ("" + peopleText("ui_16009b35ce") + "")
         });
     }
   }
@@ -1738,11 +1747,12 @@ async function peopleListAccounts(search = "") {
       params
     );
 
-    return result.rows;
+    return result.rows.filter(account => !peopleSimpleDeletedAccounts.has(String(account.id)));
   }
 
   return peopleReadLocalAccounts()
     .filter((account) => {
+      if (peopleSimpleDeletedAccounts.has(String(account.id))) return false;
       if (!q) return true;
       return String(account.username || "")
         .toLocaleLowerCase("fr-FR")
@@ -2261,7 +2271,7 @@ async function peopleCreateFriendRequest(senderId, recipientId) {
       String(request.recipient_id) === recipient
   );
 
-  if (existing) return existing;
+  if (existing) return { ...existing, created: false };
 
   if (peoplePool) {
     const result = await peoplePool.query(
@@ -2272,7 +2282,7 @@ async function peopleCreateFriendRequest(senderId, recipientId) {
       [sender, recipient]
     );
 
-    if (result.rows[0]) return result.rows[0];
+    if (result.rows[0]) return { ...result.rows[0], created: true };
 
     const conflict = await peoplePool.query(
       "SELECT id, sender_id, recipient_id, created_at " +
@@ -2292,7 +2302,7 @@ async function peopleCreateFriendRequest(senderId, recipientId) {
       throw err;
     }
 
-    return row || null;
+    return row ? { ...row, created: false } : null;
   }
 
   const data = peopleReadLocalSocial();
@@ -2307,7 +2317,7 @@ async function peopleCreateFriendRequest(senderId, recipientId) {
   data.friend_requests.push(request);
   peopleWriteLocalSocial(data);
 
-  return request;
+  return { ...request, created: true };
 }
 
 async function peopleAcceptFriendRequest(accountId, requestId) {
@@ -2990,7 +3000,7 @@ async function peopleDmHistory(
 
       message.reply_sender_username =
         sender?.username ||
-        "Utilisateur";
+        "User";
 
       message.reply_body =
         reply.body || "";
@@ -3485,7 +3495,7 @@ async function peopleEnsureReplyColumns() {
 function peopleDeletedReply(id) {
   return {
     id: String(id),
-    username: "Message supprimé",
+    username: ("" + peopleText("ui_0a8438e26d") + ""),
     text: "",
     imageId: null,
     deleted: true
@@ -3605,7 +3615,7 @@ async function peopleDmReplyPreview(
       id: String(row.id),
       username:
         row.sender_username ||
-        "Utilisateur",
+        "User",
       text:
         peopleDecryptMessageText(
           row.body
@@ -3647,7 +3657,7 @@ async function peopleDmReplyPreview(
     id: String(message.id),
     username:
       sender?.username ||
-      "Utilisateur",
+      "User",
     text:
       String(message.body || ""),
     imageId:
@@ -4799,201 +4809,73 @@ function peopleSimpleAdminKickAccount(
   }
 }
 
-async function peopleSimpleAdminDeleteLocal(
-  account
-) {
-  const id =
-    String(
-      account.id
-    );
-
-  const accounts =
-    peopleReadLocalAccounts()
-      .filter(
-        (item) =>
-          String(
-            item.id
-          ) !== id
-      );
-
-  peopleWriteLocalAccounts(
-    accounts
-  );
-
-  const social =
-    peopleReadLocalSocial();
-
-  social.friends =
-    (
-      Array.isArray(
-        social.friends
-      )
-        ? social.friends
-        : []
-    ).filter(
-      (item) =>
-        String(
-          item.user_id
-        ) !== id &&
-        String(
-          item.friend_id
-        ) !== id
-    );
-
-  social.friend_requests =
-    (
-      Array.isArray(
-        social.friend_requests
-      )
-        ? social.friend_requests
-        : []
-    ).filter(
-      (item) =>
-        String(
-          item.sender_id
-        ) !== id &&
-        String(
-          item.recipient_id
-        ) !== id
-    );
-
-  social.dms =
-    (
-      Array.isArray(
-        social.dms
-      )
-        ? social.dms
-        : []
-    ).filter(
-      (item) =>
-        String(
-          item.sender_id
-        ) !== id &&
-        String(
-          item.recipient_id
-        ) !== id
-    );
-
-  if (
-    Array.isArray(
-      social.closed_dms
-    )
-  ) {
-    social.closed_dms =
-      social.closed_dms
-        .filter(
-          (item) =>
-            String(
-              item.user_id
-            ) !== id &&
-            String(
-              item.other_id
-            ) !== id
-        );
-  }
-
-  peopleWriteLocalSocial(
-    social
-  );
-
-  const serverData =
-    peopleReadLocalServers();
-
-  serverData.members =
-    serverData.members
-      .filter(
-        (item) =>
-          String(
-            item.userId ??
-            item.user_id ??
-            ""
-          ) !== id
-      );
-
-  /*
-    Ici on ne détruit pas directement les serveurs créés
-    par ce compte. Ils restent sans propriétaire si des
-    membres sont encore présents ; le nettoyage global
-    supprimera ensuite ceux qui sont devenus totalement vides.
-  */
-  serverData.servers =
-    serverData.servers.map(
-      (item) => {
-        const owner =
-          String(
-            item.ownerId ??
-            item.owner_id ??
-            ""
-          );
-
-        if (
-          owner !== id
-        ) {
-          return item;
-        }
-
-        return {
-          ...item,
-          ownerId: null,
-          owner_id: null
-        };
-      }
-    );
-
-  peopleWriteLocalServers(
-    serverData
-  );
+async function peopleSimpleAdminDeleteLocal(account) {
+  const id = String(account.id);
+  const accounts = peopleReadLocalAccounts();
+  const number = Math.max(0, ...accounts.map(item => Number(String(item.password_hash || '').match(/^!deleted:(\d+)$/)?.[1] || 0))) + 1;
+  const name = 'Deleted User ' + number;
+  const tombstone = { id: account.id, username: name, username_key: peopleUsernameKey(name), password_hash: '!deleted:' + number, description: '', created_at: new Date().toISOString() };
+  peopleWriteLocalAccounts(accounts.map(item => String(item.id) === id ? tombstone : item));
+  const social = peopleReadLocalSocial();
+  social.friends = social.friends.filter(item => String(item.user_id) !== id && String(item.friend_id) !== id);
+  social.friend_requests = social.friend_requests.filter(item => String(item.sender_id) !== id && String(item.recipient_id) !== id);
+  // Keep messages and conversation IDs; their names resolve to the tombstone.
+  peopleWriteLocalSocial(social);
+  peopleWriteLocalGeneral(peopleReadLocalGeneral().map(item => {
+    if (String(item.senderId) === id) return { ...item, username: name };
+    if (item.system) return { ...item, text: String(item.text || '').split(account.username).join(name) };
+    return item;
+  }));
+  const audit = peopleReadAdminAudit().map(entry => String(entry.actor_id) === id ? { ...entry, actor_name: name } : entry);
+  fsAccounts.writeFileSync(pathAccounts.join(__dirname, 'people-admin-audit.local.json'), JSON.stringify(audit), 'utf8');
+  const data = peopleReadLocalServers();
+  data.members = data.members.filter(item => String(item.userId ?? item.user_id) !== id);
+  data.memberRoles = (data.memberRoles || []).filter(item => String(item.userId ?? item.user_id) !== id);
+  data.servers = data.servers.map(item => String(item.ownerId ?? item.owner_id) === id ? { ...item, ownerId: null, owner_id: null } : item);
+  peopleWriteLocalServers(data);
+  const avatars = peopleReadAvatarMeta(); delete avatars[id]; peopleWriteAvatarMeta(avatars);
+  peopleWriteLocalE2ee(peopleReadLocalE2ee().filter(item => String(item.user_id) !== id));
+  return tombstone;
 }
 
-async function peopleSimpleAdminDeleteAccount(
-  username
-) {
-  const account =
-    await peopleFindAccount(
-      username
-    );
-
-  if (!account) {
-    return null;
-  }
-
-  const accountId =
-    String(
-      account.id
-    );
-
+async function peopleSimpleAdminDeleteAccount(username) {
+  const account = await peopleFindAccount(username);
+  if (!account || peopleSimpleDeletedAccounts.has(String(account.id))) return null;
+  const id = String(account.id);
+  let tombstone;
   if (peoplePool) {
-    /*
-      Les FK existantes de People nettoient les amis,
-      demandes, MP, PP, images et memberships.
-      Les messages serveur gardent leur historique
-      avec sender_id = NULL lorsque prévu par le schéma.
-    */
-    await peoplePool.query(
-      "DELETE FROM people_accounts WHERE id = $1",
-      [
-        accountId
-      ]
-    );
-  } else {
-    await peopleSimpleAdminDeleteLocal(
-      account
-    );
-  }
-
-  peopleSimpleAdminKickAccount(
-    accountId
-  );
-
-  // === PEOPLE_DELETE_EMPTY_AFTER_ACCOUNT_DELETE_V1 ===
+    await peopleEnsureAvatarTable();
+    const client = await peoplePool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(734992101)');
+      const numbers = await client.query("SELECT COALESCE(MAX(SUBSTRING(password_hash FROM 10)::bigint), 0) + 1 AS n FROM people_accounts WHERE password_hash ~ '^!deleted:[0-9]+$'");
+      const number = String(numbers.rows[0].n), name = 'Deleted User ' + number;
+      await client.query("UPDATE people_accounts SET username=$2, username_key=$3, password_hash=$4, description='', appearance_theme='dark', appearance_accent='', appearance_palette='', created_at=NOW() WHERE id=$1", [id, name, peopleUsernameKey(name), '!deleted:' + number]);
+      await client.query('UPDATE people_general_messages SET username=$2 WHERE sender_id=$1', [id, name]);
+      const systemMessages = await client.query('SELECT id, body FROM people_general_messages WHERE is_system=TRUE');
+      for (const message of systemMessages.rows) {
+        const text = peopleDecryptMessageText(message.body);
+        if (text.includes(account.username)) await client.query('UPDATE people_general_messages SET body=$2 WHERE id=$1', [message.id, peopleEncryptMessageText(text.split(account.username).join(name))]);
+      }
+      await client.query('UPDATE people_admin_audit SET actor_name=$2 WHERE actor_id=$1', [id, name]);
+      await client.query('DELETE FROM people_friends WHERE user_id=$1 OR friend_id=$1', [id]);
+      await client.query('DELETE FROM people_friend_requests WHERE sender_id=$1 OR recipient_id=$1', [id]);
+      await client.query('DELETE FROM people_profile_avatars WHERE account_id=$1', [id]);
+      await client.query('DELETE FROM people_e2ee_devices WHERE user_id=$1', [id]);
+      await client.query('DELETE FROM people_server_members WHERE user_id=$1', [id]);
+      await client.query('UPDATE people_servers SET owner_id=NULL WHERE owner_id=$1', [id]);
+      await client.query('COMMIT');
+      tombstone = { id, username: name };
+    } catch (error) {
+      await client.query('ROLLBACK'); throw error;
+    } finally { client.release(); }
+  } else tombstone = await peopleSimpleAdminDeleteLocal(account);
+  peopleSimpleAdminKickAccount(id);
+  peopleStatusPreferences.delete(id);
   await peopleDeleteAllEmptyServers();
-
-  return {
-    id:
-      accountId,
-    username:
-      account.username
-  };
+  io.emit('people-account-deleted', { accountId: id, username: tombstone.username });
+  return { id, username: tombstone.username };
 }
 // === PEOPLE_SIMPLE_ADMIN_DELETE_HELPERS_V1 ===
 
@@ -5198,6 +5080,7 @@ async function peopleSaveAvatar(accountId, buffer) {
 }
 
 async function peopleLoadAvatar(accountId) {
+  if (peopleSimpleDeletedAccounts.has(String(accountId))) return null;
   const ownerId = String(accountId);
 
   if (peoplePool) {
@@ -5336,7 +5219,7 @@ app.put(
       if (!account) {
         return res.status(404).json({
           ok: false,
-          error: "Compte introuvable."
+          error: ("" + peopleText("ui_e9b1e0403a") + "")
         });
       }
 
@@ -5361,7 +5244,7 @@ app.put(
         return res.status(413).json({
           ok: false,
           error:
-            "La photo de profil doit faire moins de 3 Mo."
+            ("" + peopleText("ui_6031ee3857") + "")
         });
       }
 
@@ -5369,7 +5252,7 @@ app.put(
         return res.status(400).json({
           ok: false,
           error:
-            "Format non accepte. JPEG, PNG, WebP ou GIF."
+            ("" + peopleText("ui_312dfb4667") + "")
         });
       }
 
@@ -5380,7 +5263,7 @@ app.put(
         return res.status(500).json({
           ok: false,
           error:
-            "La photo a été reçue mais n'a pas pu être relue depuis le stockage."
+            ("" + peopleText("ui_729a91234c") + "")
         });
       }
 
@@ -5392,7 +5275,7 @@ app.put(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de changer la photo de profil."
+          ("" + peopleText("ui_89173e1849") + "")
       });
     }
   }
@@ -5426,7 +5309,7 @@ app.put(
         return res.status(413).json({
           ok: false,
           error:
-            "La photo compressée est encore trop lourde."
+            ("" + peopleText("ui_e95af3ee90") + "")
         });
       }
 
@@ -5453,7 +5336,7 @@ app.put(
         return res.status(413).json({
           ok: false,
           error:
-            "La photo compressée dépasse la limite."
+            ("" + peopleText("ui_9490c6dd1d") + "")
         });
       }
 
@@ -5469,7 +5352,7 @@ app.put(
         return res.status(400).json({
           ok: false,
           error:
-            "La photo finale doit être en JPEG."
+            ("" + peopleText("ui_a24147bba4") + "")
         });
       }
 
@@ -5505,7 +5388,7 @@ app.put(
         return res.status(404).json({
           ok: false,
           error:
-            "Compte introuvable."
+            ("" + peopleText("ui_e9b1e0403a") + "")
         });
       }
 
@@ -5546,7 +5429,7 @@ app.put(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible d'enregistrer la photo de profil."
+          ("" + peopleText("ui_838f91d566") + "")
       });
     }
   }
@@ -5577,7 +5460,7 @@ app.get(
         return res.status(404).json({
           ok: false,
           error:
-            "Profil introuvable."
+            ("" + peopleText("ui_142330085b") + "")
         });
       }
 
@@ -5627,7 +5510,7 @@ app.get(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de charger la photo de profil."
+          ("" + peopleText("ui_50f6a9d647") + "")
       });
     }
   }
@@ -5647,7 +5530,7 @@ app.get(
       if (!appearance) {
         return res.status(404).json({
           ok: false,
-          error: "Compte introuvable."
+          error: ("" + peopleText("ui_e9b1e0403a") + "")
         });
       }
 
@@ -5659,7 +5542,7 @@ app.get(
       console.error("[People appearance/get]", err);
       return res.status(500).json({
         ok: false,
-        error: "Impossible de charger l'apparence."
+        error: ("" + peopleText("ui_adc0c643cf") + "")
       });
     }
   }
@@ -5679,7 +5562,7 @@ app.put(
       if (!PEOPLE_APPEARANCE_THEMES.has(rawTheme)) {
         return res.status(400).json({
           ok: false,
-          error: "Thème d'apparence invalide."
+          error: ("" + peopleText("ui_3c4409b8ec") + "")
         });
       }
 
@@ -5688,7 +5571,7 @@ app.put(
       if (!currentAppearance) {
         return res.status(404).json({
           ok: false,
-          error: "Compte introuvable."
+          error: ("" + peopleText("ui_e9b1e0403a") + "")
         });
       }
 
@@ -5711,7 +5594,7 @@ app.put(
       ) {
         return res.status(400).json({
           ok: false,
-          error: "Palette d'apparence invalide."
+          error: ("" + peopleText("ui_d0f1eedc6e") + "")
         });
       }
 
@@ -5723,7 +5606,7 @@ app.put(
         if (!/^#[0-9A-F]{6}$/.test(value)) {
           return res.status(400).json({
             ok: false,
-            error: "Couleur invalide pour " + key + "."
+            error: "Invalid color for " + key + "."
           });
         }
       }
@@ -5754,7 +5637,7 @@ app.put(
         ) {
           return res.status(400).json({
             ok: false,
-            error: "Réglages de dégradé invalides."
+            error: ("" + peopleText("ui_fdf0c94b5a") + "")
           });
         }
       }
@@ -5771,7 +5654,7 @@ app.put(
       if (!appearance) {
         return res.status(404).json({
           ok: false,
-          error: "Compte introuvable."
+          error: ("" + peopleText("ui_e9b1e0403a") + "")
         });
       }
 
@@ -5783,7 +5666,7 @@ app.put(
       console.error("[People appearance/put]", err);
       return res.status(500).json({
         ok: false,
-        error: "Impossible d'enregistrer l'apparence."
+        error: ("" + peopleText("ui_1fae17339e") + "")
       });
     }
   }
@@ -5800,7 +5683,7 @@ app.get("/api/profile/:username", async (req, res) => {
     if (!account) {
       return res.status(404).json({
         ok: false,
-        error: "Profil introuvable."
+        error: ("" + peopleText("ui_142330085b") + "")
       });
     }
 
@@ -5813,7 +5696,7 @@ app.get("/api/profile/:username", async (req, res) => {
     const serverId = String(req.query.serverId || "");
     if (serverId) {
       if (!(await peopleIsServerMember(session.id, serverId))) {
-        return res.status(403).json({ ok: false, error: "Accès refusé à ce serveur." });
+        return res.status(403).json({ ok: false, error: ("" + peopleText("ui_6bd1c7fe85") + "") });
       }
       const state = await peopleServerRoleState(account.id, serverId);
       if (state) serverMember = { serverId, roles: state.assigned, roleColor: state.assigned[0]?.color || null, owner: state.owner };
@@ -5835,7 +5718,7 @@ app.get("/api/profile/:username", async (req, res) => {
     console.error("[People profile/get]", err);
     res.status(500).json({
       ok: false,
-      error: "Impossible de charger ce profil."
+      error: ("" + peopleText("ui_4d5ec8b0f2") + "")
     });
   }
 });
@@ -5852,7 +5735,7 @@ app.put("/api/profile/me", async (req, res) => {
     if (description.length > 280) {
       return res.status(400).json({
         ok: false,
-        error: "La description est limitee a 280 caracteres."
+        error: ("" + peopleText("ui_ceb4bc7759") + "")
       });
     }
 
@@ -5864,7 +5747,7 @@ app.put("/api/profile/me", async (req, res) => {
     if (!account) {
       return res.status(404).json({
         ok: false,
-        error: "Compte introuvable."
+        error: ("" + peopleText("ui_e9b1e0403a") + "")
       });
     }
 
@@ -5881,7 +5764,7 @@ app.put("/api/profile/me", async (req, res) => {
     console.error("[People profile/update]", err);
     res.status(500).json({
       ok: false,
-      error: "Impossible de modifier le profil."
+      error: ("" + peopleText("ui_2f1cf3728c") + "")
     });
   }
 });
@@ -6035,7 +5918,7 @@ app.get("/api/social/people", async (req, res) => {
 
     res.status(500).json({
       ok: false,
-      error: "Impossible de charger les personnes."
+      error: ("" + peopleText("ui_b54ae59f89") + "")
     });
   }
 });
@@ -6077,7 +5960,7 @@ app.get("/api/social/friends", async (req, res) => {
     console.error("[People social/friends]", err);
     res.status(500).json({
       ok: false,
-      error: "Impossible de charger les amis."
+      error: ("" + peopleText("ui_4abebde4e8") + "")
     });
   }
 });
@@ -6157,7 +6040,7 @@ app.get("/api/social/friend-requests", async (req, res) => {
     res.status(500).json({
       ok: false,
       error:
-        "Impossible de charger les demandes d'ami."
+        ("" + peopleText("ui_61635d9818") + "")
     });
   }
 });
@@ -6171,10 +6054,10 @@ app.post("/api/social/friends/:username", async (req, res) => {
       req.params.username
     );
 
-    if (!target) {
+    if (!target || peopleSimpleDeletedAccounts.has(String(target.id))) {
       return res.status(404).json({
         ok: false,
-        error: "Utilisateur introuvable."
+        error: ("" + peopleText("ui_f412be4314") + "")
       });
     }
 
@@ -6182,7 +6065,7 @@ app.post("/api/social/friends/:username", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error:
-          "Tu ne peux pas t'envoyer une demande a toi-meme."
+          ("" + peopleText("ui_b2dd82dd9c") + "")
       });
     }
 
@@ -6192,12 +6075,14 @@ app.post("/api/social/friends/:username", async (req, res) => {
           session.id,
           target.id
         );
+      if (request && request.created === false) return res.json({ ok: true, state: "outgoing", requestId: String(request.id) });
 
       peopleEmitToAccount(
         target.id,
         "friend-state-changed",
         {
           type: "request",
+          requestId: request ? String(request.id) : null,
           from: session.username
         }
       );
@@ -6222,7 +6107,7 @@ app.post("/api/social/friends/:username", async (req, res) => {
       if (err?.code === "ALREADY_FRIENDS") {
         return res.status(409).json({
           ok: false,
-          error: "Vous etes deja amis."
+          error: ("" + peopleText("ui_2500c09721") + "")
         });
       }
 
@@ -6230,8 +6115,8 @@ app.post("/api/social/friends/:username", async (req, res) => {
         return res.status(409).json({
           ok: false,
           error:
-            "Cette personne t'a deja envoye une demande. " +
-            "Accepte-la dans Demandes d'ami."
+            "This person has already sent you a request. " +
+            "Accept it in Friend Requests."
         });
       }
 
@@ -6246,7 +6131,7 @@ app.post("/api/social/friends/:username", async (req, res) => {
     res.status(500).json({
       ok: false,
       error:
-        "Impossible d'envoyer la demande d'ami."
+        ("" + peopleText("ui_833c17f300") + "")
     });
   }
 });
@@ -6269,7 +6154,7 @@ app.post(
       if (!accepted) {
         return res.status(404).json({
           ok: false,
-          error: "Demande d'ami introuvable."
+          error: ("" + peopleText("ui_a87ed5d28d") + "")
         });
       }
 
@@ -6298,7 +6183,7 @@ app.post(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible d'accepter cette demande."
+          ("" + peopleText("ui_f154c714f3") + "")
       });
     }
   }
@@ -6322,7 +6207,7 @@ app.delete(
       if (!removed) {
         return res.status(404).json({
           ok: false,
-          error: "Demande d'ami introuvable."
+          error: ("" + peopleText("ui_a87ed5d28d") + "")
         });
       }
 
@@ -6354,7 +6239,7 @@ app.delete(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de supprimer cette demande."
+          ("" + peopleText("ui_3bb77f7612") + "")
       });
     }
   }
@@ -6372,7 +6257,7 @@ app.delete("/api/social/friends/:username", async (req, res) => {
     if (!target) {
       return res.status(404).json({
         ok: false,
-        error: "Utilisateur introuvable."
+        error: ("" + peopleText("ui_f412be4314") + "")
       });
     }
 
@@ -6405,7 +6290,7 @@ app.delete("/api/social/friends/:username", async (req, res) => {
 
     res.status(500).json({
       ok: false,
-      error: "Impossible de retirer cet ami."
+      error: ("" + peopleText("ui_83f6f66e22") + "")
     });
   }
 });
@@ -6436,7 +6321,7 @@ app.patch(
         return res.status(403).json({
           ok: false,
           error:
-            "Tu ne peux modifier que tes propres messages."
+            ("" + peopleText("ui_373d45a3ed") + "")
         });
       }
 
@@ -6453,7 +6338,7 @@ app.patch(
         return res.status(400).json({
           ok: false,
           error:
-            "Le message modifié est invalide."
+            ("" + peopleText("ui_52148fe9a4") + "")
         });
       }
 
@@ -6498,7 +6383,7 @@ app.patch(
           return res.status(400).json({
             ok: false,
             error:
-              "Enveloppe E2EE invalide."
+              ("" + peopleText("ui_7a2697ef90") + "")
           });
         }
       }
@@ -6515,7 +6400,7 @@ app.patch(
         return res.status(400).json({
           ok: false,
           error:
-            "Impossible de modifier ce message."
+            ("" + peopleText("ui_b905780737") + "")
         });
       }
 
@@ -6551,7 +6436,7 @@ app.patch(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de modifier ce message."
+          ("" + peopleText("ui_b905780737") + "")
       });
     }
   }
@@ -6581,7 +6466,7 @@ app.delete(
         return res.status(403).json({
           ok: false,
           error:
-            "Tu ne peux supprimer que tes propres messages."
+            ("" + peopleText("ui_f85180d9a0") + "")
         });
       }
 
@@ -6618,7 +6503,7 @@ app.delete(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de supprimer ce message."
+          ("" + peopleText("ui_f522b3fc84") + "")
       });
     }
   }
@@ -6652,7 +6537,7 @@ app.post(
         return res.status(404).json({
           ok: false,
           error:
-            "Utilisateur introuvable."
+            ("" + peopleText("ui_f412be4314") + "")
         });
       }
 
@@ -6667,7 +6552,7 @@ app.post(
         return res.status(400).json({
           ok: false,
           error:
-            "Conversation invalide."
+            ("" + peopleText("ui_075376b311") + "")
         });
       }
 
@@ -6689,7 +6574,7 @@ app.post(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de fermer ce MP."
+          ("" + peopleText("ui_9d7a65221b") + "")
       });
     }
   }
@@ -6721,7 +6606,7 @@ app.post(
         return res.status(404).json({
           ok: false,
           error:
-            "Utilisateur introuvable."
+            ("" + peopleText("ui_f412be4314") + "")
         });
       }
 
@@ -6743,7 +6628,7 @@ app.post(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de rouvrir ce MP."
+          ("" + peopleText("ui_ff479b5984") + "")
       });
     }
   }
@@ -6770,7 +6655,7 @@ app.get("/api/dm/conversations", async (req, res) => {
     console.error("[People dm/conversations]", err);
     res.status(500).json({
       ok: false,
-      error: "Impossible de charger les MP."
+      error: ("" + peopleText("ui_a3bbd74206") + "")
     });
   }
 });
@@ -6796,7 +6681,7 @@ app.get("/api/dm/:username", async (req, res) => {
       return res.status(404).json({
         ok: false,
         error:
-          "Utilisateur introuvable."
+          ("" + peopleText("ui_f412be4314") + "")
       });
     }
 
@@ -6807,7 +6692,7 @@ app.get("/api/dm/:username", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error:
-          "Tu ne peux pas ouvrir un MP avec toi-meme."
+          ("" + peopleText("ui_057dbade97") + "")
       });
     }
 
@@ -6908,7 +6793,7 @@ app.get("/api/dm/:username", async (req, res) => {
     res.status(500).json({
       ok: false,
       error:
-        "Impossible de charger cette conversation."
+        ("" + peopleText("ui_01e5bff7c0") + "")
     });
   }
 });
@@ -6925,7 +6810,7 @@ app.post("/api/dm/:username/read", async (req, res) => {
     if (!target) {
       return res.status(404).json({
         ok: false,
-        error: "Utilisateur introuvable."
+        error: ("" + peopleText("ui_f412be4314") + "")
       });
     }
 
@@ -6938,7 +6823,7 @@ app.post("/api/dm/:username/read", async (req, res) => {
     console.error("[People dm/read]", err);
     res.status(500).json({
       ok: false,
-      error: "Impossible de marquer les MP comme lus."
+      error: ("" + peopleText("ui_cba0af2abe") + "")
     });
   }
 });
@@ -6983,7 +6868,7 @@ app.post("/api/dm/:username", async (req, res) => {
       return res.status(429).json({
         ok: false,
         error:
-          "Tu envoies trop de messages trop vite."
+          ("" + peopleText("ui_8ba98a9202") + "")
       });
     }
 
@@ -6992,11 +6877,11 @@ app.post("/api/dm/:username", async (req, res) => {
         req.params.username
       );
 
-    if (!target) {
+    if (!target || peopleSimpleDeletedAccounts.has(String(target.id))) {
       return res.status(404).json({
         ok: false,
         error:
-          "Utilisateur introuvable."
+          ("" + peopleText("ui_f412be4314") + "")
       });
     }
 
@@ -7007,7 +6892,7 @@ app.post("/api/dm/:username", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error:
-          "Tu ne peux pas t'envoyer un MP."
+          ("" + peopleText("ui_150d153b08") + "")
       });
     }
 
@@ -7048,7 +6933,7 @@ app.post("/api/dm/:username", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error:
-          "Le MP doit contenir du texte ou une image."
+          ("" + peopleText("ui_06ce47a4b1") + "")
       });
     }
 
@@ -7098,7 +6983,7 @@ app.post("/api/dm/:username", async (req, res) => {
           .json({
             ok: false,
             error:
-              "Enveloppe E2EE invalide."
+              ("" + peopleText("ui_7a2697ef90") + "")
           });
       }
     }
@@ -7179,7 +7064,7 @@ app.post("/api/dm/:username", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error:
-          "Enveloppe E2EE invalide."
+          ("" + peopleText("ui_7a2697ef90") + "")
       });
     }
 
@@ -7190,7 +7075,7 @@ app.post("/api/dm/:username", async (req, res) => {
       return res.status(400).json({
         ok: false,
         error:
-          "Cette image n'est plus disponible. Réessaie de la sélectionner."
+          ("" + peopleText("ui_2e15d16880") + "")
       });
     }
 
@@ -7202,7 +7087,7 @@ app.post("/api/dm/:username", async (req, res) => {
     res.status(500).json({
       ok: false,
       error:
-        "Impossible d'envoyer ce MP."
+        ("" + peopleText("ui_08143137ac") + "")
     });
   }
 });
@@ -7364,7 +7249,7 @@ function peopleMessageImageStorageIsEncrypted(buffer) {
 }
 
 function peopleEncryptMessageImageData(buffer) {
-  if (!Buffer.isBuffer(buffer)) throw new TypeError("Le contenu doit être un Buffer.");
+  if (!Buffer.isBuffer(buffer)) throw new TypeError("The content must be a Buffer.");
   if (peopleMessageImageStorageIsEncrypted(buffer)) return buffer;
 
   const iv = cryptoAccounts.randomBytes(12);
@@ -7389,7 +7274,7 @@ function peopleDecryptMessageImageData(buffer) {
   if (!peopleMessageImageStorageIsEncrypted(buffer)) return buffer;
 
   const offset = PEOPLE_MESSAGE_IMAGE_STORAGE_MAGIC.length;
-  if (buffer.length < offset + 28) throw new Error("Pièce jointe chiffrée au repos invalide.");
+  if (buffer.length < offset + 28) throw new Error(("" + peopleText("ui_7d9bdabb6d") + ""));
   const iv = buffer.subarray(offset, offset + 12);
   const tag = buffer.subarray(offset + 12, offset + 28);
   const ciphertext = buffer.subarray(offset + 28);
@@ -7805,7 +7690,7 @@ app.post(
       const session = peopleSessionForRequest(req, res);
       if (!session) return;
       if (!peopleMessageImageUploadAllowed(session.id)) {
-        return res.status(429).json({ ok: false, error: "Tu envoies trop de pièces jointes trop vite." });
+        return res.status(429).json({ ok: false, error: ("" + peopleText("ui_80d1f2725c") + "") });
       }
 
       const attachment = await peopleCreatePendingMessageImage(
@@ -7825,14 +7710,14 @@ app.post(
       if (err?.type === "entity.too.large" || err?.code === "IMAGE_SIZE") {
         return res.status(413).json({
           ok: false,
-          error: `La pièce jointe doit faire moins de ${PEOPLE_MESSAGE_IMAGE_MAX_MB} Mo.`
+          error: `The attachment must be smaller than ${PEOPLE_MESSAGE_IMAGE_MAX_MB} Mo.`
         });
       }
       if (err?.code === "E2EE_IMAGE_INVALID") {
-        return res.status(400).json({ ok: false, error: "Pièce jointe E2EE invalide." });
+        return res.status(400).json({ ok: false, error: ("" + peopleText("ui_e2f26ecb6a") + "") });
       }
       console.error("[People chat/attachment upload]", err);
-      res.status(500).json({ ok: false, error: "Impossible d'envoyer la pièce jointe." });
+      res.status(500).json({ ok: false, error: ("" + peopleText("ui_13a2398a19") + "") });
     }
   }
 );
@@ -8126,7 +8011,7 @@ app.get("/api/unread/servers/:id", async (req, res) => {
     if (!(await peopleIsServerMember(session.id, sid))) {
       return res.status(403).json({
         ok: false,
-        error: "Tu n'es pas membre de ce serveur."
+        error: ("" + peopleText("ui_245a48ac6e") + "")
       });
     }
 
@@ -8148,7 +8033,7 @@ app.get("/api/unread/servers/:id", async (req, res) => {
     console.error("[People unread/summary]", err);
     return res.status(500).json({
       ok: false,
-      error: "Impossible de charger les messages non lus."
+      error: ("" + peopleText("ui_c4c3ff561a") + "")
     });
   }
 });
@@ -8166,7 +8051,7 @@ app.post(
       if (!(await peopleIsServerMember(session.id, sid))) {
         return res.status(403).json({
           ok: false,
-          error: "Tu n'es pas membre de ce serveur."
+          error: ("" + peopleText("ui_245a48ac6e") + "")
         });
       }
 
@@ -8179,12 +8064,12 @@ app.post(
       if (!channel) {
         return res.status(404).json({
           ok: false,
-          error: "Salon textuel introuvable."
+          error: ("" + peopleText("ui_f6aa77569b") + "")
         });
       }
 
       if (!(await peopleCanServerPermission(session.id, sid, "VIEW_CHANNEL", cid))) {
-        return res.status(403).json({ ok: false, error: "Tu n'as pas accès à ce salon." });
+        return res.status(403).json({ ok: false, error: ("" + peopleText("ui_2843250447") + "") });
       }
 
       await peopleUnreadMarkRead(
@@ -8202,7 +8087,7 @@ app.post(
       console.error("[People unread/read]", err);
       return res.status(500).json({
         ok: false,
-        error: "Impossible de marquer ce salon comme lu."
+        error: ("" + peopleText("ui_7cd73f98a6") + "")
       });
     }
   }
@@ -8430,7 +8315,7 @@ app.get("/api/notification-preferences", async (req, res) => {
     console.error("[People notification preferences/get]", err);
     return res.status(500).json({
       ok: false,
-      error: "Impossible de charger les réglages de notifications."
+      error: ("" + peopleText("ui_ebd0be49fc") + "")
     });
   }
 });
@@ -8444,7 +8329,7 @@ app.put("/api/notification-preferences", async (req, res) => {
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return res.status(400).json({
         ok: false,
-        error: "Réglages de notifications invalides."
+        error: ("" + peopleText("ui_1493339986") + "")
       });
     }
 
@@ -8452,7 +8337,7 @@ app.put("/api/notification-preferences", async (req, res) => {
     if (serialized.length > 160000) {
       return res.status(413).json({
         ok: false,
-        error: "Trop de réglages de notifications."
+        error: ("" + peopleText("ui_b93d0ab0e7") + "")
       });
     }
 
@@ -8464,7 +8349,7 @@ app.put("/api/notification-preferences", async (req, res) => {
     console.error("[People notification preferences/set]", err);
     return res.status(500).json({
       ok: false,
-      error: "Impossible d'enregistrer les réglages de notifications."
+      error: ("" + peopleText("ui_498474f13d") + "")
     });
   }
 });
@@ -8620,11 +8505,11 @@ async function peopleReactionSummary(scope, messageId, accountId) {
     rows = result.rows.map((row) => ({
       emoji: peopleDecryptMessageText(row.emoji_cipher),
       accountId: String(row.account_id),
-      username: row.username || "Utilisateur"
+      username: row.username || "User"
     }));
   } else {
     const accounts = new Map(
-      peopleReadLocalAccounts().map((account) => [String(account.id), account.username || "Utilisateur"])
+      peopleReadLocalAccounts().map((account) => [String(account.id), account.username || "User"])
     );
     rows = peopleReadLocalReactions()
       .filter((item) => String(item.scope) === kind && String(item.messageId) === id)
@@ -8632,7 +8517,7 @@ async function peopleReactionSummary(scope, messageId, accountId) {
       .map((item) => ({
         emoji: peopleDecryptMessageText(item.emoji || ""),
         accountId: String(item.accountId || ""),
-        username: accounts.get(String(item.accountId || "")) || "Utilisateur"
+        username: accounts.get(String(item.accountId || "")) || "User"
       }));
   }
 
@@ -8759,14 +8644,14 @@ app.get("/api/message-reactions/:scope/:id", async (req, res) => {
     );
 
     if (!context) {
-      return res.status(404).json({ ok: false, error: "Message introuvable." });
+      return res.status(404).json({ ok: false, error: ("" + peopleText("ui_6b9f0ba90a") + "") });
     }
 
     const reactions = await peopleReactionSummary(context.scope, context.messageId, session.id);
     res.json({ ok: true, reactions });
   } catch (err) {
     console.error("[People reactions/get]", err);
-    res.status(500).json({ ok: false, error: "Impossible de charger les réactions." });
+    res.status(500).json({ ok: false, error: ("" + peopleText("ui_aa99bd3f15") + "") });
   }
 });
 
@@ -8782,7 +8667,7 @@ app.post("/api/message-reactions/:scope/:id/toggle", async (req, res) => {
     );
 
     if (!context) {
-      return res.status(404).json({ ok: false, error: "Message introuvable." });
+      return res.status(404).json({ ok: false, error: ("" + peopleText("ui_6b9f0ba90a") + "") });
     }
 
     if (
@@ -8791,12 +8676,12 @@ app.post("/api/message-reactions/:scope/:id/toggle", async (req, res) => {
       context.channelId &&
       !(await peopleCanServerPermission(session.id, context.serverId, "ADD_REACTIONS", context.channelId))
     ) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission d'ajouter des réactions dans ce salon." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_764fff2344") + "") });
     }
 
     const emoji = peopleReactionEmoji(req.body?.emoji);
     if (!emoji) {
-      return res.status(400).json({ ok: false, error: "Réaction invalide." });
+      return res.status(400).json({ ok: false, error: ("" + peopleText("ui_45800ef2db") + "") });
     }
 
     const active = await peopleToggleReaction(context.scope, context.messageId, session.id, emoji);
@@ -8808,7 +8693,7 @@ app.post("/api/message-reactions/:scope/:id/toggle", async (req, res) => {
     console.error("[People reactions/toggle]", err);
     res.status(err?.code === "REACTION_INVALID" ? 400 : 500).json({
       ok: false,
-      error: err?.code === "REACTION_INVALID" ? "Réaction invalide." : "Impossible de modifier la réaction."
+      error: err?.code === "REACTION_INVALID" ? ("" + peopleText("ui_45800ef2db") + "") : "Unable to update the reaction."
     });
   }
 });
@@ -8923,9 +8808,7 @@ function peopleReadLocalServers() {
 }
 
 function peopleWriteLocalServers(data) {
-  fsAccounts.writeFileSync(
-    PEOPLE_LOCAL_SERVERS,
-    JSON.stringify(
+  const serialized = JSON.stringify(
       {
         servers:
           Array.isArray(data?.servers)
@@ -8958,9 +8841,19 @@ function peopleWriteLocalServers(data) {
       },
       null,
       2
-    ) + "\n",
-    "utf8"
-  );
+    ) + "\n";
+  const temporary = PEOPLE_LOCAL_SERVERS + "." + cryptoAccounts.randomUUID() + ".tmp";
+  let descriptor;
+  try {
+    descriptor = fsAccounts.openSync(temporary, "wx");
+    fsAccounts.writeFileSync(descriptor, serialized, "utf8");
+    fsAccounts.fsyncSync(descriptor);
+    fsAccounts.closeSync(descriptor); descriptor = undefined;
+    fsAccounts.renameSync(temporary, PEOPLE_LOCAL_SERVERS);
+  } finally {
+    if (descriptor !== undefined) fsAccounts.closeSync(descriptor);
+    if (fsAccounts.existsSync(temporary)) fsAccounts.unlinkSync(temporary);
+  }
 }
 
 // === PEOPLE_SERVER_ICON_V1_PUBLIC ===
@@ -11040,7 +10933,7 @@ app.get("/api/servers/:id/channels", async (req, res) => {
     const session = peopleSessionForRequest(req, res);
     if (!session) return;
     const member = await peopleIsServerMember(session.id, req.params.id);
-    if (!member) return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
+    if (!member) return res.status(403).json({ ok: false, error: ("" + peopleText("ui_245a48ac6e") + "") });
     const [channels, permissions] = await Promise.all([
       peopleListVisibleServerChannels(session.id, req.params.id),
       peoplePermissionSnapshot(session.id, req.params.id)
@@ -11048,7 +10941,7 @@ app.get("/api/servers/:id/channels", async (req, res) => {
     res.json({ ok: true, channels, permissions });
   } catch (err) {
     console.error("[People channels/list]", err);
-    res.status(500).json({ ok: false, error: "Impossible de charger les salons." });
+    res.status(500).json({ ok: false, error: ("" + peopleText("ui_074f0e00f4") + "") });
   }
 });
 
@@ -11057,7 +10950,7 @@ app.post("/api/servers/:id/channels", async (req, res) => {
     const session = peopleSessionForRequest(req, res);
     if (!session) return;
     if (!(await peopleCanManageServerChannels(session.id, req.params.id))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les salons." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_2b21d3c7d5") + "") });
     }
     const channel = await peopleCreateServerChannel(req.params.id, req.body?.type, req.body?.name, req.body?.parentId);
     if (channel?.type === "text") {
@@ -11067,7 +10960,7 @@ app.post("/api/servers/:id/channels", async (req, res) => {
     res.status(201).json({ ok: true, channel });
   } catch (err) {
     const status = err?.code === "CHANNEL_INVALID" ? 400 : 500;
-    res.status(status).json({ ok: false, error: status === 400 ? "Nom ou type de salon invalide." : "Impossible de créer cet élément." });
+    res.status(status).json({ ok: false, error: status === 400 ? "Invalid channel name or type." : "Unable to create this item." });
   }
 });
 
@@ -11076,15 +10969,15 @@ app.patch("/api/servers/:id/channels/:channelId", async (req, res) => {
     const session = peopleSessionForRequest(req, res);
     if (!session) return;
     if (!(await peopleCanManageServerChannels(session.id, req.params.id, req.params.channelId))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer ce salon." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_ecfef4e857") + "") });
     }
     const channel = await peopleUpdateServerChannel(req.params.id, req.params.channelId, req.body || {});
-    if (!channel) return res.status(404).json({ ok: false, error: "Salon introuvable." });
+    if (!channel) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_b4f2a2a14c") + "") });
     await peopleBroadcastServerChannels(req.params.id);
     res.json({ ok: true, channel });
   } catch (err) {
     const status = err?.code === "CHANNEL_INVALID" ? 400 : 500;
-    res.status(status).json({ ok: false, error: status === 400 ? "Nom de salon invalide." : "Impossible de modifier cet élément." });
+    res.status(status).json({ ok: false, error: status === 400 ? "Invalid channel name." : "Unable to update this item." });
   }
 });
 
@@ -11093,41 +10986,41 @@ app.delete("/api/servers/:id/channels/:channelId", async (req, res) => {
     const session = peopleSessionForRequest(req, res);
     if (!session) return;
     if (!(await peopleCanManageServerChannels(session.id, req.params.id, req.params.channelId))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer ce salon." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_ecfef4e857") + "") });
     }
     const result = await peopleDeleteServerChannel(req.params.id, req.params.channelId);
     if (!result.ok && result.code === "LAST_TEXT") {
-      return res.status(400).json({ ok: false, error: "Un serveur doit garder au moins un salon textuel." });
+      return res.status(400).json({ ok: false, error: ("" + peopleText("ui_0ba6412240") + "") });
     }
-    if (!result.ok) return res.status(404).json({ ok: false, error: "Salon introuvable." });
+    if (!result.ok) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_b4f2a2a14c") + "") });
     await peopleServerE2eeDropChannel(req.params.id, req.params.channelId);
     await peopleBroadcastServerChannels(req.params.id);
     res.json({ ok: true });
   } catch (err) {
     console.error("[People channels/delete]", err);
-    res.status(500).json({ ok: false, error: "Impossible de supprimer cet élément." });
+    res.status(500).json({ ok: false, error: ("" + peopleText("ui_91bb94f021") + "") });
   }
 });
 // === PEOPLE_SERVER_CHANNELS_V2_END ===
 
 // === PEOPLE_ROLES_PERMISSIONS_V1_START ===
 const PEOPLE_PERMISSION_DEFINITIONS = Object.freeze([
-  { key: "VIEW_CHANNEL", bit: 1 << 0, label: "Voir les salons", group: "Salons" },
-  { key: "SEND_MESSAGES", bit: 1 << 1, label: "Envoyer des messages", group: "Texte" },
-  { key: "ATTACH_FILES", bit: 1 << 2, label: "Joindre des fichiers", group: "Texte" },
-  { key: "ADD_REACTIONS", bit: 1 << 3, label: "Ajouter des réactions", group: "Texte" },
-  { key: "CONNECT", bit: 1 << 4, label: "Rejoindre les vocaux", group: "Vocal" },
-  { key: "SPEAK", bit: 1 << 5, label: "Parler", group: "Vocal" },
-  { key: "STREAM", bit: 1 << 6, label: "Caméra et partage d'écran", group: "Vocal" },
-  { key: "CREATE_INVITE", bit: 1 << 7, label: "Créer / copier des invitations", group: "Serveur" },
-  { key: "MANAGE_MESSAGES", bit: 1 << 8, label: "Gérer les messages", group: "Modération" },
-  { key: "MANAGE_CHANNELS", bit: 1 << 9, label: "Gérer les salons", group: "Serveur" },
-  { key: "MANAGE_ROLES", bit: 1 << 10, label: "Gérer les rôles", group: "Serveur" },
-  { key: "KICK_MEMBERS", bit: 1 << 11, label: "Exclure des membres", group: "Modération" },
-  { key: "BAN_MEMBERS", bit: 1 << 12, label: "Bannir des membres", group: "Modération" },
-  { key: "MANAGE_SERVER", bit: 1 << 13, label: "Gérer le serveur", group: "Serveur" },
-  { key: "ADMINISTRATOR", bit: 1 << 14, label: "Administrateur", group: "Avancé" },
-  { key: "MOVE_MEMBERS", bit: 1 << 15, label: "Déconnecter les membres du vocal", group: "Modération" }
+  { key: "VIEW_CHANNEL", bit: 1 << 0, label: "View Channels", group: "Channels" },
+  { key: "SEND_MESSAGES", bit: 1 << 1, label: "Send Messages", group: "Texte" },
+  { key: "ATTACH_FILES", bit: 1 << 2, label: "Attach Files", group: "Texte" },
+  { key: "ADD_REACTIONS", bit: 1 << 3, label: "Add Reactions", group: "Texte" },
+  { key: "CONNECT", bit: 1 << 4, label: "Connect to Voice", group: "Voice" },
+  { key: "SPEAK", bit: 1 << 5, label: "Parler", group: "Voice" },
+  { key: "STREAM", bit: 1 << 6, label: "Camera and Screen Sharing", group: "Voice" },
+  { key: "CREATE_INVITE", bit: 1 << 7, label: "Create / Copy Invitations", group: ("" + peopleText("ui_aef7de28d5") + "") },
+  { key: "MANAGE_MESSAGES", bit: 1 << 8, label: "Manage Messages", group: "Moderation" },
+  { key: "MANAGE_CHANNELS", bit: 1 << 9, label: "Manage Channels", group: ("" + peopleText("ui_aef7de28d5") + "") },
+  { key: "MANAGE_ROLES", bit: 1 << 10, label: "Manage Roles", group: ("" + peopleText("ui_aef7de28d5") + "") },
+  { key: "KICK_MEMBERS", bit: 1 << 11, label: "Kick Members", group: "Moderation" },
+  { key: "BAN_MEMBERS", bit: 1 << 12, label: "Ban Members", group: "Moderation" },
+  { key: "MANAGE_SERVER", bit: 1 << 13, label: "Manage Server", group: ("" + peopleText("ui_aef7de28d5") + "") },
+  { key: "ADMINISTRATOR", bit: 1 << 14, label: "Administrateur", group: "Advanced" },
+  { key: "MOVE_MEMBERS", bit: 1 << 15, label: "Disconnect Voice Members", group: "Moderation" }
 ]);
 
 const PEOPLE_PERMISSION_BY_KEY = new Map(
@@ -11193,7 +11086,7 @@ function peopleRolePublic(role) {
   return {
     id: String(role.id),
     serverId: String(role.serverId ?? role.server_id ?? ""),
-    name: String(role.name || "Rôle"),
+    name: String(role.name || ("" + peopleText("ui_14736a2eb9") + "")),
     color: peopleRoleColor(role.color || "#99AAB5"),
     position: Number(role.position || 0),
     everyone: Boolean(role.everyone ?? role.is_everyone),
@@ -11751,7 +11644,7 @@ async function peopleServerListBans(serverId) {
       const uid = String(item.userId ?? item.user_id ?? "");
       return {
         userId: uid,
-        username: peopleUsername(byId.get(uid)?.username || "Utilisateur"),
+        username: peopleUsername(byId.get(uid)?.username || "User"),
         bannedBy: item.bannedBy ?? item.banned_by ?? null,
         reason: String(item.reason || ""),
         createdAt: item.createdAt ?? item.created_at ?? null
@@ -11764,20 +11657,20 @@ async function peopleServerListBans(serverId) {
 async function peopleServerCanModerate(actorId, serverId, targetId, permission) {
   const actor = String(actorId || "");
   const target = String(targetId || "");
-  if (!actor || !target || actor === target) return { ok: false, reason: "Tu ne peux pas te modérer toi-même." };
+  if (!actor || !target || actor === target) return { ok: false, reason: "You cannot moderate yourself." };
   const server = await peopleGetServer(serverId);
-  if (!server) return { ok: false, reason: "Serveur introuvable." };
-  if (server.ownerId && String(server.ownerId) === target) return { ok: false, reason: "Le propriétaire du serveur ne peut pas être modéré." };
+  if (!server) return { ok: false, reason: ("" + peopleText("ui_d074483c59") + "") };
+  if (server.ownerId && String(server.ownerId) === target) return { ok: false, reason: "The server owner cannot be moderated." };
   const actorState = await peopleServerRoleState(actor, server.id);
   if (!actorState || !peoplePermissionHas(actorState.mask, permission)) {
-    return { ok: false, reason: "Tu n'as pas cette permission de modération." };
+    return { ok: false, reason: "You do not have this moderation permission." };
   }
   if (actorState.owner) return { ok: true, server, actorState };
   const targetMember = await peopleIsServerMember(target, server.id);
   if (targetMember) {
     const targetState = await peopleServerRoleState(target, server.id);
     if (targetState && Number(targetState.highestRolePosition || 0) >= Number(actorState.highestRolePosition || 0)) {
-      return { ok: false, reason: "Ce membre a un rôle égal ou supérieur au tien." };
+      return { ok: false, reason: "This member has an equal or higher role than yours." };
     }
   }
   return { ok: true, server, actorState };
@@ -11940,25 +11833,25 @@ async function peopleRequireRoleManager(session, serverId) {
 app.get("/api/servers/:id/permissions/me", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
-    if (!(await peopleIsServerMember(session.id, req.params.id))) return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
+    if (!(await peopleIsServerMember(session.id, req.params.id))) return res.status(403).json({ ok: false, error: ("" + peopleText("ui_245a48ac6e") + "") });
     const channelId = String(req.query.channelId || "") || null;
-    if (channelId && !(await peopleGetServerChannel(req.params.id, channelId))) return res.status(404).json({ ok: false, error: "Salon introuvable." });
+    if (channelId && !(await peopleGetServerChannel(req.params.id, channelId))) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_b4f2a2a14c") + "") });
     return res.json({ ok: true, permissions: await peoplePermissionSnapshot(session.id, req.params.id, channelId), catalog: peoplePermissionCatalog() });
   } catch (err) {
     console.error("[People permissions/me]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger tes permissions." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_a9fc043759") + "") });
   }
 });
 
 app.get("/api/servers/:id/roles", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
-    if (!(await peopleIsServerMember(session.id, req.params.id))) return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
+    if (!(await peopleIsServerMember(session.id, req.params.id))) return res.status(403).json({ ok: false, error: ("" + peopleText("ui_245a48ac6e") + "") });
     const [roles, me] = await Promise.all([peopleListServerRoles(req.params.id), peoplePermissionSnapshot(session.id, req.params.id)]);
     return res.json({ ok: true, roles, permissions: peoplePermissionCatalog(), me });
   } catch (err) {
     console.error("[People roles/list]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger les rôles." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_15a1174e0e") + "") });
   }
 });
 
@@ -11966,13 +11859,13 @@ app.post("/api/servers/:id/roles", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const state = await peopleRequireRoleManager(session, req.params.id);
-    if (!state) return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les rôles." });
+    if (!state) return res.status(403).json({ ok: false, error: ("" + peopleText("ui_72744cdd8e") + "") });
     const role = await peopleCreateServerRole(req.params.id, req.body?.name, req.body?.color, req.body?.permissions || [], state);
     await peopleBroadcastServerPermissionRefresh(req.params.id);
     return res.status(201).json({ ok: true, role });
   } catch (err) {
     const bad = ["ROLE_INVALID", "ROLE_PERMISSION_ESCALATION", "ROLE_HIERARCHY"].includes(err?.code);
-    return res.status(bad ? 400 : 500).json({ ok: false, error: err?.code === "ROLE_PERMISSION_ESCALATION" ? "Tu ne peux pas accorder une permission que tu ne possèdes pas." : "Impossible de créer ce rôle." });
+    return res.status(bad ? 400 : 500).json({ ok: false, error: err?.code === "ROLE_PERMISSION_ESCALATION" ? ("" + peopleText("ui_8d00408b0c") + "") : "Unable to create this role." });
   }
 });
 
@@ -11980,14 +11873,14 @@ app.patch("/api/servers/:id/roles/:roleId", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const state = await peopleRequireRoleManager(session, req.params.id);
-    if (!state) return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les rôles." });
+    if (!state) return res.status(403).json({ ok: false, error: ("" + peopleText("ui_72744cdd8e") + "") });
     const role = await peopleUpdateServerRole(req.params.id, req.params.roleId, req.body || {}, state);
-    if (!role) return res.status(404).json({ ok: false, error: "Rôle introuvable." });
+    if (!role) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_328b324cb8") + "") });
     await peopleBroadcastServerPermissionRefresh(req.params.id);
     return res.json({ ok: true, role });
   } catch (err) {
-    const message = err?.code === "ROLE_HIERARCHY" ? "Ce rôle est trop haut dans la hiérarchie." :
-      err?.code === "ROLE_PERMISSION_ESCALATION" ? "Tu ne peux pas accorder une permission que tu ne possèdes pas." : "Impossible de modifier ce rôle.";
+    const message = err?.code === "ROLE_HIERARCHY" ? ("" + peopleText("ui_06835fcdd4") + "") :
+      err?.code === "ROLE_PERMISSION_ESCALATION" ? ("" + peopleText("ui_8d00408b0c") + "") : ("" + peopleText("ui_e2675f5260") + "");
     return res.status(["ROLE_INVALID","ROLE_HIERARCHY","ROLE_PERMISSION_ESCALATION"].includes(err?.code) ? 400 : 500).json({ ok: false, error: message });
   }
 });
@@ -11996,13 +11889,13 @@ app.delete("/api/servers/:id/roles/:roleId", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const state = await peopleRequireRoleManager(session, req.params.id);
-    if (!state) return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les rôles." });
+    if (!state) return res.status(403).json({ ok: false, error: ("" + peopleText("ui_72744cdd8e") + "") });
     const removed = await peopleDeleteServerRole(req.params.id, req.params.roleId, state);
-    if (!removed) return res.status(400).json({ ok: false, error: "Ce rôle ne peut pas être supprimé." });
+    if (!removed) return res.status(400).json({ ok: false, error: ("" + peopleText("ui_c86ba68ed4") + "") });
     await peopleBroadcastServerPermissionRefresh(req.params.id);
     return res.json({ ok: true });
   } catch (err) {
-    return res.status(err?.code === "ROLE_HIERARCHY" ? 400 : 500).json({ ok: false, error: err?.code === "ROLE_HIERARCHY" ? "Ce rôle est trop haut dans la hiérarchie." : "Impossible de supprimer ce rôle." });
+    return res.status(err?.code === "ROLE_HIERARCHY" ? 400 : 500).json({ ok: false, error: err?.code === "ROLE_HIERARCHY" ? ("" + peopleText("ui_06835fcdd4") + "") : "Unable to delete this role." });
   }
 });
 
@@ -12010,14 +11903,14 @@ app.get("/api/servers/:id/member-roles", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const server = await peopleGetServer(req.params.id);
-    if (!server || !(await peopleIsServerMember(session.id, server.id))) return res.status(403).json({ ok: false, error: "Accès refusé." });
+    if (!server || !(await peopleIsServerMember(session.id, server.id))) return res.status(403).json({ ok: false, error: ("" + peopleText("ui_278f003df0") + "") });
     const roster = await peopleServerPresenceRoster(server.id);
     const members = [];
     for (const member of roster) {
       const id = String(member.accountId || member.id || "");
       members.push({
         id,
-        username: member.username || "Membre",
+        username: member.username || ("" + peopleText("ui_7c968fb71f") + ""),
         owner: Boolean(server.ownerId && String(server.ownerId) === id),
         highestRolePosition: (await peopleServerRoleState(id, server.id))?.highestRolePosition || 0,
         roleIds: await peopleMemberRoleIds(server.id, id)
@@ -12026,7 +11919,7 @@ app.get("/api/servers/:id/member-roles", async (req, res) => {
     return res.json({ ok: true, members, me: await peoplePermissionSnapshot(session.id, server.id) });
   } catch (err) {
     console.error("[People roles/members]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger les rôles des membres." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_ecaf7ccb9e") + "") });
   }
 });
 
@@ -12034,13 +11927,13 @@ app.put("/api/servers/:id/members/:userId/roles", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const state = await peopleRequireRoleManager(session, req.params.id);
-    if (!state) return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les rôles." });
+    if (!state) return res.status(403).json({ ok: false, error: ("" + peopleText("ui_72744cdd8e") + "") });
     const roleIds = await peopleSetMemberRoles(req.params.id, req.params.userId, req.body?.roleIds, state);
     await peopleBroadcastServerPermissionRefresh(req.params.id);
     return res.json({ ok: true, roleIds });
   } catch (err) {
     const status = ["MEMBER_INVALID", "ROLE_HIERARCHY"].includes(err?.code) ? 400 : 500;
-    return res.status(status).json({ ok: false, error: err?.code === "ROLE_HIERARCHY" ? "Tu ne peux pas attribuer ou retirer un rôle égal ou supérieur au tien." : "Impossible de modifier les rôles de ce membre." });
+    return res.status(status).json({ ok: false, error: err?.code === "ROLE_HIERARCHY" ? "You cannot assign or remove a role equal to or higher than yours." : "Unable to update this member's roles." });
   }
 });
 
@@ -12049,10 +11942,10 @@ app.get("/api/servers/:id/permission-overrides", async (req, res) => {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const state = await peopleServerRoleState(session.id, req.params.id);
     if (!state || !(peoplePermissionHas(state.mask, "MANAGE_ROLES") || peoplePermissionHas(state.mask, "MANAGE_CHANNELS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les permissions de salon." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_2ecf4da70b") + "") });
     }
     const channel = await peopleGetServerChannel(req.params.id, req.query?.channelId);
-    if (!channel) return res.status(404).json({ ok: false, error: "Salon introuvable." });
+    if (!channel) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_b4f2a2a14c") + "") });
     const overrides = await peopleListChannelRoleOverrides(req.params.id, channel.id);
     return res.json({
       ok: true,
@@ -12060,7 +11953,7 @@ app.get("/api/servers/:id/permission-overrides", async (req, res) => {
       overrides: overrides.map((item) => ({ ...item, allow: peoplePermissionNames(item.allow), deny: peoplePermissionNames(item.deny) }))
     });
   } catch (err) {
-    return res.status(500).json({ ok: false, error: "Impossible de charger les permissions du salon." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_c375f824dc") + "") });
   }
 });
 
@@ -12069,7 +11962,7 @@ app.put("/api/servers/:id/channels/:channelId/role-overrides/:roleId", async (re
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const state = await peopleServerRoleState(session.id, req.params.id);
     if (!state || !(peoplePermissionHas(state.mask, "MANAGE_ROLES") || peoplePermissionHas(state.mask, "MANAGE_CHANNELS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les permissions de salon." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_2ecf4da70b") + "") });
     }
     const override = await peopleSetRoleChannelOverride(
       req.params.id, req.params.channelId, req.params.roleId,
@@ -12079,7 +11972,7 @@ app.put("/api/servers/:id/channels/:channelId/role-overrides/:roleId", async (re
     return res.json({ ok: true, override });
   } catch (err) {
     const bad = ["OVERRIDE_INVALID","ROLE_HIERARCHY","ROLE_PERMISSION_ESCALATION"].includes(err?.code);
-    return res.status(bad ? 400 : 500).json({ ok: false, error: err?.code === "ROLE_HIERARCHY" ? "Ce rôle est trop haut dans la hiérarchie." : err?.code === "ROLE_PERMISSION_ESCALATION" ? "Tu ne peux pas autoriser une permission que tu ne possèdes pas." : "Impossible de modifier ces permissions." });
+    return res.status(bad ? 400 : 500).json({ ok: false, error: err?.code === "ROLE_HIERARCHY" ? ("" + peopleText("ui_06835fcdd4") + "") : err?.code === "ROLE_PERMISSION_ESCALATION" ? "You cannot allow a permission you do not have." : "Unable to update these permissions." });
   }
 });
 
@@ -12088,19 +11981,19 @@ app.delete("/api/servers/:id/channels/:channelId/role-overrides/:roleId", async 
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const state = await peopleServerRoleState(session.id, req.params.id);
     if (!state || !(peoplePermissionHas(state.mask, "MANAGE_ROLES") || peoplePermissionHas(state.mask, "MANAGE_CHANNELS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer les permissions de salon." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_2ecf4da70b") + "") });
     }
     const role = await peopleGetServerRole(req.params.id, req.params.roleId);
     const channel = await peopleGetServerChannel(req.params.id, req.params.channelId);
-    if (!role || !channel) return res.status(404).json({ ok: false, error: "Salon ou rôle introuvable." });
+    if (!role || !channel) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_5dbea8de8c") + "") });
     if (!state.owner && !role.everyone && role.position >= state.highestRolePosition) {
-      return res.status(403).json({ ok: false, error: "Ce rôle est trop haut dans la hiérarchie." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_06835fcdd4") + "") });
     }
     await peopleDeleteRoleChannelOverride(req.params.id, req.params.channelId, req.params.roleId);
     await peopleBroadcastServerPermissionRefresh(req.params.id);
     return res.json({ ok: true });
   } catch (err) {
-    return res.status(500).json({ ok: false, error: "Impossible de réinitialiser ces permissions." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_fb69eecf5e") + "") });
   }
 });
 
@@ -12111,7 +12004,7 @@ app.delete("/api/servers/:id/members/:userId", async (req, res) => {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const targetId = String(req.params.userId || "");
     if (!(await peopleIsServerMember(targetId, req.params.id))) {
-      return res.status(404).json({ ok: false, error: "Ce membre n'est plus dans le serveur." });
+      return res.status(404).json({ ok: false, error: ("" + peopleText("ui_5aeb7885a2") + "") });
     }
     const check = await peopleServerCanModerate(session.id, req.params.id, targetId, "KICK_MEMBERS");
     if (!check.ok) return res.status(403).json({ ok: false, error: check.reason });
@@ -12119,7 +12012,7 @@ app.delete("/api/servers/:id/members/:userId", async (req, res) => {
     return res.json({ ok: true, userId: targetId });
   } catch (err) {
     console.error("[People server/kick]", err);
-    return res.status(500).json({ ok: false, error: "Impossible d'exclure ce membre." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_46ee8a1f7e") + "") });
   }
 });
 
@@ -12127,12 +12020,12 @@ app.get("/api/servers/:id/bans", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     if (!(await peopleCanServerPermission(session.id, req.params.id, "BAN_MEMBERS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de voir les bannissements." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_673f01b78d") + "") });
     }
     return res.json({ ok: true, bans: await peopleServerListBans(req.params.id) });
   } catch (err) {
     console.error("[People server/bans]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger les bannissements." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_e956f45c8c") + "") });
   }
 });
 
@@ -12141,14 +12034,14 @@ app.put("/api/servers/:id/bans/:userId", async (req, res) => {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     const targetId = String(req.params.userId || "");
     const account = await peopleFindAccountById(targetId);
-    if (!account) return res.status(404).json({ ok: false, error: "Utilisateur introuvable." });
+    if (!account) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_f412be4314") + "") });
     const check = await peopleServerCanModerate(session.id, req.params.id, targetId, "BAN_MEMBERS");
     if (!check.ok) return res.status(403).json({ ok: false, error: check.reason });
     await peopleServerBanMember(req.params.id, targetId, session.id, req.body?.reason);
     return res.json({ ok: true, userId: targetId });
   } catch (err) {
     console.error("[People server/ban]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de bannir cet utilisateur." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_1987d011e9") + "") });
   }
 });
 
@@ -12156,13 +12049,13 @@ app.delete("/api/servers/:id/bans/:userId", async (req, res) => {
   try {
     const session = peopleSessionForRequest(req, res); if (!session) return;
     if (!(await peopleCanServerPermission(session.id, req.params.id, "BAN_MEMBERS"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de lever ce bannissement." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_77d90442a9") + "") });
     }
     await peopleServerUnbanMember(req.params.id, req.params.userId);
     return res.json({ ok: true, userId: String(req.params.userId || "") });
   } catch (err) {
     console.error("[People server/unban]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de lever ce bannissement." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_62d3a7c791") + "") });
   }
 });
 // === PEOPLE_SERVER_MODERATION_ROUTES_V1_END ===
@@ -12826,17 +12719,17 @@ async function peopleInitServerE2eeV1() {
 
 function peopleServerE2eeHttpError(res, code) {
   const messages = {
-    FORBIDDEN: [403, "Tu n'as pas accès à ce salon."],
-    DEVICE_UNKNOWN: [400, "Cet appareil E2EE n'est pas enregistré."],
-    INVALID: [400, "Requête E2EE invalide."],
-    CLAIMED: [409, "Un autre appareil prépare déjà la clé de ce salon."],
-    NOT_PENDING: [409, "Cet epoch E2EE n'est plus en attente."],
-    CLAIM_LOST: [409, "Cet appareil ne possède plus le verrou de génération de clé."],
-    RECIPIENT_INVALID: [400, "Un destinataire E2EE est invalide."],
-    RECIPIENT_SET_CHANGED: [409, "La liste des appareils autorisés a changé pendant la rotation."],
-    NO_RECIPIENTS: [409, "Aucun appareil E2EE autorisé n'est disponible."]
+    FORBIDDEN: [403, ("" + peopleText("ui_2843250447") + "")],
+    DEVICE_UNKNOWN: [400, "This E2EE device is not registered."],
+    INVALID: [400, "Invalid E2EE request."],
+    CLAIMED: [409, "Another device is already preparing this channel's key."],
+    NOT_PENDING: [409, "This E2EE epoch is no longer pending."],
+    CLAIM_LOST: [409, "This device no longer holds the key generation lock."],
+    RECIPIENT_INVALID: [400, "Invalid E2EE recipient."],
+    RECIPIENT_SET_CHANGED: [409, "The authorized device list changed during key rotation."],
+    NO_RECIPIENTS: [409, "No authorized E2EE device is available."]
   };
-  const [status, error] = messages[code] || [500, "Erreur E2EE serveur."];
+  const [status, error] = messages[code] || [500, ("" + peopleText("ui_3a694932fb") + "")];
   return res.status(status).json({ ok: false, code, error });
 }
 
@@ -12847,11 +12740,11 @@ async function peopleServerE2eeRouteContext(req, res) {
   const cid = String(req.params.channelId || "");
   const channel = await peopleGetServerChannel(sid, cid, "text");
   if (!channel) {
-    res.status(404).json({ ok: false, error: "Salon textuel introuvable." });
+    res.status(404).json({ ok: false, error: ("" + peopleText("ui_f6aa77569b") + "") });
     return null;
   }
   if (!(await peopleCanServerPermission(session.id, sid, "VIEW_CHANNEL", cid))) {
-    res.status(403).json({ ok: false, error: "Tu n'as pas accès à ce salon." });
+    res.status(403).json({ ok: false, error: ("" + peopleText("ui_2843250447") + "") });
     return null;
   }
   return { session, sid, cid, channel };
@@ -12881,7 +12774,7 @@ app.get("/api/servers/:id/e2ee/channels/:channelId/state", async (req, res) => {
     });
   } catch (err) {
     console.error("[People server E2EE/state]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger l'état E2EE du salon." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_4805f53b7f") + "") });
   }
 });
 
@@ -12895,7 +12788,7 @@ app.post("/api/servers/:id/e2ee/channels/:channelId/claim", async (req, res) => 
     return res.json({ ok: true, ...result.state });
   } catch (err) {
     console.error("[People server E2EE/claim]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de réserver la rotation E2EE." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_fdbe7811c0") + "") });
   }
 });
 
@@ -12917,7 +12810,7 @@ app.get("/api/servers/:id/e2ee/channels/:channelId/recipients", async (req, res)
     return res.json({ ok: true, epoch, recipients: page, nextCursor, total: all.length });
   } catch (err) {
     console.error("[People server E2EE/recipients]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de charger les appareils E2EE autorisés." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_3582b31627") + "") });
   }
 });
 
@@ -12931,7 +12824,7 @@ app.post("/api/servers/:id/e2ee/channels/:channelId/packages", async (req, res) 
     return res.json(result);
   } catch (err) {
     console.error("[People server E2EE/packages]", err);
-    return res.status(500).json({ ok: false, error: "Impossible d'enregistrer les enveloppes E2EE." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_cd7bb619b7") + "") });
   }
 });
 
@@ -12945,7 +12838,7 @@ app.post("/api/servers/:id/e2ee/channels/:channelId/finalize", async (req, res) 
     return res.json({ ok: true, ...result.state });
   } catch (err) {
     console.error("[People server E2EE/finalize]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de finaliser la clé E2EE." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_bc0330f73d") + "") });
   }
 });
 
@@ -12966,7 +12859,7 @@ app.post("/api/servers/:id/e2ee/channels/:channelId/request-sync", async (req, r
     return res.json({ ok: true, ...next });
   } catch (err) {
     console.error("[People server E2EE/request-sync]", err);
-    return res.status(500).json({ ok: false, error: "Impossible de synchroniser cet appareil E2EE." });
+    return res.status(500).json({ ok: false, error: ("" + peopleText("ui_d26dad3433") + "") });
   }
 });
 // === PEOPLE_SERVER_E2EE_KEYS_V1_END ===
@@ -13003,7 +12896,7 @@ app.get(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de charger tes serveurs."
+          ("" + peopleText("ui_f53e8c323b") + "")
       });
     }
   }
@@ -13047,7 +12940,7 @@ app.post(
         return res.status(400).json({
           ok: false,
           error:
-            "Le nom du serveur doit faire entre 2 et 40 caractères."
+            ("" + peopleText("ui_b08596e6cc") + "")
         });
       }
 
@@ -13059,7 +12952,7 @@ app.post(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de créer le serveur."
+          ("" + peopleText("ui_4bfc3b22c2") + "")
       });
     }
   }
@@ -13075,13 +12968,13 @@ app.patch(
 
       const server = await peopleGetServer(req.params.id);
       if (!server) {
-        return res.status(404).json({ ok: false, error: "Serveur introuvable." });
+        return res.status(404).json({ ok: false, error: ("" + peopleText("ui_d074483c59") + "") });
       }
 
       if (!(await peopleCanServerPermission(session.id, server.id, "MANAGE_SERVER"))) {
         return res.status(403).json({
           ok: false,
-          error: "Tu n'as pas la permission de gérer ce serveur."
+          error: ("" + peopleText("ui_b959c995b6") + "")
         });
       }
 
@@ -13089,7 +12982,7 @@ app.patch(
       if (!peopleValidServerName(name)) {
         return res.status(400).json({
           ok: false,
-          error: "Le nom du serveur doit faire entre 2 et 40 caractères."
+          error: ("" + peopleText("ui_b08596e6cc") + "")
         });
       }
 
@@ -13101,7 +12994,7 @@ app.patch(
           [String(server.id), name]
         );
         const row = result.rows[0];
-        if (!row) return res.status(404).json({ ok: false, error: "Serveur introuvable." });
+        if (!row) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_d074483c59") + "") });
         updated = {
           id: String(row.id), name: row.name,
           ownerId: row.owner_id ? String(row.owner_id) : null,
@@ -13111,7 +13004,7 @@ app.patch(
       } else {
         const data = peopleReadLocalServers();
         const stored = data.servers.find(item => String(item.id) === String(server.id));
-        if (!stored) return res.status(404).json({ ok: false, error: "Serveur introuvable." });
+        if (!stored) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_d074483c59") + "") });
         // On change seulement le nom visible: inviteCode et id restent intacts.
         stored.name = name;
         peopleWriteLocalServers(data);
@@ -13123,7 +13016,7 @@ app.patch(
       return res.json({ ok: true, server: publicServer, inviteUnchanged: true });
     } catch (err) {
       console.error("[People server/settings rename]", err);
-      return res.status(500).json({ ok: false, error: "Impossible de modifier le serveur." });
+      return res.status(500).json({ ok: false, error: ("" + peopleText("ui_dae2f2e2bb") + "") });
     }
   }
 );
@@ -13139,28 +13032,30 @@ app.patch(
 
       const current = await peopleGetServer(req.params.id);
       if (!current) {
-        return res.status(404).json({ ok: false, error: "Serveur introuvable." });
+        return res.status(404).json({ ok: false, error: ("" + peopleText("ui_d074483c59") + "") });
       }
       if (!(await peopleCanServerPermission(session.id, current.id, "MANAGE_SERVER"))) {
-        return res.status(403).json({ ok: false, error: "Tu n'as pas la permission de gérer ce serveur." });
+        return res.status(403).json({ ok: false, error: ("" + peopleText("ui_b959c995b6") + "") });
       }
 
       const raw = req.body?.iconData;
+      if (!Object.prototype.hasOwnProperty.call(req.body || {}, "iconData")) return res.status(400).json({ ok: false, error: "An icon is required." });
       let iconData = null;
 
       if (raw !== null && raw !== undefined && String(raw).trim() !== "") {
         const value = String(raw);
         const match = value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/i);
         if (!match) {
-          return res.status(400).json({ ok: false, error: "Format d'image invalide. Utilise PNG, JPEG ou WebP." });
+          return res.status(400).json({ ok: false, error: ("" + peopleText("ui_a2a181f90c") + "") });
         }
 
         let decoded;
         try { decoded = Buffer.from(match[2], "base64"); }
         catch { decoded = null; }
-        if (!decoded || !decoded.length || decoded.length > 384 * 1024) {
-          return res.status(400).json({ ok: false, error: "L'image du serveur est trop lourde." });
+        if (!decoded || !decoded.length || decoded.length > 360 * 1024) {
+          return res.status(400).json({ ok: false, error: ("" + peopleText("ui_1446dd6c75") + "") });
         }
+        if (peopleAvatarMime(decoded) !== "image/" + match[1].toLowerCase()) return res.status(400).json({ ok: false, error: "The image contents do not match its format." });
         iconData = value;
       }
 
@@ -13172,7 +13067,7 @@ app.patch(
       } else {
         const data = peopleReadLocalServers();
         const stored = data.servers.find(item => String(item.id) === String(current.id));
-        if (!stored) return res.status(404).json({ ok: false, error: "Serveur introuvable." });
+        if (!stored) return res.status(404).json({ ok: false, error: ("" + peopleText("ui_d074483c59") + "") });
         stored.iconData = iconData;
         peopleWriteLocalServers(data);
       }
@@ -13189,7 +13084,7 @@ app.patch(
       });
     } catch (err) {
       console.error("[People server/icon]", err);
-      return res.status(500).json({ ok: false, error: "Impossible de modifier l'image du serveur." });
+      return res.status(500).json({ ok: false, error: ("" + peopleText("ui_e079d5bd7b") + "") });
     }
   }
 );
@@ -13216,7 +13111,7 @@ app.get(
         return res.status(404).json({
           ok: false,
           error:
-            "Cette invitation n'existe plus."
+            ("" + peopleText("ui_65c9eddbab") + "")
         });
       }
 
@@ -13251,7 +13146,7 @@ app.get(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de charger l'invitation."
+          ("" + peopleText("ui_d333816db3") + "")
       });
     }
   }
@@ -13291,7 +13186,7 @@ async function peopleSaveServerSystemMessage(
         [
           sid,
           channelId,
-          "Système",
+          ("" + peopleText("ui_6725e7bbcd") + ""),
           peopleEncryptMessageText(
             cleanText
           )
@@ -13308,7 +13203,7 @@ async function peopleSaveServerSystemMessage(
         sid,
       channelId,
       username:
-        "Système",
+        ("" + peopleText("ui_6725e7bbcd") + ""),
       text:
         peopleDecryptMessageText(
           row.body
@@ -13334,7 +13229,7 @@ async function peopleSaveServerSystemMessage(
     senderId:
       null,
     username:
-      "Système",
+      ("" + peopleText("ui_6725e7bbcd") + ""),
     text:
       cleanText,
     imageId:
@@ -13384,13 +13279,13 @@ async function peopleEmitServerMembershipMessage(
   const username =
     peopleUsername(
       account?.username ||
-      "Quelqu'un"
+      "Someone"
     );
 
   const text =
     action === "leave"
-      ? `${username} a quitté le serveur`
-      : `${username} a rejoint le serveur`;
+      ? `${username} ${peopleText("ui_3963191ab2")}`
+      : `${username} ${peopleText("ui_a9df9e2a99")}`;
 
   const saved =
     await peopleSaveServerSystemMessage(
@@ -13434,14 +13329,14 @@ app.post(
         return res.status(404).json({
           ok: false,
           error:
-            "Cette invitation n'existe plus."
+            ("" + peopleText("ui_65c9eddbab") + "")
         });
       }
 
       if (await peopleServerIsBanned(server.id, session.id)) {
         return res.status(403).json({
           ok: false,
-          error: "Tu es banni de ce serveur."
+          error: ("" + peopleText("ui_6e543c1083") + "")
         });
       }
 
@@ -13487,7 +13382,7 @@ app.post(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de rejoindre le serveur."
+          ("" + peopleText("ui_ab9de536dc") + "")
       });
     }
   }
@@ -13515,7 +13410,7 @@ app.delete(
         return res.status(404).json({
           ok: false,
           error:
-            "Serveur introuvable."
+            ("" + peopleText("ui_d074483c59") + "")
         });
       }
 
@@ -13529,7 +13424,7 @@ app.delete(
         return res.status(404).json({
           ok: false,
           error:
-            "Tu n'es pas membre de ce serveur."
+            ("" + peopleText("ui_245a48ac6e") + "")
         });
       }
 
@@ -13556,7 +13451,7 @@ app.delete(
         return res.status(400).json({
           ok: false,
           error:
-            "Le propriétaire du serveur officiel People ne peut pas le quitter."
+            ("" + peopleText("ui_5344a70af2") + "")
         });
       }
 
@@ -13765,7 +13660,7 @@ app.delete(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de quitter le serveur."
+          ("" + peopleText("ui_dc5d3c8ff9") + "")
       });
     }
   }
@@ -13782,12 +13677,12 @@ app.get(
 
       const server = await peopleGetServer(req.params.id);
       if (!server) {
-        return res.status(404).json({ ok: false, error: "Serveur introuvable." });
+        return res.status(404).json({ ok: false, error: ("" + peopleText("ui_d074483c59") + "") });
       }
 
       const member = await peopleIsServerMember(session.id, server.id);
       if (!member) {
-        return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
+        return res.status(403).json({ ok: false, error: ("" + peopleText("ui_245a48ac6e") + "") });
       }
 
       const roster = await peopleServerPresenceRoster(server.id);
@@ -13798,7 +13693,7 @@ app.get(
         return {
           id,
           accountId: id,
-          username: entry.username || "Membre",
+          username: entry.username || ("" + peopleText("ui_7c968fb71f") + ""),
           status: entry.status,
           roles: entry.roles,
           roleColor: entry.roleColor,
@@ -13819,7 +13714,7 @@ app.get(
       });
     } catch (err) {
       console.error("[People server/settings members]", err);
-      return res.status(500).json({ ok: false, error: "Impossible de charger les membres." });
+      return res.status(500).json({ ok: false, error: ("" + peopleText("ui_b52bcea084") + "") });
     }
   }
 );
@@ -13846,7 +13741,7 @@ app.get(
         return res.status(404).json({
           ok: false,
           error:
-            "Serveur introuvable."
+            ("" + peopleText("ui_d074483c59") + "")
         });
       }
 
@@ -13860,14 +13755,14 @@ app.get(
         return res.status(403).json({
           ok: false,
           error:
-            "Tu n'es pas membre de ce serveur."
+            ("" + peopleText("ui_245a48ac6e") + "")
         });
       }
 
       if (!(await peopleCanServerPermission(session.id, server.id, "CREATE_INVITE"))) {
         return res.status(403).json({
           ok: false,
-          error: "Tu n'as pas la permission de créer une invitation."
+          error: ("" + peopleText("ui_ca465cb4f2") + "")
         });
       }
 
@@ -13886,7 +13781,7 @@ app.get(
       res.status(500).json({
         ok: false,
         error:
-          "Impossible de créer le lien d'invitation."
+          ("" + peopleText("ui_fdd474e64f") + "")
       });
     }
   }
@@ -13971,7 +13866,7 @@ function peopleDesktopReleaseInfo() {
     String(
       process.env.PEOPLE_DESKTOP_UPDATE_MESSAGE ||
       release?.message ||
-      "Une nouvelle version de People est disponible."
+      "A new version of People is available."
     ).trim();
 
   return {
@@ -14096,7 +13991,7 @@ app.get("/api/servers/:id/audit", async (req, res) => {
   const session = peopleSessionForRequest(req, res); if (!session) return;
   try {
     if (!(await peopleCanServerPermission(session.id, req.params.id, "MANAGE_SERVER"))) {
-      return res.status(403).json({ ok: false, error: "Tu n'as pas accès au journal d'administration." });
+      return res.status(403).json({ ok: false, error: ("" + peopleText("ui_5aba4406c9") + "") });
     }
     const entries = peoplePool
       ? (await peoplePool.query("SELECT actor_id, actor_name, method, path, created_at FROM people_admin_audit WHERE server_id = $1 ORDER BY id DESC LIMIT 100", [req.params.id])).rows
@@ -14104,7 +13999,7 @@ app.get("/api/servers/:id/audit", async (req, res) => {
     res.json({ ok: true, entries });
   } catch (err) {
     console.error("[People audit/read]", err);
-    res.status(500).json({ ok: false, error: "Impossible de charger le journal." });
+    res.status(500).json({ ok: false, error: ("" + peopleText("ui_f0edf506f4") + "") });
   }
 });
 
@@ -14125,7 +14020,7 @@ app.delete("/api/servers/:id/members/:userId/voice", async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("[People voice/moderation]", err);
-    res.status(500).json({ ok: false, error: "Impossible de déconnecter ce membre." });
+    res.status(500).json({ ok: false, error: ("" + peopleText("ui_51ee6371d4") + "") });
   }
 });
 
@@ -14155,11 +14050,27 @@ app.get("/api/presence/me", (req, res) => {
   res.json({ ok: true, status: peopleStatusPreferences.get(String(session.id)) || "online" });
 });
 
+// Only the public status is returned, including for invisible accounts.
+app.post("/api/presence/avatars", async (req, res) => {
+  const session = peopleSessionForRequest(req, res); if (!session) return;
+  const names = req.body?.usernames;
+  if (!Array.isArray(names) || names.length > 100 || names.some(name => typeof name !== "string" || name.length > 80)) {
+    return res.status(400).json({ ok: false, error: "Invalid usernames." });
+  }
+  try {
+    const users = await Promise.all([...new Set(names)].map(async username => {
+      const account = await peopleFindAccount(username);
+      return { username, accountId: account ? String(account.id) : null, status: account ? peoplePublicStatus(account.id) : "offline" };
+    }));
+    res.set("Cache-Control", "no-store").json({ ok: true, users });
+  } catch (err) { res.status(500).json({ ok: false, error: "Unable to refresh presence." }); }
+});
+
 app.put("/api/presence/me", async (req, res) => {
   const session = peopleSessionForRequest(req, res); if (!session) return;
   const status = req.body?.status;
   if (!["online", "idle", "dnd", "invisible"].includes(status)) {
-    return res.status(400).json({ ok: false, error: "Statut invalide." });
+    return res.status(400).json({ ok: false, error: ("" + peopleText("ui_f74d17865d") + "") });
   }
   try {
     const uid = String(session.id);
@@ -14177,7 +14088,7 @@ app.put("/api/presence/me", async (req, res) => {
     res.json({ ok: true, status });
   } catch (err) {
     console.error("[People presence/update]", err);
-    res.status(500).json({ ok: false, error: "Impossible de modifier le statut." });
+    res.status(500).json({ ok: false, error: ("" + peopleText("ui_f957c4193e") + "") });
   }
 });
 const socketServerIds = new Map();
@@ -14234,7 +14145,7 @@ app.get("/api/call-privacy", (req, res) => {
 app.put("/api/call-privacy", async (req, res) => {
   const session = peopleSessionForRequest(req, res); if (!session) return;
   const value = req.body?.showInterlocutors;
-  if (typeof value !== "boolean") return res.status(400).json({ ok: false, error: "Réglage invalide." });
+  if (typeof value !== "boolean") return res.status(400).json({ ok: false, error: ("" + peopleText("ui_751db694a0") + "") });
   try {
     const aid = String(session.id);
     if (peoplePool) {
@@ -14250,7 +14161,7 @@ app.put("/api/call-privacy", async (req, res) => {
     res.json({ ok: true, showInterlocutors: value });
   } catch (err) {
     console.error("[People call privacy]", err);
-    res.status(500).json({ ok: false, error: "Impossible d'enregistrer ce réglage." });
+    res.status(500).json({ ok: false, error: ("" + peopleText("ui_13720e6f07") + "") });
   }
 });
 
@@ -14600,10 +14511,10 @@ function peopleDmCallUsernameForRole(
 ) {
   return String(
     role === "caller"
-      ? call?.callerUsername || "Utilisateur"
+      ? call?.callerUsername || "User"
       : role === "callee"
-        ? call?.calleeUsername || "Utilisateur"
-        : "Utilisateur"
+        ? call?.calleeUsername || "User"
+        : "User"
   );
 }
 
@@ -15512,7 +15423,7 @@ function peopleDmCallConversationPreview(
       cleanBody
     )
   ) {
-    return "Message privé";
+    return ("" + peopleText("ui_cd3e16057d") + "");
   }
 
   const event =
@@ -15535,31 +15446,31 @@ function peopleDmCallConversationPreview(
     event.type ===
     "started"
   ) {
-    return "📞 Appel lancé";
+    return ("" + peopleText("ui_eec6da6fd0") + "");
   }
 
   const labels = {
     declined:
-      "📞 Appel refusé",
+      "📞 Call declined",
     cancelled:
-      "📞 Appel annulé",
+      "📞 Call cancelled",
     timeout:
-      "📞 Appel manqué",
+      "📞 Missed call",
     "alone-timeout":
-      "📞 Appel terminé",
+      ("" + peopleText("ui_5ae2519a59") + ""),
     empty:
-      "📞 Appel terminé",
+      ("" + peopleText("ui_5ae2519a59") + ""),
     disconnected:
-      "📞 Appel interrompu",
+      "📞 Call interrupted",
     hangup:
-      "📞 Appel terminé"
+      ("" + peopleText("ui_5ae2519a59") + "")
   };
 
   return (
     labels[
       event.reason
     ] ||
-    "📞 Appel terminé"
+    ("" + peopleText("ui_5ae2519a59") + "")
   );
 }
 
@@ -15842,9 +15753,9 @@ function peopleDmCallDeliverPendingForAccount(
 // === PEOPLE_DM_CALLS_V2_END ===
 
 function cleanUsername(value) {
-  return String(value || "Invité")
+  return String(value || ("" + peopleText("ui_5ed8944a85") + ""))
     .trim()
-    .slice(0, 24) || "Invité";
+    .slice(0, 24) || ("" + peopleText("ui_5ed8944a85") + "");
 }
 
 function peopleAccountConnectionCount(
@@ -16089,7 +16000,7 @@ async function emitOnlineUsers(
 }
 
 // === PEOPLE_GLOBAL_PRESENCE_EVENT_V1_START ===
-function peopleEmitGlobalPresence(
+async function peopleEmitGlobalPresence(
   accountId
 ) {
   const uid =
@@ -16102,7 +16013,9 @@ function peopleEmitGlobalPresence(
     return;
   }
 
+  const account = await peopleFindAccountById(uid);
   const payload = {
+    username: account?.username,
     status: peoplePublicStatus(uid),
     accountId:
       uid,
@@ -16140,7 +16053,7 @@ async function peopleRefreshPresenceForAccount(
   }
 
   // === PEOPLE_GLOBAL_PRESENCE_REFRESH_V1 ===
-  peopleEmitGlobalPresence(
+  await peopleEmitGlobalPresence(
     uid
   );
 
@@ -16705,20 +16618,20 @@ app.post(
       const channelId = String(req.params.channelId || "").trim();
 
       if (!serverId || !channelId) {
-        return res.status(400).json({ ok: false, error: "Salon invalide." });
+        return res.status(400).json({ ok: false, error: ("" + peopleText("ui_b02aa16d76") + "") });
       }
 
       if (!(await peopleIsServerMember(session.id, serverId))) {
-        return res.status(403).json({ ok: false, error: "Tu n'es pas membre de ce serveur." });
+        return res.status(403).json({ ok: false, error: ("" + peopleText("ui_245a48ac6e") + "") });
       }
 
       const channel = await peopleGetServerChannel(serverId, channelId, "text");
       if (!channel) {
-        return res.status(404).json({ ok: false, error: "Salon textuel introuvable." });
+        return res.status(404).json({ ok: false, error: ("" + peopleText("ui_f6aa77569b") + "") });
       }
 
       if (!(await peopleCanServerPermission(session.id, serverId, "SEND_MESSAGES", channelId))) {
-        return res.status(403).json({ ok: false, error: "Tu n'as pas la permission d'envoyer des messages dans ce salon." });
+        return res.status(403).json({ ok: false, error: ("" + peopleText("ui_9fd7c47bcf") + "") });
       }
 
       const text = String(req.body?.text || "").trim().slice(0, 1000);
@@ -16726,7 +16639,7 @@ app.post(
       const clientId = String(req.body?.clientId || "").trim().slice(0, 120);
 
       if (!text) {
-        return res.status(400).json({ ok: false, error: "Message vide." });
+        return res.status(400).json({ ok: false, error: ("" + peopleText("ui_54fcac67aa") + "") });
       }
 
       const saved = await peopleServerSaveMessage(
@@ -16740,7 +16653,7 @@ app.post(
       );
 
       if (!saved) {
-        return res.status(500).json({ ok: false, error: "Impossible d'enregistrer le message." });
+        return res.status(500).json({ ok: false, error: ("" + peopleText("ui_913e8d379e") + "") });
       }
 
       const payload = clientId ? { ...saved, clientId } : saved;
@@ -16750,8 +16663,8 @@ app.post(
     } catch (err) {
       console.error("[People offline server send]", err);
       const error = err?.code === "REPLY_INVALID"
-        ? "Le message auquel tu réponds n'est plus disponible."
-        : "Le message en attente n'a pas pu être envoyé.";
+        ? ("" + peopleText("ui_86f7bd35d3") + "")
+        : ("" + peopleText("ui_717410cbfe") + "");
       return res.status(500).json({ ok: false, error });
     }
   }
@@ -16759,6 +16672,35 @@ app.post(
 // === PEOPLE_OFFLINE_SERVER_SEND_V1_END ===
 
 io.on("connection", (socket) => {
+  // Typing is ephemeral and scoped to recipients with current access.
+  const typingSent = new Map();
+  socket.on("people-typing", async (payload = {}, ack = () => {}) => {
+    const uid = userIds.get(socket.id);
+    if (!uid || !payload || typeof payload !== "object" || Array.isArray(payload)) return ack({ ok: false });
+    const kind = payload.kind;
+    const active = payload.active === true;
+    const destination = kind === "dm" ? String(payload.username || "") : String(payload.serverId || "") + ":" + String(payload.channelId || "");
+    const bucket = kind + ":" + destination;
+    if (active && Date.now() - (typingSent.get(bucket) || 0) < 1500) return ack({ ok: true });
+    try {
+      const username = users.get(socket.id);
+      if (kind === "dm") {
+        const target = await peopleFindAccount(payload.username);
+        if (!target || String(target.id) === String(uid) || !(await peopleHasFriend(uid, target.id))) return ack({ ok: false });
+        peopleEmitToAccount(target.id, "people-typing", { kind, username, accountId: String(uid), device: socket.id, active });
+      } else if (kind === "server") {
+        const sid = String(payload.serverId || ""), cid = String(payload.channelId || "");
+        if (!(await peopleGetServerChannel(sid, cid, "text")) || !(await peopleCanServerPermission(uid, sid, "SEND_MESSAGES", cid))) return ack({ ok: false });
+        const recipients = [...userIds.entries()].filter(([id, account]) => id !== socket.id && String(account) !== String(uid) && socketServerIds.get(id) === sid && socketTextChannelIds.get(id) === cid);
+        await Promise.all(recipients.map(async ([id, account]) => {
+          if (await peopleCanServerPermission(account, sid, "VIEW_CHANNEL", cid)) io.to(id).emit("people-typing", { kind, serverId: sid, channelId: cid, username, accountId: String(uid), device: socket.id, active });
+        }));
+      } else return ack({ ok: false });
+      if (typingSent.size >= 100) typingSent.delete(typingSent.keys().next().value);
+      typingSent.set(bucket, Date.now());
+      ack({ ok: true });
+    } catch (error) { console.error("[People typing]", error); ack({ ok: false }); }
+  });
   socket.on(
     "keepalive",
     () => {}
@@ -16855,7 +16797,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Session invalide."
+              ("" + peopleText("ui_f8440a2b22") + "")
           });
         }
 
@@ -16868,7 +16810,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Utilisateur introuvable."
+              ("" + peopleText("ui_f412be4314") + "")
           });
         }
 
@@ -16883,7 +16825,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Tu ne peux pas t'appeler toi-même."
+              ("" + peopleText("ui_0743d35852") + "")
           });
         }
 
@@ -16909,7 +16851,7 @@ io.on("connection", (socket) => {
             return ack({
               ok: false,
               error:
-                "Tu es déjà dans cet appel."
+                ("" + peopleText("ui_24dea47704") + "")
             });
           }
 
@@ -16927,8 +16869,8 @@ io.on("connection", (socket) => {
                 joined.reason,
               error:
                 joined.reason === "limit"
-                  ? "Tu as atteint la limite de 2 appels simultanés."
-                  : "Impossible de rejoindre cet appel."
+                  ? ("" + peopleText("ui_baa245c544") + "")
+                  : "Unable to join this call."
             });
           }
 
@@ -16967,7 +16909,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Tu as atteint la limite de 2 appels simultanés."
+              ("" + peopleText("ui_baa245c544") + "")
           });
         }
 
@@ -16980,7 +16922,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Cette personne a atteint la limite de 2 appels simultanés."
+              ("" + peopleText("ui_feeb795a5e") + "")
           });
         }
 
@@ -17003,7 +16945,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Attends un instant avant de rappeler."
+              ("" + peopleText("ui_54bd9848ce") + "")
           });
         }
 
@@ -17145,7 +17087,7 @@ io.on("connection", (socket) => {
         ack({
           ok: false,
           error:
-            "Impossible de lancer l'appel."
+            ("" + peopleText("ui_39654ea614") + "")
         });
       }
     }
@@ -17638,7 +17580,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Session invalide."
+              ("" + peopleText("ui_f8440a2b22") + "")
           });
         }
 
@@ -17651,7 +17593,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Serveur introuvable."
+              ("" + peopleText("ui_d074483c59") + "")
           });
         }
 
@@ -17665,7 +17607,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Tu n'es pas membre de ce serveur."
+              ("" + peopleText("ui_245a48ac6e") + "")
           });
         }
 
@@ -17722,7 +17664,7 @@ io.on("connection", (socket) => {
         const activeTextChannel = requestedText || channels.find((item) => item.type === "text") || null;
 
         if (!activeTextChannel) {
-          return ack({ ok: false, error: "Tu n'as accès à aucun salon textuel de ce serveur." });
+          return ack({ ok: false, error: ("" + peopleText("ui_03d491fa26") + "") });
         }
 
         socketTextChannelIds.set(socket.id, String(activeTextChannel.id));
@@ -17774,7 +17716,7 @@ io.on("connection", (socket) => {
         ack({
           ok: false,
           error:
-            "Impossible d'ouvrir ce serveur."
+            ("" + peopleText("ui_125f76b74b") + "")
         });
       }
     }
@@ -17787,13 +17729,13 @@ io.on("connection", (socket) => {
       try {
         const accountId = userIds.get(socket.id);
         const sid = String(serverId || socketServerIds.get(socket.id) || "");
-        if (!accountId || !sid) return ack({ ok: false, error: "Session invalide." });
-        if (!(await peopleIsServerMember(accountId, sid))) return ack({ ok: false, error: "Tu n'es pas membre de ce serveur." });
+        if (!accountId || !sid) return ack({ ok: false, error: ("" + peopleText("ui_f8440a2b22") + "") });
+        if (!(await peopleIsServerMember(accountId, sid))) return ack({ ok: false, error: ("" + peopleText("ui_245a48ac6e") + "") });
         const channel = await peopleGetServerChannel(sid, channelId, "text");
-        if (!channel) return ack({ ok: false, error: "Salon textuel introuvable." });
+        if (!channel) return ack({ ok: false, error: ("" + peopleText("ui_f6aa77569b") + "") });
         const channelMask = await peopleServerEffectivePermissionMask(accountId, sid, channel.id);
         if (!peoplePermissionHas(channelMask, "VIEW_CHANNEL")) {
-          return ack({ ok: false, error: "Tu n'as pas accès à ce salon." });
+          return ack({ ok: false, error: ("" + peopleText("ui_2843250447") + "") });
         }
         socketServerIds.set(socket.id, sid);
         socketTextChannelIds.set(socket.id, String(channel.id));
@@ -17807,7 +17749,7 @@ io.on("connection", (socket) => {
         });
       } catch (err) {
         console.error("[People channel/select]", err);
-        ack({ ok: false, error: "Impossible d'ouvrir ce salon." });
+        ack({ ok: false, error: ("" + peopleText("ui_c764ed30bd") + "") });
       }
     }
   );
@@ -17844,7 +17786,7 @@ io.on("connection", (socket) => {
       if (!username || !senderId || !serverId || !channelId) {
         reply({
           ok: false,
-          error: "Session ou serveur invalide."
+          error: ("" + peopleText("ui_f600707b5a") + "")
         });
         return;
       }
@@ -17860,18 +17802,18 @@ io.on("connection", (socket) => {
       if (!cleanText && !imageKey) {
         reply({
           ok: false,
-          error: "Message vide."
+          error: ("" + peopleText("ui_54fcac67aa") + "")
         });
         return;
       }
 
       if (!(await peopleCanServerPermission(senderId, serverId, "SEND_MESSAGES", channelId))) {
-        reply({ ok: false, error: "Tu n'as pas la permission d'envoyer des messages dans ce salon." });
+        reply({ ok: false, error: ("" + peopleText("ui_9fd7c47bcf") + "") });
         return;
       }
 
       if (imageKey && !(await peopleCanServerPermission(senderId, serverId, "ATTACH_FILES", channelId))) {
-        reply({ ok: false, error: "Tu n'as pas la permission de joindre des fichiers dans ce salon." });
+        reply({ ok: false, error: ("" + peopleText("ui_6bea09e4d2") + "") });
         return;
       }
 
@@ -17897,7 +17839,7 @@ io.on("connection", (socket) => {
         if (!saved) {
           reply({
             ok: false,
-            error: "Impossible d'enregistrer le message."
+            error: ("" + peopleText("ui_913e8d379e") + "")
           });
           return;
         }
@@ -17926,10 +17868,10 @@ io.on("connection", (socket) => {
 
         const errorText =
           err?.code === "IMAGE_INVALID"
-            ? "Cette image n'est plus disponible. Réessaie de la sélectionner."
+            ? ("" + peopleText("ui_2e15d16880") + "")
             : err?.code === "REPLY_INVALID"
-              ? "Le message auquel tu réponds n'est plus disponible."
-              : "Le message n'a pas pu être sauvegardé.";
+              ? ("" + peopleText("ui_86f7bd35d3") + "")
+              : ("" + peopleText("ui_659dcb3ae5") + "");
 
         // Comportement historique conservé pour tous les anciens clients.
         socket.emit(
@@ -17971,7 +17913,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Aucun serveur actif."
+              ("" + peopleText("ui_2728ffb11a") + "")
           });
         }
 
@@ -17982,7 +17924,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Le message est trop long."
+              ("" + peopleText("ui_1778ea56f7") + "")
           });
         }
 
@@ -17999,7 +17941,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Tu ne peux modifier que tes propres messages."
+              ("" + peopleText("ui_373d45a3ed") + "")
           });
         }
 
@@ -18030,7 +17972,7 @@ io.on("connection", (socket) => {
         ack({
           ok: false,
           error:
-            "Impossible de modifier ce message."
+            ("" + peopleText("ui_b905780737") + "")
         });
       }
     }
@@ -18067,7 +18009,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Aucun serveur actif."
+              ("" + peopleText("ui_2728ffb11a") + "")
           });
         }
 
@@ -18083,7 +18025,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Tu n'as pas la permission de supprimer ce message."
+              ("" + peopleText("ui_b6673d6b7b") + "")
           });
         }
 
@@ -18109,7 +18051,7 @@ io.on("connection", (socket) => {
         ack({
           ok: false,
           error:
-            "Impossible de supprimer ce message."
+            ("" + peopleText("ui_f522b3fc84") + "")
         });
       }
     }
@@ -18158,7 +18100,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Session vocale invalide."
+              ("" + peopleText("ui_2137e90117") + "")
           });
         }
 
@@ -18171,7 +18113,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Serveur vocal introuvable."
+              ("" + peopleText("ui_28a4469711") + "")
           });
         }
 
@@ -18185,7 +18127,7 @@ io.on("connection", (socket) => {
           return ack({
             ok: false,
             error:
-              "Tu n'es plus membre de ce serveur."
+              ("" + peopleText("ui_bd118a391b") + "")
           });
         }
 
@@ -18206,13 +18148,13 @@ io.on("connection", (socket) => {
           );
 
         if (!voiceChannel) {
-          return ack({ ok: false, error: "Salon vocal introuvable." });
+          return ack({ ok: false, error: ("" + peopleText("ui_fb52846712") + "") });
         }
 
         const voiceChannelId = String(voiceChannel.id);
         const voiceMask = await peopleServerEffectivePermissionMask(accountId, sid, voiceChannelId);
         if (!peoplePermissionHas(voiceMask, "VIEW_CHANNEL") || !peoplePermissionHas(voiceMask, "CONNECT")) {
-          return ack({ ok: false, error: "Tu n'as pas la permission de rejoindre ce vocal." });
+          return ack({ ok: false, error: ("" + peopleText("ui_4875c87d3c") + "") });
         }
         const canSpeakHere = peoplePermissionHas(voiceMask, "SPEAK");
         const canStreamHere = peoplePermissionHas(voiceMask, "STREAM");
@@ -18287,7 +18229,7 @@ io.on("connection", (socket) => {
             code:
               "VOICE_ALREADY_HERE",
             error:
-              "Ton compte est déjà connecté à un vocal."
+              ("" + peopleText("ui_39e774abbc") + "")
           });
         }
 
@@ -18310,7 +18252,7 @@ io.on("connection", (socket) => {
             code:
               "VOICE_LIMIT",
             error:
-              "Tu as atteint la limite de 2 appels simultanés."
+              ("" + peopleText("ui_baa245c544") + "")
           });
         }
 
@@ -18407,7 +18349,7 @@ io.on("connection", (socket) => {
         ack({
           ok: false,
           error:
-            "Impossible de rejoindre le vocal."
+            ("" + peopleText("ui_ea9b754ec7") + "")
         });
       }
     }
@@ -18433,7 +18375,7 @@ io.on("connection", (socket) => {
           user.channelId
         );
         if (!allowed) {
-          socket.emit("system-message", { text: "Tu n'as pas la permission de parler dans ce vocal.", time: Date.now() });
+          socket.emit("system-message", { text: "You do not have permission to speak in this voice channel.", time: Date.now() });
           user.muted = true;
           voiceUsers.set(socket.id, user);
           emitVoiceState(user.serverId);
@@ -18452,7 +18394,7 @@ io.on("connection", (socket) => {
       const user = voiceUsers.get(socket.id);
       if (!user) return;
       if (Boolean(camera) && !(await peopleCanServerPermission(user.accountId, user.serverId, "STREAM", user.channelId))) {
-        socket.emit("system-message", { text: "Tu n'as pas la permission d'activer ta caméra dans ce vocal.", time: Date.now() });
+        socket.emit("system-message", { text: "You do not have permission to enable your camera in this voice channel.", time: Date.now() });
         user.camera = false;
       } else {
         user.camera = Boolean(camera);
@@ -18468,7 +18410,7 @@ io.on("connection", (socket) => {
       const user = voiceUsers.get(socket.id);
       if (!user) return;
       if (Boolean(screen) && !(await peopleCanServerPermission(user.accountId, user.serverId, "STREAM", user.channelId))) {
-        socket.emit("system-message", { text: "Tu n'as pas la permission de partager ton écran dans ce vocal.", time: Date.now() });
+        socket.emit("system-message", { text: "You do not have permission to share your screen in this voice channel.", time: Date.now() });
         user.screen = false;
       } else {
         user.screen = Boolean(screen);
@@ -18514,7 +18456,7 @@ io.on("connection", (socket) => {
           username:
             users.get(
               socket.id
-            ) || "Invité",
+            ) || ("" + peopleText("ui_5ed8944a85") + ""),
           sdp
         }
       );

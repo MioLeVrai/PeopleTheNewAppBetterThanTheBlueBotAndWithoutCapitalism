@@ -67,7 +67,7 @@
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.ok) {
-      throw new Error(data?.error || "Action impossible.");
+      throw new Error(data?.error || ("" + window.PeopleI18n.t("ui_4a47d829df") + ""));
     }
     return data;
   }
@@ -101,7 +101,7 @@
       button.dataset.emoji = emoji;
       button.title = Array.isArray(reaction?.users) && reaction.users.length
         ? reaction.users.join(", ")
-        : "Réaction";
+        : ("" + window.PeopleI18n.t("ui_d8be728bfd") + "");
 
       const emojiNode = document.createElement("span");
       emojiNode.textContent = emoji;
@@ -151,7 +151,7 @@
       const data = await request(scope, id, { toggle: true, emoji });
       applyState(scope, id, data.reactions || []);
     } catch (err) {
-      alert(err?.message || "Impossible d'ajouter la réaction.");
+      alert(err?.message || ("" + window.PeopleI18n.t("ui_b71fe1dc4c") + ""));
     }
   }
 
@@ -168,7 +168,7 @@
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = emoji;
-      button.title = "Réagir avec " + emoji;
+      button.title = ("" + window.PeopleI18n.t("ui_1de9892d16") + " ") + emoji;
       button.addEventListener("click", async () => {
         closePicker();
         await toggleReaction(unit, emoji);
@@ -189,8 +189,8 @@
     quick.type = "button";
     quick.className = "people-reaction-quick";
     quick.textContent = "☺";
-    quick.title = "Ajouter une réaction";
-    quick.setAttribute("aria-label", "Ajouter une réaction");
+    quick.title = ("" + window.PeopleI18n.t("ui_dbb07934cd") + "");
+    quick.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_dbb07934cd") + ""));
     quick.addEventListener("click", (event) => {
       event.stopPropagation();
       openPicker(unit, quick);
@@ -232,7 +232,7 @@
         const react = document.createElement("button");
         react.type = "button";
         react.className = "people-message-menu-item reaction";
-        react.textContent = "😊 Réagir";
+        react.textContent = ("" + window.PeopleI18n.t("ui_1e473a06dd") + "");
         react.addEventListener("click", () => {
           const rect = react.getBoundingClientRect();
           menu.remove();

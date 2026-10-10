@@ -50,7 +50,7 @@
     if (text) return text;
 
     if (message?.imageId) {
-      return "📎 Pièce jointe";
+      return ("" + window.PeopleI18n.t("ui_b97d58e7b3") + "");
     }
 
     return "Message";
@@ -87,7 +87,7 @@
         } catch (err) {
           alert(
             err?.message ||
-            "Action impossible."
+            ("" + window.PeopleI18n.t("ui_4a47d829df") + "")
           );
         }
       }
@@ -125,7 +125,7 @@
 
     menu.appendChild(
       makeMenuButton(
-        "↩ Répondre",
+        ("" + window.PeopleI18n.t("ui_b2df965204") + ""),
         "reply",
         onReply
       )
@@ -134,7 +134,7 @@
     if (canEdit) {
       menu.appendChild(
         makeMenuButton(
-          "✏ Modifier",
+          ("" + window.PeopleI18n.t("ui_c62d7bf6a0") + ""),
           "edit",
           onEdit
         )
@@ -144,7 +144,7 @@
     if (typeof canDelete === "function" ? canDelete() : canDelete) {
       menu.appendChild(
         makeMenuButton(
-          "🗑 Supprimer",
+          ("" + window.PeopleI18n.t("ui_870809ae98") + ""),
           "delete",
           onDelete
         )
@@ -255,10 +255,10 @@
 
     author.textContent =
       reply.deleted
-        ? "Message supprimé"
+        ? ("" + window.PeopleI18n.t("ui_0a8438e26d") + "")
         : String(
             reply.username ||
-            "Utilisateur"
+            "User"
           );
 
     // === PEOPLE_REPLY_PROFILE_CLICK_V3 ===
@@ -302,7 +302,7 @@
 
     text.textContent =
       reply.deleted
-        ? "Le message d’origine a été supprimé."
+        ? ("" + window.PeopleI18n.t("ui_e1269fb250") + "")
         : summary(reply);
 
     box.append(author, text);
@@ -335,12 +335,12 @@
 
         if (author) {
           author.textContent =
-            "Message supprimé";
+            ("" + window.PeopleI18n.t("ui_0a8438e26d") + "");
         }
 
         if (text) {
           text.textContent =
-            "Le message d’origine a été supprimé.";
+            ("" + window.PeopleI18n.t("ui_e1269fb250") + "");
         }
 
         box.disabled = true;
@@ -386,16 +386,16 @@
       }
     }
 
-    label.textContent = "modifié";
+    label.textContent = ("" + window.PeopleI18n.t("ui_1fb9f40972") + "");
 
     const date =
       new Date(editedAt);
 
     label.title =
       Number.isNaN(date.getTime())
-        ? "Message modifié"
-        : "Modifié le " +
-          date.toLocaleString("fr-FR");
+        ? ("" + window.PeopleI18n.t("ui_48c829a8fc") + "")
+        : ("" + window.PeopleI18n.t("ui_109467a652") + " ") +
+          date.toLocaleString("en-US");
   }
 
   function startInlineEdit(
@@ -443,7 +443,7 @@
 
     textarea.setAttribute(
       "aria-label",
-      "Modifier le message"
+      ("" + window.PeopleI18n.t("ui_8d227a2cfa") + "")
     );
 
     const actions =
@@ -456,7 +456,7 @@
       document.createElement("button");
 
     save.type = "button";
-    save.textContent = "Enregistrer";
+    save.textContent = ("" + window.PeopleI18n.t("ui_35322b5bb5") + "");
 
     const cancel =
       document.createElement("button");
@@ -464,7 +464,7 @@
     cancel.type = "button";
     cancel.className =
       "people-message-edit-cancel";
-    cancel.textContent = "Annuler";
+    cancel.textContent = ("" + window.PeopleI18n.t("ui_19766ed6cc") + "");
 
     const hint =
       document.createElement("span");
@@ -472,7 +472,7 @@
     hint.className =
       "people-message-inline-edit-hint";
     hint.textContent =
-      "Entrée : enregistrer · Maj+Entrée : nouvelle ligne · Échap : annuler";
+      ("" + window.PeopleI18n.t("ui_0283149057") + "");
 
     actions.append(
       save,
@@ -525,7 +525,7 @@
 
       if (!next && !allowEmpty) {
         alert(
-          "Un message sans pièce jointe ne peut pas être vide."
+          ("" + window.PeopleI18n.t("ui_e0c1197eb4") + "")
         );
         return;
       }
@@ -555,7 +555,7 @@
         void commit().catch((err) => {
           alert(
             err?.message ||
-            "Modification impossible."
+            ("" + window.PeopleI18n.t("ui_b9ab4fea4b") + "")
           );
         });
       }
@@ -584,7 +584,7 @@
           void commit().catch((err) => {
             alert(
               err?.message ||
-              "Modification impossible."
+              ("" + window.PeopleI18n.t("ui_b9ab4fea4b") + "")
             );
           });
         }
@@ -669,7 +669,7 @@
 
     close.textContent = "✕";
     close.title =
-      "Annuler la réponse";
+      ("" + window.PeopleI18n.t("ui_f2d0431368") + "");
 
     close.addEventListener(
       "click",
@@ -691,7 +691,7 @@
           String(
             message?.username ||
             message?.author ||
-            "Utilisateur"
+            "User"
           ),
         text:
           String(
@@ -704,7 +704,7 @@
       };
 
       label.textContent =
-        "Répondre à " +
+        ("" + window.PeopleI18n.t("ui_6e5842a7ca") + " ") +
         state.username;
 
       text.textContent =

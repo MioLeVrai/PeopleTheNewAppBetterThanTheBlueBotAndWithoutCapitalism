@@ -8,7 +8,7 @@
   let primarySoundMuted = false;
   const bar = document.createElement("nav");
   bar.id = "peopleCallBar";
-  bar.setAttribute("aria-label", "Appels en cours");
+  bar.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_57e59d440b") + ""));
   bar.hidden = true;
   document.body.append(bar);
   document.body.classList.add("people-global-calls");
@@ -51,7 +51,7 @@
         if (!remote.getTracks().includes(event.track)) remote.addTrack(event.track);
         node.srcObject = remote; node.muted = state.soundMuted;
         void window.PeopleAudioDevices?.applyOutput?.(node);
-        void node.play().catch(() => {});
+        void window.PeopleCallMedia?.play(node);
         notify();
       };
       let recovery;
@@ -76,7 +76,7 @@
       await pc.setLocalDescription(await pc.createOffer());
       connection.emit("webrtc-offer", { target: id, sdp: pc.localDescription });
     }
-    const safe = fn => data => { void Promise.resolve().then(() => fn(data)).catch(error => { if (!ended) console.warn("Vocal secondaire", error); }); };
+    const safe = fn => data => { void Promise.resolve().then(() => fn(data)).catch(error => { if (!ended) console.warn(("" + window.PeopleI18n.t("ui_6e8492f83f") + ""), error); }); };
     connection.on("webrtc-offer", safe(async ({ from, sdp }) => {
       if (ended || !stream) return;
       const pc = peer(from);
@@ -110,7 +110,7 @@
       const version = ++generation;
       const result = await request(connection, "voice-join", { serverId, channelId, muted: state.muted, camera: state.camera, screen: state.screen });
       if (ended || version !== generation) return;
-      if (!result?.ok) { window.alert(result?.error || "Impossible de rejoindre le vocal."); controller.end(); return; }
+      if (!result?.ok) { window.alert(result?.error || ("" + window.PeopleI18n.t("ui_ea9b754ec7") + "")); controller.end(); return; }
       roster = result.roster || [];
       state.muted = Boolean(roster.find(user => user.id === connection.id)?.muted);
       for (const track of stream.getAudioTracks()) track.enabled = !state.muted;
@@ -145,13 +145,15 @@
     const controller = {
       state,
       getMedia: () => [...media.values()],
+      getLocalAudio: () => stream,
+      getAudioSamples: () => [{ username, stream }, ...roster.filter(user => user.id !== connection.id).map(user => ({ username: user.username, stream: media.get(user.id)?.srcObject }))],
       getRoster: () => roster,
       getLocalVideo: () => outgoingVideo() ? new MediaStream([outgoingVideo()]) : null,
       getSocketId: () => connection.id,
       reconnect() { if (!ended) { connection.disconnect(); connection.connect(); } },
       async move(nextServerId, nextChannelId, nextName) {
         const result = await request(connection, "voice-join", { serverId: nextServerId, channelId: nextChannelId, muted: state.muted, camera: state.camera, screen: state.screen });
-        if (!result?.ok) throw new Error(result?.error || "Impossible de changer de vocal.");
+        if (!result?.ok) throw new Error(result?.error || ("" + window.PeopleI18n.t("ui_7a5b41dfe0") + ""));
         if (ended) return;
         closePeers(); serverId = nextServerId; channelId = nextChannelId;
         Object.assign(state, { serverId, channelId, name: nextName, phase: "active" });
@@ -171,6 +173,7 @@
       end() {
         ended = true; generation++;
         window.removeEventListener("people-camera-effect-track-changed", refreshEffects);
+        window.removeEventListener("people-camera-input-device-changed", switchCamera);
         if (state.camera) window.PeopleCameraEffects?.detachSource?.(videoTrack);
         connection.emit("voice-leave"); connection.disconnect(); closePeers();
         stream?.getTracks().forEach(track => track.stop()); videoTrack?.stop();
@@ -185,10 +188,36 @@
       })).then(notify);
     }
     window.addEventListener("people-camera-effect-track-changed", refreshEffects);
+    async function switchCamera() {
+      if (ended || !state.camera || videoBusy) return;
+      videoBusy = true;
+      let replacement;
+      const previous = videoTrack;
+      try {
+        replacement = await navigator.mediaDevices.getUserMedia({ video: window.PeopleAudioDevices?.getCameraConstraints?.() || true, audio: false });
+        if (ended) { replacement.getTracks().forEach(track => track.stop()); return; }
+        const next = replacement.getVideoTracks()[0];
+        if (!next) throw new Error("Camera unavailable.");
+        videoTrack = next;
+        await window.PeopleCameraEffects?.attachSource?.(next);
+        for (const pc of pcs.values()) await peopleFindVideoTransceiver(pc).sender.replaceTrack(outgoingVideo());
+        previous?.stop();
+        next.onended = () => { if (!ended && videoTrack === next) void video("camera"); };
+        notify();
+      } catch (error) {
+        videoTrack = previous; replacement?.getTracks().forEach(track => track.stop());
+        if (previous) await window.PeopleCameraEffects?.attachSource?.(previous);
+        for (const pc of pcs.values()) await peopleFindVideoTransceiver(pc).sender.replaceTrack(outgoingVideo()).catch(() => {});
+        window.alert("Unable to switch camera. The previous camera is still selected.");
+      } finally { videoBusy = false; }
+    }
+    window.addEventListener("people-camera-input-device-changed", switchCamera);
     return controller;
   }
 
   const primary = {
+    getLocalAudio: () => localStream,
+    getAudioSamples: () => [{ username, stream: localStream }, ...activeVoiceRoster.filter(user => user.id !== socket.id).map(user => ({ username: user.username, stream: document.getElementById("audio-" + user.id)?.srcObject }))],
     mute() { micMuted = !micMuted; localStream?.getAudioTracks().forEach(track => { track.enabled = !micMuted; }); socket.emit("voice-mute", { muted: micMuted }); updateMicUi(); notify(); },
     sound() {
       primarySoundMuted = !primarySoundMuted;
@@ -203,7 +232,7 @@
     camera: () => cameraEnabled ? disableCamera() : enableCamera(),
     async move(serverId, channelId) {
       const result = await peopleVoiceJoinRequest(serverId, channelId);
-      if (!result?.ok) throw new Error(result?.error || "Impossible de changer de vocal.");
+      if (!result?.ok) throw new Error(result?.error || ("" + window.PeopleI18n.t("ui_7a5b41dfe0") + ""));
       for (const id of [...peers.keys()]) closePeer(id);
       activeVoiceServerId = String(serverId); activeVoiceChannelId = String(channelId);
       peopleSetActiveVoiceRoster(result.roster || []);
@@ -214,7 +243,7 @@
   };
   function states() {
     const calls = (window.PeopleDmCalls?.getStates() || []).filter(state => state.exists).map(state => ({ ...state, id: state.callId, type: "dm", name: state.username }));
-    if (voiceJoined) calls.push({ id: "server-primary", type: "server", serverId: activeVoiceServerId, channelId: activeVoiceChannelId, phase: socket.connected ? "active" : "reconnecting", muted: micMuted, camera: cameraEnabled, screen: screenEnabled, soundMuted: primarySoundMuted, name: peopleCachedServerPayload(activeVoiceServerId)?.channels?.find(channel => String(channel.id) === String(activeVoiceChannelId))?.name || "Salon vocal" });
+    if (voiceJoined) calls.push({ id: "server-primary", type: "server", serverId: activeVoiceServerId, channelId: activeVoiceChannelId, phase: socket.connected ? "active" : "reconnecting", muted: micMuted, camera: cameraEnabled, screen: screenEnabled, soundMuted: primarySoundMuted, name: peopleCachedServerPayload(activeVoiceServerId)?.channels?.find(channel => String(channel.id) === String(activeVoiceChannelId))?.name || ("" + window.PeopleI18n.t("ui_63ff7c0170") + "") });
     if (second) calls.push({ ...second.state, type: "server" });
     return calls;
   }
@@ -233,9 +262,9 @@
     calls.forEach((call, index) => {
       let node = [...bar.children].find(node => node.dataset.callId === call.id);
       if (!node) { node = button("", () => open(call.id)); node.dataset.callId = call.id; bar.append(node); }
-      const label = showNames ? call.name : `${call.type === "dm" ? "Appel privé" : "Vocal serveur"} ${index + 1}`;
-      const status = { active: "En cours", incoming: "Entrant", outgoing: "Sonnerie", connecting: "Connexion", reconnecting: "Reconnexion" }[call.phase] || "Connexion";
-      const text = `● ${label} · ${status}${call.muted ? " · Micro coupé" : ""}`;
+      const label = showNames ? call.name : `${call.type === "dm" ? ("" + window.PeopleI18n.t("ui_73acbe0e7e") + "") : ("" + window.PeopleI18n.t("ui_5f552459ac") + "")} ${index + 1}`;
+      const status = { active: "Active", incoming: "Incoming", outgoing: "Ringing", connecting: ("" + window.PeopleI18n.t("ui_d403c686f6") + ""), reconnecting: "Reconnecting" }[call.phase] || ("" + window.PeopleI18n.t("ui_d403c686f6") + "");
+      const text = `● ${label} · ${status}${call.muted ? (" " + window.PeopleI18n.t("ui_8906221d20") + "") : ""}`;
       if (node.textContent !== text) node.textContent = text;
       node.title = text; node.setAttribute("aria-expanded", String(selected === call.id));
       const slot = window.PeopleDmCalls.getStates().findIndex(state => state.callId === call.id);
@@ -280,10 +309,10 @@
     async joinServer(serverId, channelId) {
       if (joining) return false;
       if (second && String(second.state.serverId) === String(serverId) && String(second.state.channelId) === String(channelId)) { open(second.state.id); return true; }
-      if (states().filter(call => call.phase !== "incoming").length >= 2) { window.alert("Tu as atteint la limite de 2 appels simultanés. Raccroche un appel pour continuer."); return false; }
+      if (states().filter(call => call.phase !== "incoming").length >= 2) { window.alert("You have reached the limit of two simultaneous calls. End a call to continue."); return false; }
       joining = true;
       try {
-        const name = window.PeopleServerRuntime.getChannels().find(channel => String(channel.id) === String(channelId))?.name || "Salon vocal";
+        const name = window.PeopleServerRuntime.getChannels().find(channel => String(channel.id) === String(channelId))?.name || ("" + window.PeopleI18n.t("ui_63ff7c0170") + "");
         second = createSecondVoice(serverId, channelId, name); render(); await second.start(); window.PeopleServerVoiceUi.show(serverId, channelId); return true;
       } finally { joining = false; }
     }

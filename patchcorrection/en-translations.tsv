@@ -1,0 +1,827 @@
+Message chiffré invalide.	Invalid encrypted message.
+Impossible de déchiffrer un message.	Unable to decrypt a message.
+Vérifie PEOPLE_MESSAGE_ENCRYPTION_KEY.	Check PEOPLE_MESSAGE_ENCRYPTION_KEY.
+Ce rôle est trop haut dans la hiérarchie.	This role is above your highest role.
+Tu ne peux pas accorder une permission que tu ne possèdes pas.	You cannot grant a permission you do not have.
+Impossible de modifier ce rôle.	Unable to update this role.
+Erreur E2EE serveur.	Server encryption error.
+Système	System
+a quitté le serveur	left the server
+a rejoint le serveur	joined the server
+Message privé	Direct message
+📞 Appel lancé	📞 Call started
+📞 Appel terminé	📞 Call ended
+Invité	Guest
+Le message auquel tu réponds n'est plus disponible.	The message you are replying to is no longer available.
+Le message en attente n'a pas pu être envoyé.	The pending message could not be sent.
+Cette image n'est plus disponible. Réessaie de la sélectionner.	This image is no longer available. Select it again.
+Le message n'a pas pu être sauvegardé.	The message could not be saved.
+Suppression impossible.	Unable to delete.
+Modification impossible.	Unable to update.
+Connecté au vocal	Connected to voice
+🔊 quitter le vocal	🔊 leave voice
+Déjà connecté à un vocal	Already connected to voice
+🔊 vocal	🔊 voice
+Pas connecté	Disconnected
+Personne dans le vocal	No one in voice
+Partage d'écran actif	Screen sharing on
+Caméra activée	Camera on
+Micro coupé	Microphone muted
+Micro activé	Microphone on
+• partage d'écran	• screen sharing
+Caméra	Camera
+Creer mon compte	Create Account
+Se connecter	Log In
+Choisis un pseudo unique et un mot de passe.	Choose a unique username and password.
+Connecte-toi avec ton pseudo.	Log in with your username.
+Creation du compte...	Creating account...
+Connexion...	Connecting...
+Impossible de se connecter.	Unable to log in.
+Compte invalide.	Invalid account.
+Ta session a expire. Reconnecte-toi.	Your session expired. Please log in again.
+Choisis d'abord un serveur.	Choose a server first.
+Les pièces jointes demandent une connexion. Ton texte reste dans le champ.	Attachments require a connection. Your text is still in the input.
+Micro changé ✓	Microphone changed ✓
+Impossible d'utiliser ce micro	Unable to use this microphone
+Réactiver le micro de l'appel MP	Unmute the direct call microphone
+Couper le micro de l'appel MP	Mute the direct call microphone
+appel MP • micro coupé	Direct call • muted
+appel MP	Direct call
+Couper la caméra de l'appel MP	Turn off the direct call camera
+Activer la caméra de l'appel MP	Turn on the direct call camera
+Arrêter le partage d'écran de l'appel MP	Stop sharing your screen in the direct call
+Partager l'écran dans l'appel MP	Share your screen in the direct call
+Refuser l'appel MP	Decline direct call
+Annuler l'appel MP	Cancel direct call
+Raccrocher l'appel MP	End direct call
+Quitter le vocal	Leave Voice
+Aucun appel/vocal en cours	No active call
+micro coupé	muted
+Réactiver le micro avant de rejoindre	Unmute before joining
+Couper le micro avant de rejoindre	Mute before joining
+micro activé	microphone on
+Rejoins le vocal pour activer la caméra	Join voice to turn on your camera
+Couper la caméra	Turn Off Camera
+Activer la caméra	Turn On Camera
+Arrêter le partage d'écran	Stop Screen Sharing
+Partager l'écran	Share Screen
+Rejoins le vocal pour partager ton écran	Join voice to share your screen
+Impossible de rejoindre le vocal.	Unable to join voice.
+Connexion au vocal...	Connecting to voice...
+Choisis un serveur avant de rejoindre son vocal.	Choose a server before joining voice.
+Autorise le micro dans le navigateur	Allow microphone access in your browser
+Micro indisponible	Microphone unavailable
+Salon vocal invalide	Invalid voice channel
+Changement de vocal...	Changing voice channel...
+Impossible de changer de vocal.	Unable to change voice channel.
+Aucune caméra disponible	No camera available
+Autorise la caméra dans le navigateur	Allow camera access in your browser
+Aucune caméra trouvée	No camera found
+Caméra indisponible	Camera unavailable
+Caméra changée ✓	Camera changed ✓
+Impossible d'utiliser cette caméra	Unable to use this camera
+Le partage d'écran n'est pas disponible ici	Screen sharing is unavailable here
+Aucun écran sélectionné.	No screen selected.
+Partage d'écran indisponible	Screen sharing unavailable
+Aucun salon vocal sur ce serveur	No voice channels in this server
+hors ligne	offline
+Aucun membre	No members
+Hors ligne	Offline
+HORS LIGNE	OFFLINE
+EN LIGNE	ONLINE
+En ligne	Online
+Ne pas déranger	Do Not Disturb
+Absent	Idle
+Ce fichier ne contient pas de palette People.	This file does not contain a People palette.
+Couleur invalide ou manquante :	Invalid or missing color:
+Thèmes prêts à l'emploi	Preset Themes
+Choisis un thème prêt à l'emploi. Les réglages précis restent disponibles juste en dessous.	Choose a preset theme. Fine adjustments are available below.
+Personnalisation avancée	Advanced Customization
+Importe, exporte ou règle précisément chaque couleur de l'interface.	Import, export or adjust each interface color.
+Réduire	Collapse
+Ouvrir	Open
+Impossible de lire le thème actuel.	Unable to read the current theme.
+Thème exporté ✓	Theme exported ✓
+Ce fichier est trop volumineux pour être un thème People.	This file is too large for a People theme.
+importé — vérifie l'aperçu puis clique sur Enregistrer.	imported — review the preview, then click Save Changes.
+Impossible d'importer ce thème.	Unable to import this theme.
+Impossible de charger l'apparence.	Unable to load appearance settings.
+Impossible d'enregistrer l'apparence.	Unable to save appearance settings.
+Préparation...	Preparing...
+Impossible de préparer cette image.	Unable to prepare this image.
+Erreur de préparation.	Preparation failed.
+Impossible de lire cette image.	Unable to read this image.
+Ce fichier n’est pas une image.	This file is not an image.
+• sera compressée avant l’envoi	• will be compressed before sending
+Impossible de lire l'image recadrée.	Unable to read the cropped image.
+Le recadrage n'a produit aucune image.	Cropping did not produce an image.
+Impossible de compresser la photo.	Unable to compress the photo.
+Conversion de la photo impossible.	Unable to convert the photo.
+Appels en cours	Active Calls
+Vocal secondaire	Secondary voice
+Appel privé	Direct Call
+Vocal serveur	Server Voice
+Connexion	Connecting
+· Micro coupé	· Muted
+Chargement du suivi du visage…	Loading face tracking...
+Suivi visage actif	Face tracking on
+Impossible de charger le suivi du visage	Unable to load face tracking
+Le navigateur ne permet pas les effets caméra.	Your browser does not support camera effects.
+Effets désactivés	Effects off
+Choisis un effet — la caméra brute reste disponible	Choose an effect — the original camera remains available
+L'effet sera chargé avec la caméra	The effect will load when the camera starts
+Active la caméra pour utiliser les effets de visage	Turn on your camera to use face effects
+Rejoindre	Join
+Active la caméra pour utiliser les effets	Turn on your camera to use effects
+Micro	Microphone
+Réactiver le micro	Unmute Microphone
+Couper le micro	Mute Microphone
+Écran	Screen
+Micro indisponible — tu peux quand même écouter	Microphone unavailable — you can still listen
+Connexion… micro en attente	Connecting... waiting for microphone
+Appel en cours	Call in progress
+Connexion impossible — nouvelle tentative…	Unable to connect — retrying...
+Connexion instable…	Unstable connection...
+Aucune caméra disponible.	No camera available.
+Appel en cours • partage d'écran	Call in progress • screen sharing
+Appel terminé	Call ended
+Appel en cours • tu peux rejoindre	Call in progress • you can join
+Appel entrant…	Incoming call...
+People — appel entrant	People — Incoming Call
+… • fermeture après 3 min seul	... • closes after 3 minutes alone
+Connexion…	Connecting...
+Connexion réseau impossible — vérifie le réseau/TURN	Unable to connect — check your network or TURN settings
+Impossible de lancer l'appel.	Unable to start the call.
+a quitté • fermeture dans 3 min s'il ne revient pas	left • closes in 3 minutes if they do not return
+a refusé • tu restes dans l'appel jusqu'à 3 min	declined • the call stays open for up to 3 minutes
+Appel en cours • partage d'écran • micro distant coupé	Call in progress • screen sharing • remote microphone muted
+Appel en cours • micro distant coupé	Call in progress • remote microphone muted
+message privé	direct message
+Réactiver le son de la personne	Unmute this person
+Couper le son de la personne	Mute this person
+Réduire l'appel	Collapse Call
+Glisser pour régler la hauteur de l'appel	Drag to resize the call
+Régler la hauteur de l'appel	Resize Call
+Agrandir l'appel	Expand Call
+Caméra •	Camera •
+Retrouver un serveur, un salon ou une conversation (Ctrl / ⌘ K)	Find a server, channel or conversation (Ctrl / ⌘ K)
+Rechercher un serveur, un salon ou une conversation	Find a server, channel or conversation
+Aucun résultat. Essaie un autre nom.	No results. Try another name.
+résultat	result
+Écrire un message privé	Write a direct message
+Écrire un message dans le salon	Write a message in this channel
+Image en plein écran	Fullscreen Image
+Fermer l’image	Close Image
+Fermer	Close
+Clic droit : zoom · Maintiens et glisse : déplacer · Échap : fermer	Right-click to zoom · Drag to pan · Escape to close
+Ce réglage ne change le son que pour toi	This changes the sound only for you
+Réactive-les dans les permissions du site/navigateur ou dans Windows.	Enable them in your browser, site or Windows permissions.
+Plein écran	Fullscreen
+Mettre cette caméra / ce stream en plein écran	View this camera or stream in fullscreen
+Mettre la caméra / le stream en plein écran	View the camera or stream in fullscreen
+Mettre la caméra en plein écran	View the camera in fullscreen
+📎 Pièce jointe	📎 Attachment
+Action impossible.	Unable to complete this action.
+↩ Répondre	↩ Reply
+✏ Modifier	✏ Edit
+🗑 Supprimer	🗑 Delete
+Message supprimé	Deleted message
+Le message d’origine a été supprimé.	The original message was deleted.
+modifié	edited
+Message modifié	Edited message
+Modifié le	Edited on
+Modifier le message	Edit Message
+Enregistrer	Save Changes
+Annuler	Cancel
+Entrée : enregistrer · Maj+Entrée : nouvelle ligne · Échap : annuler	Enter to save · Shift+Enter for a new line · Escape to cancel
+Un message sans pièce jointe ne peut pas être vide.	A message without an attachment cannot be empty.
+Annuler la réponse	Cancel Reply
+Répondre à	Reply to
+Réaction	Reaction
+Impossible d'ajouter la réaction.	Unable to add the reaction.
+Réagir avec	React with
+Ajouter une réaction	Add Reaction
+😊 Réagir	😊 React
+Ouvrir la navigation	Open Navigation
+Fermer la navigation	Close Navigation
+Tous les messages	All Messages
+Mentions seulement	Mentions Only
+Rien	None
+Son global People	Default People Sound
+Doux	Soft
+Silencieux	Silent
+Pas en sourdine	Not muted
+Retirer	Remove
+Réglages pour cette conversation privée.	Settings for this direct conversation.
+Réglages pour tout ce serveur. Les salons peuvent avoir leur propre exception.	Settings for this server. Channels can override these settings.
+Réglages pour ce salon. Ils remplacent ceux du serveur.	Settings for this channel. These override server settings.
+Réinitialiser toutes les exceptions de notifications ?	Reset all notification overrides?
+Gérées par l'application de bureau.	Managed by the desktop app.
+Autorisées sur cet appareil.	Allowed on this device.
+Bloquées par le navigateur / système.	Blocked by your browser or system.
+Autorisation nécessaire pour les notifications système.	Permission is required for system notifications.
+IndexedDB erreur.	IndexedDB error.
+IndexedDB annulé.	IndexedDB canceled.
+Clé locale indisponible.	Local key unavailable.
+File hors ligne indisponible.	Offline queue unavailable.
+Hors ligne •	Offline •
+Hors ligne • les messages texte seront envoyés à la reconnexion	Offline • text messages will be sent when you reconnect
+Connexion rétablie	Connection restored
+Compte People indisponible pour le mode hors ligne.	People account unavailable for offline mode.
+Impossible d'envoyer le message serveur.	Unable to send the server message.
+Serveur	Server
+Amis	Friends
+Utilisateurs en double appel	Users in two calls
+— En double appel	— In two calls
+Rôles sur ce serveur	Server Roles
+Propriétaire	Owner
+Aucun rôle attribué	No roles assigned
+Ton statut	Your Status
+Statut non enregistré.	Status was not saved.
+Installer People	Install People
+Prévisualisation YouTube	YouTube Preview
+Impossible de charger la pièce jointe.	Unable to load the attachment.
+Pièce jointe vide.	Empty attachment.
+Image envoyée	Sent image
+Vidéo	Video
+Conteneur de pièces jointes invalide.	Invalid attachment container.
+Conteneur de pièces jointes trop lourd.	Attachment container is too large.
+Format de pièces jointes inconnu.	Unknown attachment format.
+En-tête de pièces jointes invalide.	Invalid attachment header.
+Conteneur de pièces jointes tronqué.	Truncated attachment container.
+Métadonnées de pièces jointes invalides.	Invalid attachment metadata.
+Liste de pièces jointes invalide.	Invalid attachment list.
+Pièce jointe du conteneur invalide.	Invalid container attachment.
+Taille du conteneur de pièces jointes incohérente.	Attachment container size mismatch.
+Impossible de charger les pièces jointes.	Unable to load attachments.
+Conteneur de pièces jointes vide.	Empty attachment container.
+📎 Chargement de la pièce jointe…	📎 Loading attachment...
+⚠️ Pièce jointe indisponible	⚠️ Attachment unavailable
+Aucun fichier sélectionné.	No file selected.
+Chaque pièce jointe doit faire moins de 25 Mo.	Each attachment must be smaller than 25 MB.
+Tu peux envoyer	You can send
+Les pièces jointes doivent faire moins de 25 Mo au total par message.	Attachments must total less than 25 MB per message.
+Trop de métadonnées dans les pièces jointes.	Too much attachment metadata.
+La pièce jointe chiffrée est trop lourde.	The encrypted attachment is too large.
+Impossible d'envoyer la pièce jointe.	Unable to send the attachment.
+Fermer l'aperçu	Close Preview
+Aperçu	Preview
+Prévisualiser la vidéo	Preview Video
+Aperçu de	Preview of
+Retirer cette pièce jointe	Remove Attachment
+Retirer	Remove
+Clique pour agrandir	Click to expand
+Clique pour lire	Click to play
+Envoyé chiffré	Sent encrypted
+Impossible d'ajouter ces fichiers.	Unable to add these files.
+Impossible de coller ces fichiers.	Unable to paste these files.
+Créer	Create
+0 — Sans catégorie	0 — No category
+la catégorie	the category
+le vocal	the voice channel
+le salon	the channel
+Les salons qu'elle contient seront déplacés hors catégorie.	Its channels will be moved out of this category.
+Son historique sera supprimé définitivement.	Its message history will be permanently deleted.
+Les personnes qui s'y trouvent seront déconnectées.	Its participants will be disconnected.
+📁 Créer une catégorie	📁 Create Category
+#  Créer un salon textuel	#  Create Text Channel
+🔊 Créer un salon vocal	🔊 Create Voice Channel
+Déplacer dans une catégorie	Move to Category
+#  Créer un salon textuel ici	#  Create Text Channel Here
+🔊 Créer un salon vocal ici	🔊 Create Voice Channel Here
+Supprimer	Delete
+Impossible d'ouvrir ce salon.	Unable to open this channel.
+Tu n'as pas la permission de rejoindre ce vocal.	You do not have permission to join this voice channel.
+Créer un salon dans cette catégorie	Create Channel in This Category
+Salon textuel •	Text channel •
+Début du salon #	Start of channel #
+Tu n'as pas la permission d'écrire dans #	You do not have permission to write in #
+Aucun salon.	No channels.
+IndexedDB E2EE serveur indisponible.	Server E2EE IndexedDB unavailable.
+Enveloppe E2EE du salon incomplète.	Incomplete channel E2EE envelope.
+La clé E2EE du salon ne correspond pas à son engagement cryptographique.	The channel E2EE key does not match its cryptographic commitment.
+Aucun appareil E2EE autorisé dans ce salon.	No authorized E2EE device in this channel.
+L'epoch E2EE a changé pendant la réservation de clé.	The E2EE epoch changed during key reservation.
+Version E2EE de salon non prise en charge.	Unsupported channel E2EE version.
+Impossible de préparer l'image.	Unable to prepare the image.
+Modifie le nom et l’image visibles du serveur sans toucher à son identité technique ni à son invitation.	Change the server name and icon while keeping its identity and invitation link.
+Changer l’image du serveur	Change Server Icon
+Image du serveur	Server Icon
+Ajouter une image	Add Image
+Changer	Change
+PNG, JPEG ou WebP. Recadrée automatiquement en carré.	PNG, JPEG or WebP. Automatically cropped to a square.
+Tu n'as pas la permission de changer l’image.	You do not have permission to change the icon.
+Image enregistrée.	Icon saved.
+Image retirée.	Icon removed.
+Impossible d’enregistrer l’image.	Unable to save the icon.
+Préparation de l’image…	Preparing image...
+Tu n'as pas la permission de gérer le serveur.	You do not have permission to manage the server.
+Le nom doit faire entre 2 et 40 caractères.	The name must contain 2 to 40 characters.
+Impossible d’enregistrer le nom.	Unable to save the name.
+Tu n'as pas la permission de gérer les salons.	You do not have permission to manage channels.
+Le gestionnaire de salons n’est pas disponible.	The channel manager is unavailable.
+Crée les éléments principaux du serveur. L’organisation avancée reste disponible directement dans la liste des salons.	Create server channels. You can organize them in the channel list.
+Catégorie	Category
+Range plusieurs salons sous un même groupe.	Group several channels in a category.
+Salon textuel	Text Channel
+Un espace avec son propre historique de messages.	A channel with its own message history.
+Salon vocal	Voice Channel
+Une room vocale indépendante avec audio, vidéo et écran.	An independent voice channel with audio, video and screen sharing.
+Création impossible.	Unable to create.
+Le lien d’invitation appartient au serveur, pas à son nom. Renommer le serveur ne le régénère pas.	The invitation link belongs to the server. Renaming the server does not change it.
+Lien copié. Il restera le même après un renommage.	Link copied. Renaming the server will not change it.
+Sélectionne puis copie le lien.	Select and copy the link.
+Impossible de charger l’invitation.	Unable to load the invitation.
+Consulte les membres, leurs rôles et utilise les actions de modération autorisées par tes permissions.	View members and roles, and use the moderation actions your permissions allow.
+Chargement des membres…	Loading members...
+membre	member
+Impossible de charger les membres.	Unable to load members.
+Aucun membre ne correspond à cette recherche.	No members match this search.
+Aucun membre.	No members.
+Membre	Member
+Déconnecter du vocal	Disconnect from Voice
+ce membre	this member
+du serveur ?	from the server?
+Impossible d'exclure ce membre.	Unable to kick this member.
+Bannir	Ban
+Impossible de bannir ce membre.	Unable to ban this member.
+Chargement des bannissements…	Loading bans...
+Aucun membre banni.	No banned members.
+Aucune raison indiquée	No reason provided
+Débannir	Unban
+Impossible de lever ce bannissement.	Unable to remove this ban.
+Impossible de charger les bannissements.	Unable to load bans.
+Rôles et permissions	Roles & Permissions
+Crée des rôles hiérarchisés, attribue-les aux membres et définis des exceptions par catégorie ou salon. Le propriétaire garde toujours toutes les permissions.	Create roles and assign them to members. Configure channel exceptions in channel settings. The owner always retains all permissions.
+Chargement des rôles…	Loading roles...
+Impossible de charger les permissions.	Unable to load permissions.
+Tu peux consulter les rôles, mais tu n'as pas la permission de les modifier.	You can view roles, but you do not have permission to edit them.
+Création…	Creating...
+Impossible de créer le rôle.	Unable to create the role.
+Rôle	Role
+Position hiérarchique	Role Position
+Tous les membres	All Members
+Ce rôle est égal ou supérieur à ton rôle le plus élevé : tu ne peux pas le modifier.	This role is at or above your highest role. You cannot edit it.
+Échec de l'enregistrement.	Save failed.
+Supprimer le rôle «	Delete role “
+Impossible de supprimer le rôle.	Unable to delete the role.
+• propriétaire	• owner
+Impossible de modifier les rôles.	Unable to update roles.
+Paramètres	Settings
+Cette section sera ajoutée plus tard.	This section will be added later.
+Les dernières actions effectuées sur le serveur.	Recent actions on this server.
+Aucune action enregistrée.	No recorded actions.
+rôle	role
+connexion vocale	voice connection
+serveur	server
+Parametres du serveur	Server Settings
+Contrôles du vocal	Voice Controls
+Salon vocal secondaire	Secondary Voice Channel
+(micro coupé)	(muted)
+Une erreur est survenue.	An error occurred.
+Serveur invalide.	Invalid server.
+Quitter «	Leave “
+🔗 Copier le lien	🔗 Copy Link
+🚪 Quitter le serveur	🚪 Leave Server
+Tu n'as rejoint aucun serveur	You have not joined a server
+Salon général de	General channel of
+Le salon texte général de	The general text channel of
+Impossible d'ouvrir ce serveur.	Unable to open this server.
+Ouvrir le serveur	Open Server
+Rejoindre le serveur	Join Server
+Le serveur a été rejoint mais n'a pas pu être ouvert.	You joined the server, but it could not be opened.
+Ouvrir les paramètres	Open Settings
+Erreur People.	People error.
+Personnalisé actif	Custom theme active
+Palette mémorisée	Saved palette
+Aperçu local — pense à enregistrer.	Local preview — remember to save.
+Modifications annulées.	Changes canceled.
+Apparence enregistrée ✓	Appearance saved ✓
+Impossible d'enregistrer l'apparence. Les changements ont été annulés.	Unable to save appearance settings. Changes were reverted.
+La synchronisation du thème a échoué.	Theme synchronization failed.
+Couleur HEX incomplète — exemple : #12ABEF.	Incomplete HEX color — example: #12ABEF.
+Valeur de couleur invalide.	Invalid color value.
+Valeurs par défaut prévisualisées — clique sur Enregistrer pour confirmer.	Default values previewed — click Save Changes to confirm.
+Compte People introuvable.	People account not found.
+Impossible de charger le profil.	Unable to load the profile.
+Impossible de charger la confidentialité des appels.	Unable to load call privacy settings.
+Impossible d'enregistrer la confidentialité des appels.	Unable to save call privacy settings.
+Réglage enregistré.	Setting saved.
+Bio enregistrée ✓	Bio saved ✓
+Impossible d'enregistrer la bio.	Unable to save the bio.
+Format d'image non supporté.	Unsupported image format.
+Préparation de la photo…	Preparing photo...
+Impossible de préparer la photo.	Unable to prepare the photo.
+Impossible de changer la photo.	Unable to change the photo.
+Photo enregistrée ✓	Photo saved ✓
+Microphone par défaut	Default Microphone
+Caméra par défaut	Default Camera
+Sortie par défaut	Default Output
+Ce navigateur ne permet pas de choisir les périphériques audio / vidéo.	This browser does not support audio or video device selection.
+Recherche des périphériques…	Finding devices...
+Micro et caméra sélectionnables. Le choix de sortie n'est pas supporté par ce navigateur.	You can select a microphone and camera. This browser does not support output device selection.
+Clique sur Détecter / actualiser pour afficher les noms des micros et caméras.	Click Detect / Refresh to display device names.
+Les changements sont appliqués automatiquement.	Changes apply automatically.
+Impossible de charger les périphériques.	Unable to load devices.
+Sortie audio changée ✓	Audio output changed ✓
+Conversation privée introuvable.	Direct conversation not found.
+Ce navigateur ne permet pas l'E2EE People.	This browser does not support People end-to-end encryption.
+Compte People indisponible pour E2EE.	People account unavailable for end-to-end encryption.
+Cet utilisateur n'a pas encore activé les MP E2EE sur un appareil.	This user has not enabled encrypted direct messages on a device yet.
+Aucune clé E2EE valide trouvée pour ce destinataire.	No valid encryption key found for this recipient.
+Trop d'appareils E2EE sont enregistrés pour cette conversation.	Too many encryption devices are registered for this conversation.
+En-tête E2EE invalide.	Invalid encryption header.
+Conteneur E2EE tronqué.	Truncated encrypted container.
+Métadonnées E2EE invalides.	Invalid encryption metadata.
+La pièce jointe doit faire moins de 25 Mo.	The attachment must be smaller than 25 MB.
+En-tête E2EE trop volumineux.	Encryption header is too large.
+Pièce jointe E2EE invalide.	Invalid encrypted attachment.
+Cette pièce jointe E2EE ne t'est pas destinée.	This encrypted attachment is not intended for you.
+Pièce jointe indisponible sur cet appareil.	Attachment unavailable on this device.
+Pièce jointe E2EE déchiffrée avec une taille incohérente.	Decrypted attachment size mismatch.
+Pièce jointe introuvable.	Attachment not found.
+Le MP ne peut pas dépasser 2000 caractères.	Direct messages cannot exceed 2000 characters.
+⚠️ Message chiffré impossible à vérifier	⚠️ Unable to verify encrypted message
+Tes contacts People	Your People Contacts
+Ouvrir le profil	Open Profile
+Accepter	Accept
+Ajouter	Add
+Veut devenir ton ami	Wants to be your friend
+En attente de sa réponse	Waiting for their response
+Refuser	Decline
+Aucune demande reçue.	No incoming requests.
+Aucune demande en attente.	No pending requests.
+Aucun ami pour l'instant. Cherche quelqu'un juste au-dessus.	No friends yet. Search for someone above.
+Aucun compte trouvé.	No accounts found.
+Fermer le MP	Close Conversation
+Impossible de fermer ce MP.	Unable to close this conversation.
+Aucun MP pour l'instant	No direct messages yet
+Tu	You
+a lancé un appel	started a call
+Début de ta conversation avec	Start of your conversation with
+Les nouveaux MP texte sont chiffrés de bout en bout.	New direct text messages are end-to-end encrypted.
+Cette conversation n'a pas encore été synchronisée sur cet appareil.	This conversation has not been synchronized on this device yet.
+Date inconnue	Unknown date
+Aucune description.	No description.
+Retirer des amis	Remove Friend
+Accepter la demande	Accept Request
+Demande envoyée	Request Sent
+Ajouter en ami	Add Friend
+Format non accepté. JPEG, PNG, WebP ou GIF uniquement.	Unsupported format. Use JPEG, PNG, WebP or GIF.
+La compression de la PP a échoué.	Profile photo compression failed.
+Photo enregistrée •	Photo saved •
+Impossible d'envoyer la photo.	Unable to upload the photo.
+Enregistré ✓	Saved ✓
+Couleur	Color
+du dégradé	of the gradient
+Début	Start
+Retirer cette couleur	Remove Color
++ Ajouter une couleur	+ Add Color
++ Ajouter une couleur (	+ Add Color (
+Modifications en direct — non enregistrées.	Live changes — not saved.
+Modifications non enregistrées.	Unsaved changes.
+Sauvegardé ✓	Saved ✓
+Impossible d'enregistrer.	Unable to save.
+Thème importé — vérifie l'aperçu puis enregistre.	Theme imported — review the preview, then save.
+prêt.	ready.
+Dégradé du thème	Theme Gradient
+Ajoute un dégradé doux aux fonds, comme les thèmes colorés de Discord.	Add a subtle gradient to your backgrounds, like Discord color themes.
+Actif	On
+Couleurs	Colors
+Gauche	Left
+Milieu	Middle
+Droite	Right
+Intensité	Intensity
+Couleur de gauche	Left Color
+Couleur gauche du dégradé	Left Gradient Color
+Couleur du milieu	Middle Color
+Couleur centrale du dégradé	Middle Gradient Color
+Couleur de droite	Right Color
+Couleur droite du dégradé	Right Gradient Color
+Importer / exporter un thème	Import / Export Theme
+Partage une palette personnalisée au format JSON ou importe celle de quelqu'un d'autre.	Share your custom palette as JSON or import someone else's palette.
+Importer	Import
+Exporter	Export
+Recadrer la photo	Crop Photo
+Glisse l’image pour la déplacer, puis ajuste le zoom.	Drag the image to move it, then adjust the zoom.
+Recadrer la photo de profil	Crop Profile Photo
+Effets visage	Face Effects
+Appliqués à ta caméra en appel	Applied to your camera during calls
+Appel People	People Call
+Raccrocher	End Call
+Où veux-tu aller ?	Where would you like to go?
+Salons du serveur actuel · Conversations · Serveurs	Current server channels · Conversations · Servers
+↑ ↓ pour parcourir · Entrée pour ouvrir · Échap pour fermer	↑ ↓ to browse · Enter to open · Escape to close
+Fermer la recherche	Close Search
+Un serveur, un salon, une personne…	A server, channel or person...
+Recevoir	Receive
+Son	Sound
+▶ Tester	▶ Preview
+Sourdine temporaire	Temporary Mute
+Réinitialiser l'exception	Reset Override
+Terminé	Done
+Choisis ce qui te prévient. Les exceptions se règlent aussi avec clic droit sur un MP, un serveur ou un salon.	Choose your notifications. Right-click a conversation, server or channel to set overrides.
+Notifications système	System Notifications
+Vérification…	Checking...
+Autoriser les notifications	Allow Notifications
+Messages privés — valeur par défaut	Direct Messages — Default
+S'applique aux MP sans exception individuelle.	Applies to direct messages without an individual override.
+Serveurs — valeur par défaut	Servers — Default
+Les réglages d'un serveur, puis d'un salon, prennent priorité.	Server settings take priority, followed by channel settings.
+Réinitialise tous les réglages spécifiques MP / serveurs / salons.	Reset all conversation, server and channel overrides.
+Réinitialiser toutes les exceptions	Reset All Overrides
+Emplacement préparé pour une prochaine mise à jour.	Coming in a future update.
+Nom du serveur	Server Name
+Le nom et l’image sont uniquement l’identité affichée dans People. Le lien d’invitation et l’identifiant du serveur restent inchangés.	The name and icon are the server's public identity. Its invitation link and server ID stay the same.
+Identité technique	Server ID
+Cette valeur identifie le serveur en interne et ne dépend jamais de son nom ou de son image.	This value identifies the server independently of its name or icon.
+Tu peux toujours renommer, déplacer et supprimer les catégories, textuels et vocaux depuis leur menu contextuel. Les boutons ＋ des catégories restent disponibles.	Right-click categories and channels to rename, organize or delete them. Use ＋ to create channels within a category.
+Lien d’invitation actuel	Current Invitation Link
+Copier	Copy
+Ce lien reste identique quand tu modifies le nom du serveur.	This link stays the same when you rename the server.
+Membres	Members
+Rechercher un membre	Search Members
+Membres bannis	Banned Members
+Un membre banni ne peut plus rejoindre avec une invitation.	Banned members cannot join with an invitation.
+Créer un rôle	Create Role
+Les rôles les plus hauts contrôlent ceux placés en dessous.	Higher roles control the roles below them.
+Nom du rôle	Role Name
+Attribuer les rôles	Assign Roles
+Un membre peut avoir plusieurs rôles. Les permissions se cumulent.	Members can have multiple roles. Their permissions are combined.
+Enregistrer les rôles	Save Changes
+PARAMÈTRES DU SERVEUR	SERVER SETTINGS
+Paramètres du serveur	Server Settings
+Profil	Profile
+Apparence	Appearance
+Sons	Sounds
+MON COMPTE	MY ACCOUNT
+Modifie les informations visibles sur ton profil People.	Edit the information shown on your People profile.
+Changer la photo	Change Photo
+Nom d'utilisateur	Username
+Le changement de pseudo n'est pas encore disponible.	Changing your username is not available yet.
+Visible sur ta fiche de profil.	Visible on your profile.
+PERSONNALISATION	CUSTOMIZATION
+Prévisualise ton thème en direct, puis enregistre seulement quand le résultat te plaît. Tes réglages suivent ton compte.	Preview your theme live, then save when you are happy with it. Your settings follow your account.
+Préréglages	Presets
+Choisis une base. Rien n'est envoyé au serveur tant que tu n'appuies pas sur Enregistrer.	Choose a starting theme. Changes are saved only when you click Save Changes.
+Sombre	Dark
+Le thème People classique.	The classic People theme.
+Minuit	Midnight
+Des noirs plus profonds.	Deeper black backgrounds.
+Clair	Light
+Une interface lumineuse.	A bright interface.
+Suit le thème de l'appareil.	Follows your device theme.
+Personnalisé	Custom
+Tes 5 couleurs exactes.	Your five custom colors.
+Palette personnalisée	Custom Palette
+Modifie une couleur pour passer en mode personnalisé. Tu peux annuler tous les changements avant de sauvegarder.	Change a color to switch to a custom theme. You can cancel changes before saving.
+Accueil	Home
+Amis et messages privés	Friends and Direct Messages
+MESSAGES PRIVÉS	DIRECT MESSAGES
+Retrouver quelqu'un	Find Someone
+DEMANDES D'AMI	FRIEND REQUESTS
+À ACCEPTER	INCOMING
+ENVOYÉES	SENT
+MES AMIS	MY FRIENDS
+Cet aperçu reprend les mêmes rôles de couleur que l'application : rail, panneau, fond, texte, champs et accent.	This preview uses the app's colors for the rail, panels, backgrounds, text, inputs and accents.
+Fond principal	Main Background
+Chat et zone centrale.	Chat and central area.
+Panneaux	Panels
+Barres, cartes et zones élevées.	Bars, cards and raised surfaces.
+Fond secondaire	Secondary Background
+Rail des serveurs, menus et champs.	Server rail, menus and inputs.
+Texte principal	Main Text
+Messages, titres et texte important.	Messages, titles and key text.
+Boutons, sélections et éléments actifs.	Buttons, selections and active elements.
+Valeurs par défaut	Defaults
+Choisis les sons utilisés uniquement sur cet appareil.	Choose sounds used on this device.
+Périphériques audio / vidéo	Audio Devices
+Choisis le micro, la caméra et le casque ou haut-parleur utilisés par les vocaux et appels.	Choose the microphone and speakers used for voice channels and calls. Select cameras in the call interface.
+Entrée — Microphone	Input — Microphone
+Sortie — Casque / haut-parleurs	Output — Headphones / Speakers
+Détecter / actualiser	Detect / Refresh
+Sonnerie d'appel	Call Ringtone
+Son joué quand quelqu'un t'appelle en MP.	The sound played when someone calls you directly.
+Utilisé pour les MP et les @pings.	Used for direct messages and @mentions.
+Paramètres People	People Settings
+Écris une petite description...	Write a short bio...
+Aperçu réaliste de l'interface People	People Interface Preview
+Fond principal en hexadécimal	Main Background HEX
+Panneaux en hexadécimal	Panels HEX
+Fond secondaire en hexadécimal	Secondary Background HEX
+Texte principal en hexadécimal	Main Text HEX
+Accent en hexadécimal	Accent HEX
+Confidentialité des appels	Call Privacy
+Afficher avec qui je suis en double appel	Show who I am in two calls with
+Le double appel reste toujours visible. Désactivé, aucun interlocuteur n'est communiqué par cet indicateur.	The two-call indicator remains visible. Turn this off to hide participants' names from it.
+Écouter	Preview Sound
+Aperçu grandeur nature	Live Preview
+Vois le thème directement sur ton vrai People pendant que tu le modifies.	Preview your theme in People while editing it.
+Voir dans People	Preview in People
+APPARENCE	APPEARANCE
+Modifier People en direct	Edit People Live
+Couleurs principales	Main Colors
+Modifie les surfaces et l'accent.	Edit surface and accent colors.
+Dégradé global	App Gradient
+Un seul dégradé traverse toute l'interface.	One gradient across the interface.
+Activer le dégradé	Enable Gradient
+Sauvegarder	Save Changes
+Creer un compte	Create Account
+Pas d'e-mail pour l'instant. Garde bien ton mot de passe.	Email recovery is not available yet. Keep your password safe.
+👥 Amis	👥 Friends
+en ligne	online
+🔊 vocal	🔊 voice
+# général	# general
+Salon général	General Channel
+Bienvenue dans # général	Welcome to #general
+Le salon texte général.	The general text channel.
+Envoyer	Send
+Cherche un compte People, ouvre son profil, ajoute-le à tes amis ou envoie-lui un MP.	Find a People account, open their profile, add them as a friend or send a direct message.
+Demandes d'ami	Friend Requests
+À accepter	Incoming
+Envoyées	Sent
+Mes amis	My Friends
+Aucun ami pour l'instant.	No friends yet.
+Début de votre conversation sur People.	Start of your conversation on People.
+0 personne	0 people
+Chargement des membres...	Loading members...
+Membre depuis	Member Since
+Envoyer un MP	Send Message
+Créer ton serveur	Create Your Server
+Pour cette V1, il aura automatiquement un # général et un 🔊 vocal. Pas d'autres salons pour l'instant.	Your server starts with a general text channel and a voice channel. You can create more channels in server settings.
+NOM DU SERVEUR	SERVER NAME
+Tu as reçu une invitation pour rejoindre	You have been invited to join
+0 membre	0 members
+Pseudo	Username
+Mot de passe	Password
+Navigation principale	Main Navigation
+Accueil et messages privés	Home and Direct Messages
+Tes serveurs	Your Servers
+Créer un serveur	Create Server
+Créer une catégorie ou un salon	Create Category or Channel
+Copier le lien d'invitation	Copy Invitation Link
+Ouvrir mon profil	Open My Profile
+Activer/couper le micro	Toggle Microphone
+Activer/couper la caméra	Toggle Camera
+Afficher les personnes en ligne	Show Online Members
+Caméras du vocal	Voice Cameras
+Envoyer une pièce jointe (25 Mo max)	Send Attachment (25 MB max)
+Envoyer une pièce jointe	Send Attachment
+Message dans #général	Message #general
+Chercher un pseudo...	Search usernames...
+Retour aux amis	Back to Friends
+Message privé...	Direct message...
+Membres du serveur	Server Members
+Fermer la liste des membres	Close Member List
+Se deconnecter	Log Out
+Mon serveur	My Server
+Dépose tes fichiers ici	Drop your files here
+DATABASE_URL manque. Configure PostgreSQL dans Render avant le deploiement.	DATABASE_URL is missing. Configure PostgreSQL before deployment.
+Format AES-GCM invalide.	Invalid AES-GCM format.
+PEOPLE_SIMPLE_ADMIN_TOKEN n'est pas configuré sur Render.	PEOPLE_SIMPLE_ADMIN_TOKEN is not configured.
+Accès admin refusé.	Admin access denied.
+Pseudo : 3 a 24 caracteres, lettres/chiffres/_/./- uniquement.	Username: 3 to 24 characters, using letters, numbers, _, . or -.
+Le mot de passe doit contenir entre 8 et 128 caracteres.	The password must contain 8 to 128 characters.
+Ce pseudo est deja pris.	This username is already taken.
+Impossible de creer le compte.	Unable to create the account.
+Trop d'essais pour ce pseudo. Reessaie dans quelques minutes.	Too many login attempts. Try again in a few minutes.
+Pseudo ou mot de passe incorrect.	Incorrect username or password.
+Connexion impossible.	Unable to connect.
+Pseudo invalide.	Invalid username.
+Compte introuvable.	Account not found.
+Impossible de supprimer ce compte.	Unable to delete this account.
+Connexion requise.	Login required.
+Clé E2EE de l'appareil invalide.	Invalid device encryption key.
+Impossible d'enregistrer la clé E2EE.	Unable to save the encryption key.
+Utilisateur introuvable.	User not found.
+Conversation E2EE invalide.	Invalid encrypted conversation.
+Impossible de charger les clés E2EE.	Unable to load encryption keys.
+La photo de profil doit faire moins de 3 Mo.	The profile photo must be smaller than 3 MB.
+Format non accepte. JPEG, PNG, WebP ou GIF.	Unsupported format. Use JPEG, PNG, WebP or GIF.
+La photo a été reçue mais n'a pas pu être relue depuis le stockage.	The photo was received but could not be read from storage.
+Impossible de changer la photo de profil.	Unable to change the profile photo.
+La photo compressée est encore trop lourde.	The compressed photo is still too large.
+La photo compressée dépasse la limite.	The compressed photo exceeds the limit.
+La photo finale doit être en JPEG.	The final photo must be a JPEG.
+Impossible d'enregistrer la photo de profil.	Unable to save the profile photo.
+Profil introuvable.	Profile not found.
+Impossible de charger la photo de profil.	Unable to load the profile photo.
+Thème d'apparence invalide.	Invalid appearance theme.
+Palette d'apparence invalide.	Invalid appearance palette.
+Réglages de dégradé invalides.	Invalid gradient settings.
+Accès refusé à ce serveur.	Access to this server denied.
+Impossible de charger ce profil.	Unable to load this profile.
+La description est limitee a 280 caracteres.	The bio is limited to 280 characters.
+Impossible de modifier le profil.	Unable to update the profile.
+Impossible de charger les personnes.	Unable to load people.
+Impossible de charger les amis.	Unable to load friends.
+Impossible de charger les demandes d'ami.	Unable to load friend requests.
+Tu ne peux pas t'envoyer une demande a toi-meme.	You cannot send yourself a friend request.
+Vous etes deja amis.	You are already friends.
+Impossible d'envoyer la demande d'ami.	Unable to send the friend request.
+Demande d'ami introuvable.	Friend request not found.
+Impossible d'accepter cette demande.	Unable to accept this request.
+Impossible de supprimer cette demande.	Unable to delete this request.
+Impossible de retirer cet ami.	Unable to remove this friend.
+Tu ne peux modifier que tes propres messages.	You can only edit your own messages.
+Le message modifié est invalide.	The edited message is invalid.
+Enveloppe E2EE invalide.	Invalid encryption envelope.
+Impossible de modifier ce message.	Unable to edit this message.
+Tu ne peux supprimer que tes propres messages.	You can only delete your own messages.
+Impossible de supprimer ce message.	Unable to delete this message.
+Conversation invalide.	Invalid conversation.
+Impossible de rouvrir ce MP.	Unable to reopen this conversation.
+Impossible de charger les MP.	Unable to load direct messages.
+Tu ne peux pas ouvrir un MP avec toi-meme.	You cannot open a direct conversation with yourself.
+Impossible de charger cette conversation.	Unable to load this conversation.
+Impossible de marquer les MP comme lus.	Unable to mark direct messages as read.
+Tu envoies trop de messages trop vite.	You are sending messages too quickly.
+Tu ne peux pas t'envoyer un MP.	You cannot send yourself a direct message.
+Le MP doit contenir du texte ou une image.	The message must contain text or an image.
+Impossible d'envoyer ce MP.	Unable to send this direct message.
+Pièce jointe chiffrée au repos invalide.	Invalid encrypted attachment in storage.
+Tu envoies trop de pièces jointes trop vite.	You are sending attachments too quickly.
+Tu n'es pas membre de ce serveur.	You are not a member of this server.
+Impossible de charger les messages non lus.	Unable to load unread messages.
+Salon textuel introuvable.	Text channel not found.
+Tu n'as pas accès à ce salon.	You do not have access to this channel.
+Impossible de marquer ce salon comme lu.	Unable to mark this channel as read.
+Impossible de charger les réglages de notifications.	Unable to load notification settings.
+Réglages de notifications invalides.	Invalid notification settings.
+Trop de réglages de notifications.	Too many notification settings.
+Impossible d'enregistrer les réglages de notifications.	Unable to save notification settings.
+Message introuvable.	Message not found.
+Impossible de charger les réactions.	Unable to load reactions.
+Tu n'as pas la permission d'ajouter des réactions dans ce salon.	You do not have permission to add reactions in this channel.
+Réaction invalide.	Invalid reaction.
+Impossible de charger les salons.	Unable to load channels.
+Tu n'as pas la permission de gérer ce salon.	You do not have permission to manage this channel.
+Salon introuvable.	Channel not found.
+Un serveur doit garder au moins un salon textuel.	A server must keep at least one text channel.
+Impossible de supprimer cet élément.	Unable to delete this item.
+Impossible de charger tes permissions.	Unable to load your permissions.
+Impossible de charger les rôles.	Unable to load roles.
+Tu n'as pas la permission de gérer les rôles.	You do not have permission to manage roles.
+Rôle introuvable.	Role not found.
+Ce rôle ne peut pas être supprimé.	This role cannot be deleted.
+Accès refusé.	Access denied.
+Impossible de charger les rôles des membres.	Unable to load member roles.
+Tu n'as pas la permission de gérer les permissions de salon.	You do not have permission to manage channel permissions.
+Impossible de charger les permissions du salon.	Unable to load channel permissions.
+Salon ou rôle introuvable.	Channel or role not found.
+Impossible de réinitialiser ces permissions.	Unable to reset these permissions.
+Ce membre n'est plus dans le serveur.	This member is no longer in the server.
+Tu n'as pas la permission de voir les bannissements.	You do not have permission to view bans.
+Impossible de bannir cet utilisateur.	Unable to ban this user.
+Tu n'as pas la permission de lever ce bannissement.	You do not have permission to remove this ban.
+Impossible de charger l'état E2EE du salon.	Unable to load the channel encryption state.
+Impossible de réserver la rotation E2EE.	Unable to reserve encryption key rotation.
+Impossible de charger les appareils E2EE autorisés.	Unable to load authorized encryption devices.
+Impossible d'enregistrer les enveloppes E2EE.	Unable to save encryption envelopes.
+Impossible de finaliser la clé E2EE.	Unable to finalize the encryption key.
+Impossible de synchroniser cet appareil E2EE.	Unable to synchronize this encryption device.
+Impossible de charger tes serveurs.	Unable to load your servers.
+Le nom du serveur doit faire entre 2 et 40 caractères.	The server name must contain 2 to 40 characters.
+Impossible de créer le serveur.	Unable to create the server.
+Serveur introuvable.	Server not found.
+Tu n'as pas la permission de gérer ce serveur.	You do not have permission to manage this server.
+Impossible de modifier le serveur.	Unable to update the server.
+Format d'image invalide. Utilise PNG, JPEG ou WebP.	Invalid image format. Use PNG, JPEG or WebP.
+L'image du serveur est trop lourde.	The server icon is too large.
+Impossible de modifier l'image du serveur.	Unable to update the server icon.
+Cette invitation n'existe plus.	This invitation no longer exists.
+Impossible de charger l'invitation.	Unable to load the invitation.
+Tu es banni de ce serveur.	You are banned from this server.
+Impossible de rejoindre le serveur.	Unable to join the server.
+Le propriétaire du serveur officiel People ne peut pas le quitter.	The owner of the official People server cannot leave it.
+Impossible de quitter le serveur.	Unable to leave the server.
+Tu n'as pas la permission de créer une invitation.	You do not have permission to create an invitation.
+Impossible de créer le lien d'invitation.	Unable to create the invitation link.
+Tu n'as pas accès au journal d'administration.	You do not have access to the audit log.
+Impossible de charger le journal.	Unable to load the audit log.
+Impossible de déconnecter ce membre.	Unable to disconnect this member.
+Statut invalide.	Invalid status.
+Impossible de modifier le statut.	Unable to change status.
+Réglage invalide.	Invalid setting.
+Impossible d'enregistrer ce réglage.	Unable to save this setting.
+Salon invalide.	Invalid channel.
+Tu n'as pas la permission d'envoyer des messages dans ce salon.	You do not have permission to send messages in this channel.
+Message vide.	Empty message.
+Impossible d'enregistrer le message.	Unable to save the message.
+Session invalide.	Invalid session.
+Tu ne peux pas t'appeler toi-même.	You cannot call yourself.
+Tu es déjà dans cet appel.	You are already in this call.
+Tu as atteint la limite de 2 appels simultanés.	You have reached the limit of two simultaneous calls.
+Cette personne a atteint la limite de 2 appels simultanés.	This person has reached the limit of two simultaneous calls.
+Attends un instant avant de rappeler.	Wait a moment before calling again.
+Tu n'as accès à aucun salon textuel de ce serveur.	You do not have access to any text channels in this server.
+Session ou serveur invalide.	Invalid session or server.
+Tu n'as pas la permission de joindre des fichiers dans ce salon.	You do not have permission to attach files in this channel.
+Aucun serveur actif.	No active server.
+Le message est trop long.	The message is too long.
+Tu n'as pas la permission de supprimer ce message.	You do not have permission to delete this message.
+Session vocale invalide.	Invalid voice session.
+Serveur vocal introuvable.	Voice server not found.
+Tu n'es plus membre de ce serveur.	You are no longer a member of this server.
+Salon vocal introuvable.	Voice channel not found.
+Ton compte est déjà connecté à un vocal.	Your account is already connected to a voice channel.

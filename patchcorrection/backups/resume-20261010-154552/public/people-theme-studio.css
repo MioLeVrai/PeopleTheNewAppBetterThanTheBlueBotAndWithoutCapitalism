@@ -1,0 +1,252 @@
+/* === PEOPLE_GLOBAL_GRADIENT_STUDIO_V1_START === */
+:root[data-people-global-gradient="on"] body {
+  background-color: var(--people-night) !important;
+  background-image: var(--people-global-gradient) !important;
+  background-attachment: fixed !important;
+  background-size: 100vw 100vh !important;
+  background-position: 0 0 !important;
+  background-repeat: no-repeat !important;
+}
+
+/* Le dégradé existe UNE seule fois sur le viewport. Les zones utilisent des voiles. */
+:root[data-people-global-gradient="on"] .app {
+  background: transparent !important;
+}
+
+:root[data-people-global-gradient="on"] .main,
+:root[data-people-global-gradient="on"] .home-main,
+:root[data-people-global-gradient="on"] .messages,
+:root[data-people-global-gradient="on"] .dm-view,
+:root[data-people-global-gradient="on"] .dm-messages,
+:root[data-people-global-gradient="on"] .friends-view,
+:root[data-people-global-gradient="on"] .people-settings-content {
+  background-color: var(--people-global-main-overlay) !important;
+  background-image: none !important;
+}
+
+:root[data-people-global-gradient="on"] .sidebar,
+:root[data-people-global-gradient="on"] .online-panel,
+:root[data-people-global-gradient="on"] .server-title,
+:root[data-people-global-gradient="on"] .topbar,
+:root[data-people-global-gradient="on"] .home-topbar,
+:root[data-people-global-gradient="on"] .dm-header,
+:root[data-people-global-gradient="on"] .profile,
+:root[data-people-global-gradient="on"] .friends-search-card,
+:root[data-people-global-gradient="on"] .profile-card-section,
+:root[data-people-global-gradient="on"] .profile-card-modal,
+:root[data-people-global-gradient="on"] .join-card,
+:root[data-people-global-gradient="on"] .people-server-modal-card,
+:root[data-people-global-gradient="on"] .people-invite-card,
+:root[data-people-global-gradient="on"] .people-card,
+:root[data-people-global-gradient="on"] .people-settings-modal,
+:root[data-people-global-gradient="on"] .people-server-settings-shell {
+  background-color: var(--people-global-panel-overlay) !important;
+  background-image: none !important;
+}
+
+:root[data-people-global-gradient="on"] .server-rail,
+:root[data-people-global-gradient="on"] .people-message-context-menu,
+:root[data-people-global-gradient="on"] .people-server-context-menu,
+:root[data-people-global-gradient="on"] .people-dm-context-menu {
+  background-color: var(--people-global-rail-overlay) !important;
+  background-image: none !important;
+}
+
+/* Preview miniature : même principe, un seul gradient derrière tout. */
+#peopleSettingsPalettePreview {
+  background: var(--preview-global-gradient, var(--palette-background)) !important;
+}
+#peopleSettingsPalettePreview .people-settings-preview-main,
+#peopleSettingsPalettePreview .people-settings-preview-content {
+  background: var(--preview-global-main-overlay, transparent) !important;
+}
+#peopleSettingsPalettePreview .people-settings-preview-sidebar,
+#peopleSettingsPalettePreview .people-settings-preview-topbar,
+#peopleSettingsPalettePreview .people-settings-preview-search-card,
+#peopleSettingsPalettePreview .people-settings-preview-friend {
+  background: var(--preview-global-panel-overlay, var(--palette-panel)) !important;
+}
+#peopleSettingsPalettePreview .people-settings-preview-request-grid > div,
+#peopleSettingsPalettePreview .people-settings-preview-profile {
+  background: var(--preview-global-panel-soft-overlay, var(--palette-panel)) !important;
+}
+#peopleSettingsPalettePreview .people-settings-preview-rail {
+  background: var(--preview-global-rail-overlay, var(--palette-secondary)) !important;
+}
+
+.people-theme-studio-launch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 10px 0 2px;
+  padding: 11px 12px;
+  border: 1px solid var(--people-border, #322b43);
+  border-radius: 10px;
+  background: var(--people-surface, #211d30);
+}
+.people-theme-studio-launch-row > div { display: grid; gap: 3px; }
+.people-theme-studio-launch-row strong { font-size: 12px; color: var(--people-text); }
+.people-theme-studio-launch-row span { font-size: 10px; color: var(--people-muted); }
+
+.people-appearance-gradient-colorbar,
+.people-theme-studio-gradient-bar {
+  position: relative;
+  min-height: 70px !important;
+  overflow: visible;
+}
+.people-gradient-dynamic-stop {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  z-index: 2;
+}
+.people-gradient-dynamic-stop input[type="color"] {
+  width: 32px;
+  height: 32px;
+  padding: 3px;
+  border: 2px solid rgba(255,255,255,.94);
+  border-radius: 7px;
+  background: rgba(8,8,12,.46);
+  box-shadow: 0 3px 10px rgba(0,0,0,.34);
+  cursor: pointer;
+}
+.people-gradient-dynamic-stop span {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(0,0,0,.52);
+  color: white;
+  font-size: 8px;
+  font-weight: 850;
+}
+.people-gradient-dynamic-stop button {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.38);
+  border-radius: 50%;
+  background: rgba(20,17,27,.90);
+  color: white;
+  font-size: 13px;
+  line-height: 15px;
+  cursor: pointer;
+}
+.people-gradient-add-stop {
+  justify-self: start;
+  margin-top: 1px;
+  padding: 7px 10px;
+  border: 1px solid var(--people-border, #322b43);
+  border-radius: 8px;
+  background: var(--people-surface, #211d30);
+  color: var(--people-text, #f2eff8);
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.people-gradient-add-stop:disabled { opacity: .48; cursor: default; }
+
+body.people-theme-studio-open { overflow: hidden; }
+.people-theme-studio {
+  position: fixed;
+  z-index: 2147483000;
+  top: 0;
+  right: 0;
+  width: min(410px, 94vw);
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0,1fr) auto;
+  background: color-mix(in srgb, var(--people-deep, #181524) 94%, transparent);
+  border-left: 1px solid var(--people-border, #322b43);
+  box-shadow: -20px 0 55px rgba(0,0,0,.35);
+  backdrop-filter: blur(18px);
+  color: var(--people-text, #f2eff8);
+}
+.people-theme-studio[hidden] { display: none !important; }
+.people-theme-studio-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 72px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--people-border, #322b43);
+}
+.people-theme-studio-head > div { display: grid; gap: 4px; }
+.people-theme-studio-head span { font-size: 9px; font-weight: 900; color: var(--people-accent); letter-spacing: .08em; }
+.people-theme-studio-head strong { font-size: 15px; }
+.people-theme-studio-head button {
+  width: 34px; height: 34px; border: 0; border-radius: 9px;
+  background: var(--people-surface); color: var(--people-text); font-size: 22px; cursor: pointer;
+}
+.people-theme-studio-scroll { overflow: auto; padding: 14px; display: grid; align-content: start; gap: 12px; }
+.people-theme-studio-section {
+  padding: 13px;
+  border: 1px solid var(--people-border, #322b43);
+  border-radius: 12px;
+  background: var(--people-global-panel-soft-overlay, var(--people-surface));
+  display: grid;
+  gap: 11px;
+}
+.people-theme-studio-title { display: grid; gap: 3px; }
+.people-theme-studio-title strong { font-size: 12px; }
+.people-theme-studio-title span { font-size: 10px; color: var(--people-muted); }
+.people-theme-studio-palette { display: grid; gap: 8px; }
+.people-theme-studio-color-row {
+  display: grid;
+  grid-template-columns: minmax(92px,1fr) 34px 76px 106px;
+  align-items: center;
+  gap: 6px;
+}
+.people-theme-studio-color-row > span { font-size: 10px; color: var(--people-muted); }
+.people-theme-studio-color-row input[type="color"] { width: 34px; height: 30px; padding: 2px; border: 1px solid var(--people-border); border-radius: 6px; background: transparent; }
+.people-theme-studio-color-row input[type="text"],
+.people-theme-studio-rgb input {
+  min-width: 0; height: 30px; box-sizing: border-box; border: 1px solid var(--people-border);
+  border-radius: 6px; background: var(--people-input); color: var(--people-text); font-size: 9px; padding: 0 6px;
+}
+.people-theme-studio-rgb { display: grid; grid-template-columns: repeat(3,1fr); gap: 3px; }
+.people-theme-studio-rgb input { width: 100%; padding: 0 3px; text-align: center; }
+.people-theme-studio-toggle,
+.people-theme-studio-range { display: grid; gap: 6px; font-size: 10px; color: var(--people-muted); }
+.people-theme-studio-toggle { grid-template-columns: 1fr auto; align-items: center; }
+.people-theme-studio-toggle input,
+.people-theme-studio-range input { accent-color: var(--people-accent); }
+.people-theme-studio-range > span { display: flex; justify-content: space-between; gap: 8px; }
+.people-theme-studio-range b { color: var(--people-text); }
+.people-theme-studio-gradient-bar {
+  border: 1px solid var(--people-border);
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.025);
+}
+.people-theme-studio-footer {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--people-border, #322b43);
+  background: color-mix(in srgb, var(--people-deep) 96%, transparent);
+}
+.people-theme-studio-footer > span { min-width: 0; font-size: 9px; color: var(--people-muted); }
+.people-theme-studio-footer > span[data-tone="error"] { color: #ff767e; }
+.people-theme-studio-footer > span[data-tone="success"] { color: #63d594; }
+.people-theme-studio-cancel,
+.people-theme-studio-save {
+  min-height: 34px; padding: 0 12px; border-radius: 8px; font-size: 10px; font-weight: 850; cursor: pointer;
+}
+.people-theme-studio-cancel { border: 1px solid var(--people-border); background: var(--people-surface); color: var(--people-text); }
+.people-theme-studio-save { border: 0; background: var(--people-accent); color: white; }
+.people-theme-studio-save:disabled { opacity: .55; cursor: wait; }
+
+@media (max-width: 620px) {
+  .people-theme-studio { width: 100vw; }
+  .people-theme-studio-color-row { grid-template-columns: minmax(84px,1fr) 34px 72px; }
+  .people-theme-studio-rgb { grid-column: 1 / -1; }
+}
+/* === PEOPLE_GLOBAL_GRADIENT_STUDIO_V1_END === */

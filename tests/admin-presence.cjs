@@ -23,7 +23,7 @@ async function main() {
   const start = async () => {
     child = spawn(process.execPath, [path.join(dir, "server.js")], {
       cwd: root, windowsHide: true,
-      env: { ...process.env, PORT: String(port), DATABASE_URL: "", NODE_ENV: "test", SESSION_SECRET: "test-secret-only", NODE_PATH: path.join(root, "node_modules") }
+      env: { ...process.env, PORT: String(port), DATABASE_URL: "", NODE_ENV: "test", SESSION_SECRET: "test-secret-only", PEOPLE_SIMPLE_ADMIN_TOKEN: "disposable-admin-token", NODE_PATH: path.join(root, "node_modules") }
     });
     child.stdout.on("data", chunk => { logs += chunk; });
     child.stderr.on("data", chunk => { logs += chunk; });
@@ -128,18 +128,56 @@ async function main() {
     const roster = (await api(admin.cookie, route + "/members")).members;
     assert.deepEqual(roster.find(user => user.id === admin.id).roleIds, [adminRole.id]);
     const profile = (await api(member.cookie, `/api/profile/AdminTest?serverId=${server.id}`)).profile;
+    assert.equal((await api(member.cookie, "/api/profile/AdminTest")).profile.serverMember, null, "Global profiles do not contain server roles");
     assert.equal(profile.serverMember.roles[0].name, "Admin");
     assert.equal(profile.serverMember.roleColor, "#FF3366");
     await api(outsider.cookie, `/api/profile/AdminTest?serverId=${server.id}`, "GET", undefined, 403);
+    const iconA = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j5yQAAAAASUVORK5CYII=";
+    const iconB = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+    for (const iconData of [iconA, iconB, iconA]) {
+      assert.equal((await api(admin.cookie, route + "/icon", "PATCH", { iconData })).server.iconData, iconData);
+      assert.equal((await api(member.cookie, "/api/servers")).servers.find(item => item.id === server.id).iconData, iconData, "Other clients receive persisted icon");
+    }
+    await api(member.cookie, route + "/icon", "PATCH", { iconData: iconB }, 403);
+    await api(admin.cookie, route + "/icon", "PATCH", { iconData: "data:image/png;base64,ZmFrZQ==" }, 400);
+    await api(admin.cookie, route + "/icon", "PATCH", {}, 400);
+    assert.equal((await api(member.cookie, "/api/servers")).servers.find(item => item.id === server.id).iconData, iconA, "Failure preserves previous icon");
     await api(member.cookie, route + "/audit", "GET", undefined, 403);
     assert((await api(admin.cookie, route + "/audit")).entries.some(entry => entry.actor_id === admin.id));
-    if (process.argv.includes("--browser")) {
-      const textChannel = (await api(member.cookie, route + "/channels")).channels.find(item => item.type === "text");
-      await api(member.cookie, `${route}/channels/${textChannel.id}/messages`, "POST", { text: "Message de test modération" });
-      await require("./browser-smoke.cjs")({ base, cookie: admin.cookie, server });
-    }
     const socket = await connect(admin.cookie);
     const memberSocket = await connect(member.cookie);
+    const typingChannel = (await api(member.cookie, route + "/channels")).channels.find(c => c.type === "text");
+    for (const client of [socket, memberSocket]) assert.equal((await client.emit("server-channel-select", { serverId: server.id, channelId: typingChannel.id })).ok, true);
+    assert.equal((await memberSocket.emit("people-typing", { kind: "server", serverId: server.id, channelId: typingChannel.id, active: true })).ok, true);
+    await socket.poll();
+    assert(socket.packets.some(p => p.startsWith('42["people-typing"') && p.includes('"active":true') && p.includes('"username":"MemberTest"')));
+    assert.equal((await memberSocket.emit("people-typing", { kind: "server", serverId: server.id, channelId: typingChannel.id, active: false })).ok, true);
+    await socket.poll();
+    assert(socket.packets.some(p => p.startsWith('42["people-typing"') && p.includes('"active":false')));
+    assert.equal((await memberSocket.emit("people-typing", null)).ok, false, "Invalid typing payload does not crash the server");
+    await api(owner.cookie, `${route}/channels/${channel.id}/role-overrides/${memberRole.id}`, "PUT", { deny: ["VIEW_CHANNEL", "SEND_MESSAGES"], allow: [] });
+    await api(member.cookie, `${route}/channels/${channel.id}/messages`, "POST", { text: "Forbidden message" }, 403);
+    assert.equal((await memberSocket.emit("people-typing", { kind: "server", serverId: server.id, channelId: channel.id, active: true })).ok, false, "Server denies unauthorized typing");
+    assert.equal((await memberSocket.emit("server-channel-select", { serverId: server.id, channelId: channel.id })).ok, false, "Denied channels remain private");
+    await api(owner.cookie, `${route}/channels/${channel.id}/role-overrides/${memberRole.id}`, "DELETE");
+    const requestPackets = socket.packets.filter(p => p.startsWith('42["friend-state-changed"')).length;
+    const request = await api(member.cookie, "/api/social/friends/AdminTest", "POST", {});
+    await socket.poll();
+    assert.equal(socket.packets.filter(p => p.startsWith('42["friend-state-changed"')).length - requestPackets, 1, "One friend request event per recipient connection");
+    assert.equal((await api(member.cookie, "/api/social/friends/AdminTest", "POST", {})).requestId, request.requestId);
+    await api(admin.cookie, `/api/social/friend-requests/${request.requestId}/accept`, "POST", {});
+    assert.equal((await memberSocket.emit("people-typing", { kind: "dm", username: "AdminTest", active: true })).ok, true);
+    await socket.poll();
+    assert(socket.packets.some(p => p.startsWith('42["people-typing"') && p.includes('"kind":"dm"') && p.includes('"username":"MemberTest"')));
+    assert.equal((await memberSocket.emit("people-typing", { kind: "dm", username: "OutsideTest", active: true })).ok, false);
+    if (process.argv.includes("--browser")) {
+      const textChannel = (await api(member.cookie, route + "/channels")).channels.find(item => item.type === "text");
+      await api(member.cookie, `${route}/channels/${textChannel.id}/messages`, "POST", { text: "Moderation test message" });
+      await require("./browser-smoke.cjs")({ base, cookie: admin.cookie, server, dmTarget: member.username });
+    }
+    const notificationPrefs = { defaults: { dm: { mode: "none", sound: "silent" }, server: { mode: "mentions", sound: "inherit" } } };
+    await api(admin.cookie, "/api/notification-preferences", "PUT", { prefs: notificationPrefs });
+    assert.equal((await api(admin.cookie, "/api/notification-preferences")).prefs.defaults.dm.mode, "none");
     const voiceChannel = (await api(member.cookie, route + "/channels")).channels.find(channel => channel.type === "voice");
     assert.equal((await memberSocket.emit("server-select", { serverId: server.id })).ok, true);
     assert.equal((await memberSocket.emit("voice-join", { serverId: server.id, channelId: voiceChannel.id, muted: true })).ok, true);
@@ -152,6 +190,9 @@ async function main() {
       const profile = (await api(member.cookie, "/api/profile/AdminTest")).profile;
       assert.equal(profile.status, status === "invisible" ? "offline" : status);
       assert.equal(profile.online, status !== "invisible");
+      const snapshot = await api(member.cookie, "/api/presence/avatars", "POST", { usernames: ["AdminTest", "UnknownUser"] });
+      assert.equal(snapshot.users[0].status, status === "invisible" ? "offline" : status);
+      assert.equal(snapshot.users[1].status, "offline");
     }
     await api(admin.cookie, "/api/presence/me", "PUT", { status: "invalid" }, 400);
     await api("", "/api/presence/me", "PUT", { status: "online" }, 401);
@@ -164,13 +205,53 @@ async function main() {
     await api(member.cookie, `/api/servers/invite/${server.inviteCode}/join`, "POST", {}, 403);
     await api(admin.cookie, `${route}/bans/${member.id}`, "DELETE");
     await api(member.cookie, `/api/servers/invite/${server.inviteCode}/join`, "POST", {});
+    const deletedAccounts = [];
+    for (const username of ["DeleteFixtureA", "DeleteFixtureB"]) {
+      const victim = await register(username);
+      await api(victim.cookie, "/api/profile/me", "PUT", { description: "PRIVATE PROFILE" });
+      await api(victim.cookie, `/api/servers/invite/${server.inviteCode}/join`, "POST", {});
+      const text = (await api(victim.cookie, route + "/channels")).channels.find(c => c.type === "text");
+      await api(victim.cookie, `${route}/channels/${text.id}/messages`, "POST", { text: "Retained server message" });
+      await api(victim.cookie, "/api/dm/OwnerTest", "POST", { body: "Retained DM" });
+      const response = await fetch(base + "/api/simple-admin/delete-account", { method: "POST", headers: { Authorization: "Bearer disposable-admin-token", "Content-Type": "application/json" }, body: JSON.stringify({ username }) });
+      const result = await response.json();
+      assert.equal(response.status, 200, JSON.stringify(result));
+      assert.equal(result.deleted.username, "Deleted User " + (deletedAccounts.length + 1));
+      assert.equal(result.deleted.id, victim.id, "Stable conversation reference");
+      await api(victim.cookie, "/api/auth/me", "GET", undefined, 401);
+      const deletedName = result.deleted.username;
+      const profile = (await api(owner.cookie, "/api/profile/" + encodeURIComponent(deletedName))).profile;
+      assert.equal(profile.deleted, true); assert.equal(profile.description, ""); assert.equal(profile.online, false);
+      const dm = await api(owner.cookie, "/api/dm/" + encodeURIComponent(deletedName));
+      assert(dm.messages.some(m => m.body === "Retained DM"));
+      const conversations = (await api(owner.cookie, "/api/dm/conversations")).conversations;
+      assert(conversations.some(c => c.user.username === deletedName && c.user.id === victim.id));
+      const ownerSocket = await connect(owner.cookie);
+      const history = await ownerSocket.emit("server-channel-select", { serverId: server.id, channelId: text.id });
+      assert.equal(history.ok, true);
+      assert(history.history.some(m => m.username === deletedName && m.text === "Retained server message"));
+      assert(!JSON.stringify(history).includes(username));
+      await ownerSocket.send("41");
+      await api(owner.cookie, "/api/dm/" + encodeURIComponent(deletedName), "POST", { body: "Cannot send to a deleted user" }, 404);
+      deletedAccounts.push({ victim, deletedName });
+    }
     await stop();
     await start();
+    for (const { victim, deletedName } of deletedAccounts) {
+      await api(victim.cookie, "/api/auth/me", "GET", undefined, 401);
+      assert.equal((await api(owner.cookie, "/api/profile/" + encodeURIComponent(deletedName))).profile.id, victim.id);
+      assert((await api(owner.cookie, "/api/dm/" + encodeURIComponent(deletedName))).messages.some(m => m.body === "Retained DM"));
+    }
+    assert.equal((await api(admin.cookie, "/api/servers")).servers.find(item => item.id === server.id).iconData, iconA, "Icon survives backend restart");
     assert.equal((await api(admin.cookie, "/api/presence/me")).status, "invisible");
+    assert.equal((await api(admin.cookie, "/api/notification-preferences")).prefs.defaults.dm.mode, "none", "Notification preferences persist after restart");
+    const login = await fetch(base + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "AdminTest", password: "test-password-123" }) });
+    assert.equal(login.status, 200);
+    assert.equal((await api(login.headers.get("set-cookie").split(";")[0], "/api/servers")).servers.find(s => s.id === server.id).iconData, iconA, "Icon persists with a newly authenticated session");
     assert.equal((await api(member.cookie, "/api/profile/AdminTest")).profile.status, "offline");
     assert((await api(admin.cookie, route + "/audit")).entries.length > 0);
     for (const asset of ["/manifest.webmanifest", "/people-app-192.png", "/people-app-512.png", "/people-presence.js", "/people-presence.css"]) assert.equal((await fetch(base + asset)).status, 200, asset);
-    console.log("PASS: admin permissions, hierarchy, bans, audit, role profiles, live presence, invisibility, restart persistence, PWA assets.");
+    console.log("PASS: admin permissions, hierarchy, bans, audit, role profiles, live presence, invisibility, successive icons and restart persistence, stable deleted users with retained DM/server histories and revoked sessions, PWA assets.");
   } finally {
     await stop();
     // Only remove the unique disposable directory created by this test.

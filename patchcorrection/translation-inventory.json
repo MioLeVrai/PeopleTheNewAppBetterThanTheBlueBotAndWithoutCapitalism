@@ -1,0 +1,397 @@
+[
+  {
+    "text": "(base64url/base64 ou 64 caractères hex).",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 185,
+        "context": " const err = new Error( \"PEOPLE_MESSAGE_ENCRYPTION_KEY doit contenir exactement 32 octets \" + \"(base64url/base64 ou 64 caractères hex).\" ); "
+      }
+    ]
+  },
+  {
+    "text": "Ajoute cette variable dans Render > Environment avant de démarrer People.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 215,
+        "context": " const err = new Error( \"PEOPLE_MESSAGE_ENCRYPTION_KEY manque. \" + \"Ajoute cette variable dans Render > Environment avant de démarrer People.\" ); "
+      }
+    ]
+  },
+  {
+    "text": "description, created_at ",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 1661,
+        "context": "onst result = await peoplePool.query( \"SELECT id, username, username_key, password_hash, \" + \"description, created_at \" + \"FROM"
+      },
+      {
+        "file": "server.js",
+        "line": 1692,
+        "context": "onst result = await peoplePool.query( \"SELECT id, username, username_key, password_hash, \" + \"description, created_at \" + \"FROM"
+      }
+    ]
+  },
+  {
+    "text": "SET description = $1 ",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 1768,
+        "context": "onst result = await peoplePool.query( \"UPDATE people_accounts \" + \"SET description = $1 \" + \"WHER"
+      }
+    ]
+  },
+  {
+    "text": "RETURNING id, username, description, created_at",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 1770,
+        "context": "onst result = await peoplePool.query( \"UPDATE people_accounts \" + \"SET description = $1 \" + \"WHERE id = $2 \" + \"RETURNING id, username, description, created_at\", [clean"
+      }
+    ]
+  },
+  {
+    "text": "ADD COLUMN IF NOT EXISTS description VARCHAR(280) NOT NULL DEFAULT ''",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 4570,
+        "context": "turn; } await peoplePool.query( \"ALTER TABLE people_accounts \" + \"ADD COLUMN IF NOT EXISTS description VARCHAR(280) NOT NULL DEFAULT ''\" ); awa"
+      }
+    ]
+  },
+  {
+    "text": "people-notification-prefs.local.json",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 8217,
+        "context": "=== const PEOPLE_LOCAL_NOTIFICATION_PREFS = pathAccounts.join( __dirname, \"people-notification-prefs.local.json\" ); const PEOP"
+      }
+    ]
+  },
+  {
+    "text": "/api/notification-preferences",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 8422,
+        "context": "ficationPrefs(store); return prefs; } app.get(\"/api/notification-preferences\", async (req, res) => { try { const session = peopleSessionForRequest(req, res); if (!session"
+      },
+      {
+        "file": "server.js",
+        "line": 8440,
+        "context": "\"ui_ebd0be49fc\") + \"\") }); } }); app.put(\"/api/notification-preferences\", async (req, res) => { try { const session = peopleSessionForRequest(req, res); if (!session) ret"
+      },
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 177,
+        "context": "erver() { try { const data = await api(\"/api/notification-preferences\"); if (dat"
+      },
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 199,
+        "context": "n false; try { const data = await api(\"/api/notification-preferences\", { method: \"PUT\", body: JSON.stringify({ prefs }) }); if (dat"
+      }
+    ]
+  },
+  {
+    "text": " serveur(s) vide(s) nettoyé(s).",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 9621,
+        "context": "ted > 0 ) { console.log( \"[People] \" + deleted + \" serveur(s) vide(s) nettoyé(s).\" ); } "
+      }
+    ]
+  },
+  {
+    "text": "général",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 10992,
+        "context": "sid, \"text\"); if (!text) text = await peopleCreateServerChannel(sid, \"text\", \"général\", null); let vo"
+      },
+      {
+        "file": "server.js",
+        "line": 11015,
+        "context": "s.randomUUID(), serverId: sid, type: \"text\", name: \"général\", pare"
+      },
+      {
+        "file": "server.js",
+        "line": 13033,
+        "context": "hannel(server.id, \"text\"))) { await peopleCreateServerChannel(server.id, \"text\", \"général\", null); } "
+      }
+    ]
+  },
+  {
+    "text": "vocal",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 10994,
+        "context": ", \"voice\"); if (!voice) voice = await peopleCreateServerChannel(sid, \"voice\", \"vocal\", null); await "
+      },
+      {
+        "file": "server.js",
+        "line": 11022,
+        "context": ".randomUUID(), serverId: sid, type: \"voice\", name: \"vocal\", pare"
+      },
+      {
+        "file": "server.js",
+        "line": 13036,
+        "context": "annel(server.id, \"voice\"))) { await peopleCreateServerChannel(server.id, \"voice\", \"vocal\", null); } "
+      }
+    ]
+  },
+  {
+    "text": " serveur(s) + ",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 18943,
+        "context": "IT\" ); console.log( \"[People] Chiffrement messages : \" + migratedGeneral + \" serveur(s) + \" + mig"
+      }
+    ]
+  },
+  {
+    "text": " image(s) migrée(s).",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 18947,
+        "context": "IT\" ); console.log( \"[People] Chiffrement messages : \" + migratedGeneral + \" serveur(s) + \" + migratedDm + \" MP + \" + migratedImages + \" image(s) migrée(s).\" ); "
+      }
+    ]
+  },
+  {
+    "text": " image(s) locale(s) migrée(s).",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 19066,
+        "context": " 1; } } console.log( \"[People] Chiffrement messages local vérifié; \" + migratedLocalImages + \" image(s) locale(s) migrée(s).\" ); } // ="
+      }
+    ]
+  },
+  {
+    "text": "système",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 561,
+        "context": " ).trim(); if ( !username || username.toLocaleLowerCase( \"fr-FR\" ) === \"système\" || userna"
+      },
+      {
+        "file": "public/people-social.js",
+        "line": 2347,
+        "context": "im(); if ( !username || username.toLocaleLowerCase( \"fr-FR\" ) === \"système\" || user"
+      }
+    ]
+  },
+  {
+    "text": "Notification",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2743,
+        "context": " if ( !payload?.silent && \"Notification\" in window && No"
+      },
+      {
+        "file": "public/people-local-controls.js",
+        "line": 507,
+        "context": "eturn \"desktop-native\"; } if (!(\"Notification\" in window)) return \"unsu"
+      },
+      {
+        "file": "public/people-local-controls.js",
+        "line": 911,
+        "context": "in navigator, notificationSupported: \"Notification\" in window, deskt"
+      },
+      {
+        "file": "public/people-social.js",
+        "line": 6436,
+        "context": "ationDecision?.allowed !== false && \"Notification\" in window && No"
+      }
+    ]
+  },
+  {
+    "text": "Reset all notification overrides?",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 266,
+        "context": " \"ui_2603a583cb\": \"Reset All Overrides\", \"ui_a04eafaddc\": \"Reset all notification overrides?\", \"ui_f9434ea"
+      }
+    ]
+  },
+  {
+    "text": "Unknown date",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 592,
+        "context": "ot been synchronized on this device yet.\", \"ui_ad224bb89c\": \"Unknown date\", \"ui_06a6948"
+      }
+    ]
+  },
+  {
+    "text": "No description.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 593,
+        "context": " yet.\", \"ui_ad224bb89c\": \"Unknown date\", \"ui_06a6948209\": \"No description.\", \"ui_68b2b4f"
+      }
+    ]
+  },
+  {
+    "text": "Unable to load notification settings.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 736,
+        "context": "\": \"Unable to mark this channel as read.\", \"ui_ebd0be49fc\": \"Unable to load notification settings.\", \"ui_1493339"
+      }
+    ]
+  },
+  {
+    "text": "Invalid notification settings.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 737,
+        "context": ": \"Unable to load notification settings.\", \"ui_1493339986\": \"Invalid notification settings.\", \"ui_b93d0ab"
+      }
+    ]
+  },
+  {
+    "text": "Too many notification settings.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 738,
+        "context": "339986\": \"Invalid notification settings.\", \"ui_b93d0ab0e7\": \"Too many notification settings.\", \"ui_498474f"
+      }
+    ]
+  },
+  {
+    "text": "Unable to save notification settings.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 739,
+        "context": "ab0e7\": \"Too many notification settings.\", \"ui_498474f13d\": \"Unable to save notification settings.\", \"ui_6b9f0ba"
+      }
+    ]
+  },
+  {
+    "text": "people-notification-prefs-v1:",
+    "uses": [
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 6,
+        "context": "IFICATION_PREFS_CLIENT_V1_START === const STORAGE_PREFIX = \"people-notification-prefs-v1:\"; const SAVE_"
+      }
+    ]
+  },
+  {
+    "text": "/people-notification-prefs.js",
+    "uses": [
+      {
+        "file": "public/people-notifications-sw.js",
+        "line": 25,
+        "context": "dmin-presence\"; const PEOPLE_SHELL_ASSETS = [ \"/people-presence.js\", \"/people-presence.css\", \"/manifest.webmanifest\", \"/people-app-192.png\", \"/people-app-512.png\", \"/\", \""
+      }
+    ]
+  },
+  {
+    "text": "/people-notification-prefs.css",
+    "uses": [
+      {
+        "file": "public/people-notifications-sw.js",
+        "line": 44,
+        "context": "dmin-presence\"; const PEOPLE_SHELL_ASSETS = [ \"/people-presence.js\", \"/people-presence.css\", \"/manifest.webmanifest\", \"/people-app-192.png\", \"/people-app-512.png\", \"/\", \""
+      }
+    ]
+  },
+  {
+    "text": "Choisis la catégorie avec son numéro :\n",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 260,
+        "context": " title: \"Move channel\", description: `Choisis la catégorie avec son numéro :\\n${choices}`, value: "
+      }
+    ]
+  },
+  {
+    "text": "people-settings-notification-sound-v1",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 29,
+        "context": "============= const SOUND_KEYS = { notification: \"people-settings-notification-sound-v1\", ringtone"
+      }
+    ]
+  },
+  {
+    "text": "A softer notification.",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 45,
+        "context": ".PeopleI18n.t(\"ui_5964d46729\") + \"\"), description: \"A softer notification.\" }, {"
+      }
+    ]
+  },
+  {
+    "text": "A retro notification sound.",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 51,
+        "context": "d: \"digital\", name: \"Digital\", description: \"A retro notification sound.\" }, {"
+      }
+    ]
+  },
+  {
+    "text": "A short, bright notification.",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 57,
+        "context": " id: \"pop\", name: \"Pop\", description: \"A short, bright notification.\" } ]; "
+      }
+    ]
+  },
+  {
+    "text": "notification",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 4050,
+        "context": "onFragment .appendChild( soundCard( sound, \"notification\" ) ); "
+      },
+      {
+        "file": "public/people-settings.js",
+        "line": 4148,
+        "context": "ener( \"click\", (event) => { handleSoundClick( event, \"notification\", notifications ); } ); "
+      }
+    ]
+  },
+  {
+    "text": "people-ping-toast people-dm-notification-toast",
+    "uses": [
+      {
+        "file": "public/people-social.js",
+        "line": 6216,
+        "context": "eateElement( \"div\" ); toast.className = \"people-ping-toast people-dm-notification-toast\"; const "
+      }
+    ]
+  }
+]

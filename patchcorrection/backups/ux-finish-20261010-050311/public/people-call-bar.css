@@ -1,0 +1,31 @@
+/* One reserved row above every page, including settings. */
+#peopleCallBar {
+  position: fixed; inset: 0 0 auto; z-index: 5100;
+  height: 40px !important; min-height: 40px !important; max-height: 40px !important;
+  padding: 4px 8px; display: flex; align-items: center; gap: 6px;
+  background: var(--panel); border-bottom: 1px solid var(--people-border, #322b43);
+}
+#peopleCallBar[hidden] { display: none; }
+#peopleCallBar button {
+  flex: 0 1 280px; min-width: 0; height: 30px; padding: 0 10px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border: 1px solid transparent; border-radius: 7px;
+  background: transparent; color: var(--muted); font-size: 12px; text-align: left; cursor: pointer;
+}
+#peopleCallBar button:hover, #peopleCallBar button[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+#peopleCallBar button:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.people-has-calls #peopleAppShell { margin-top: 40px; height: calc(var(--people-viewport-height, 100dvh) - 40px) !important; }
+.people-has-calls #peopleAppShell > * { max-height: calc(var(--people-viewport-height, 100dvh) - 40px) !important; }
+.people-has-calls #peopleAppShell > .main,
+.people-has-calls #peopleAppShell > .home-main,
+.people-has-calls #peopleAppShell > .sidebar,
+.people-has-calls #peopleAppShell > .online-panel,
+.people-has-calls #peopleAppShell > .server-rail { height: calc(var(--people-viewport-height, 100dvh) - 40px) !important; }
+.people-has-calls #peopleSettingsModal { top: 40px; }
+.people-global-remote-media { position: fixed; width: 1px; height: 1px; left: -10px; pointer-events: none; }
+@media (max-width: 480px) { #peopleCallBar button { flex: 1 1 0; padding: 0 5px; font-size: 11px; } }
+@media (max-width: 780px) {
+  .people-has-calls #peopleAppShell > .sidebar,
+  .people-has-calls #peopleAppShell > .online-panel { top: 40px !important; }
+  .people-has-calls .people-mobile-sidebar-toggle { top: calc(47px + env(safe-area-inset-top)) !important; }
+}

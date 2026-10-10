@@ -4,10 +4,16 @@ const path = require("node:path");
 const os = require("node:os");
 const { spawn } = require("node:child_process");
 
-module.exports = async ({ base, cookie, peerCookie, targets, answer }) => {
+module.exports = async ({ base, cookie, peerCookie, targetCookies, targets, answer }) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "people-calls-browser-test-"));
+  const fakeAudio = path.join(dir, "speaking-tone.wav");
+  const sampleRate = 48000, durationSeconds = 120, samples = sampleRate * durationSeconds;
+  const wav = Buffer.alloc(44 + samples * 2);
+  wav.write("RIFF", 0); wav.writeUInt32LE(wav.length - 8, 4); wav.write("WAVEfmt ", 8); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(sampleRate, 24); wav.writeUInt32LE(sampleRate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write("data", 36); wav.writeUInt32LE(samples * 2, 40);
+  for (let index = 0; index < samples; index++) wav.writeInt16LE(Math.round(Math.sin(index * 2 * Math.PI * 440 / sampleRate) * 8192), 44 + index * 2);
+  fs.writeFileSync(fakeAudio, wav);
   const browser = spawn("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", [
-    "--headless=new", "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+    "--headless=new", "--use-fake-device-for-media-stream", `--use-file-for-fake-audio-capture=${fakeAudio.replace(/\\/g, "/")}`, "--use-fake-ui-for-media-stream", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
     "--remote-debugging-port=0", `--user-data-dir=${dir}`, "about:blank"
   ], { windowsHide: true, stdio: "ignore" });
   let ws;
@@ -52,7 +58,7 @@ module.exports = async ({ base, cookie, peerCookie, targets, answer }) => {
     };
     const waitFor = async expression => {
       for (let i = 0; i < 100; i++) { if (await evaluate(expression)) return; await delay(100); }
-      const state = await evaluate('({ dm: document.getElementById("dmHeaderName")?.textContent, calls: window.PeopleDmCalls?.getStates(), statuses: [...document.querySelectorAll(".people-dm-call-identity span")].map(n => n.textContent) })');
+      const state = await evaluate('({ dm: document.getElementById("dmHeaderName")?.textContent, calls: window.PeopleDmCalls?.getStates(), statuses: [...document.querySelectorAll(".people-dm-call-identity span")].map(n => n.textContent), avatars: [...document.querySelectorAll(".people-dm-call-avatar")].map(avatar => ({ username: avatar.dataset.peopleAvatarUsername, speaking: avatar.classList.contains("people-speaking") })) })');
       throw new Error("Browser wait failed: " + expression + "\n" + JSON.stringify(state) + "\n" + exceptions.join("\n"));
     };
     primarySession = (await command("Target.attachToTarget", { targetId: debugTargets.find(target => target.type === "page").id, flatten: true })).sessionId;
@@ -73,6 +79,24 @@ module.exports = async ({ base, cookie, peerCookie, targets, answer }) => {
       await delay(100);
     }
     assert.equal(networkPending.size, 0, "Initial application requests finished");
+    const dmClients = [];
+    for (const clientCookie of targetCookies || []) {
+      const context = await command("Target.createBrowserContext");
+      const target = await command("Target.createTarget", { url: "about:blank", browserContextId: context.browserContextId });
+      const session = (await command("Target.attachToTarget", { targetId: target.targetId, flatten: true })).sessionId;
+      await command("Runtime.enable", {}, session); await command("Page.enable", {}, session); await command("Network.enable", {}, session);
+      const split = clientCookie.indexOf("=");
+      await command("Network.setCookie", { name: clientCookie.slice(0, split), value: clientCookie.slice(split + 1), url: base, httpOnly: true }, session);
+      await command("Page.navigate", { url: base }, session);
+      const evaluateClient = async expression => {
+        const result = await command("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }, session);
+        if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
+        return result.result.value;
+      };
+      for (let i=0;i<100 && !await evaluateClient('Boolean(window.PeopleDmCalls && window.peopleSocket?.connected && document.getElementById("joinScreen").classList.contains("hidden"))');i++) await delay(100);
+      assert.equal(await evaluateClient('Boolean(window.PeopleDmCalls && window.peopleSocket?.connected)'), true);
+      dmClients.push(evaluateClient);
+    }
     assert.equal(await evaluate('window.PeopleDmCalls.getStates().length'), 2);
     const startCall = async username => {
       await evaluate(`window.PeopleSocialNavigation.openDm(${JSON.stringify(username)})`);
@@ -84,9 +108,27 @@ module.exports = async ({ base, cookie, peerCookie, targets, answer }) => {
     await delay(3100);
     await startCall(targets[1]);
     await waitFor('window.PeopleDmCalls.getStates().filter(s => s.exists).length === 2');
-    for (let i = 0; i < 2; i++) await answer(i, await evaluate(`window.PeopleDmCalls.getStates()[${i}].callId`));
+    for (let i = 0; i < 2; i++) {
+      if (dmClients[i]) {
+        assert.equal(await dmClients[i]('window.PeopleDmCalls.getStates().some(s => s.phase === "incoming")'), true);
+        await dmClients[i]('document.getElementById("peopleDmCallAccept").click()');
+      } else await answer(i, await evaluate(`window.PeopleDmCalls.getStates()[${i}].callId`));
+    }
     assert.equal(await evaluate('new Set(window.PeopleDmCalls.getStates().map(s => s.callId)).size'), 2);
     await waitFor('window.PeopleDmCalls.getStates().every(s => s.phase === "active")');
+    await waitFor('["peopleDmCallRemoteAudio", "peopleDmCallRemoteAudioSecond"].every(id => { const a=document.getElementById(id); return a.srcObject?.getAudioTracks().length && !a.paused && a.readyState >= 2; })');
+    await command("Input.dispatchMouseEvent", { type: "mousePressed", x: 1, y: 1, button: "left", clickCount: 1 });
+    await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 1, y: 1, button: "left", clickCount: 1 });
+    const dmEnergies = await evaluate(`(async () => {
+      const context=new AudioContext(); await context.resume();
+      const meters=["peopleDmCallRemoteAudio","peopleDmCallRemoteAudioSecond"].map(id=>{ const source=context.createMediaStreamSource(document.getElementById(id).srcObject),analyser=context.createAnalyser(); source.connect(analyser);return {id,source,analyser,data:new Float32Array(analyser.fftSize),max:0,speaking:false}; });
+      for(let i=0;i<80;i++){for(const m of meters){m.analyser.getFloatTimeDomainData(m.data);m.max=Math.max(m.max,Math.sqrt(m.data.reduce((sum,v)=>sum+v*v,0)/m.data.length));m.speaking ||= document.getElementById(m.id.replace("RemoteAudio", "Overlay")).querySelector(".people-dm-call-avatar").classList.contains("people-speaking");}await new Promise(r=>setTimeout(r,50));}
+      meters.forEach(m=>{m.source.disconnect();m.analyser.disconnect();});await context.close();return meters.map(({id,max,speaking})=>({id,max,speaking}));
+    })()`);
+    assert(dmEnergies.every(m=>m.max>.001), "Both private calls receive non-silent audio: " + JSON.stringify(dmEnergies));
+    console.log("PASS: measured audio energy in two simultaneous private calls: " + JSON.stringify(dmEnergies));
+    assert(dmEnergies.every(m=>m.speaking), "Both private-call speaking indicators react to their non-silent audio: " + JSON.stringify(dmEnergies));
+    console.log("PASS: actual audio drives both private-call speaking indicators while non-silent audio is received.");
     const checkBar = async (count = 2) => {
       await waitFor('document.querySelectorAll("#peopleCallBar button").length === ' + count);
       const geometry = await evaluate('({style:document.getElementById("peopleCallBar").outerHTML,css:["height","minHeight","maxHeight","padding","boxSizing","transform","zoom"].map(k=>[k,getComputedStyle(document.getElementById("peopleCallBar"))[k]]),bar:document.getElementById("peopleCallBar").getBoundingClientRect().toJSON(), viewport:[innerWidth,innerHeight], buttons:[...document.querySelectorAll("#peopleCallBar button")].map(b=>{ const r=b.getBoundingClientRect(); return {rect:r.toJSON(),hit:document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.outerHTML}; })})');
@@ -98,7 +140,7 @@ module.exports = async ({ base, cookie, peerCookie, targets, answer }) => {
     const initialIds = await evaluate('window.PeopleDmCalls.getStates().map(s => s.callId)');
     await checkBar();
     await evaluate('window.peopleSocket.disconnect(); window.peopleSocket.connect(); void 0');
-    await waitFor('window.peopleSocket.connected && window.PeopleDmCalls.getStates().every(s => s.phase === "active") && document.querySelector(\'section[aria-label="Utilisateurs en double appel"]\').textContent.includes("BrowserCaller")');
+    await waitFor('window.peopleSocket.connected && window.PeopleDmCalls.getStates().every(s => s.phase === "active") && document.querySelector(\'section[aria-label="Users in two calls"]\')?.textContent.includes("BrowserCaller")');
     assert.deepEqual(await evaluate('window.PeopleDmCalls.getStates().map(s => s.callId)'), initialIds, "DM sessions rejoined after transport reconnect");
     for (const width of [320, 390, 1440]) {
       await command("Emulation.setDeviceMetricsOverride", { width, height: width === 320 ? 568 : 900, deviceScaleFactor: 1, mobile: width < 500 });
@@ -168,7 +210,7 @@ module.exports = async ({ base, cookie, peerCookie, targets, answer }) => {
     assert.deepEqual(await evaluate('window.PeopleDmCalls.getStates().map(s => s.callId)'), initialIds, "DM ids preserved across navigation");
     assert.equal(await evaluate('window.PeopleDmCalls.getStates().every(s => s.phase === "active")'), true);
     await evaluate('document.getElementById("peopleSettingsButton").click()');
-    const privacyInput = '[...document.querySelectorAll("#peopleSettingsModal label")].find(n => n.textContent.includes("double appel")).querySelector("input")';
+    const privacyInput = 'document.querySelector("#peopleSettingsModal input[data-call-privacy]")';
     await waitFor('!(' + privacyInput + ').disabled');
     await evaluate('(' + privacyInput + ').click()');
     await waitFor('document.getElementById("peopleCallBar").textContent.includes(' + JSON.stringify(targets[0]) + ')');
@@ -217,6 +259,26 @@ module.exports = async ({ base, cookie, peerCookie, targets, answer }) => {
     await waitFor('[...document.querySelectorAll(".people-global-remote-media")].some(v => v.srcObject?.getAudioTracks().length && !v.paused && v.readyState >= 2)');
     for (let i = 0; i < 100 && !await peerEval('[...document.querySelectorAll("#audioContainer audio")].some(a => a.srcObject?.getAudioTracks().length && !a.paused && a.readyState >= 2)'); i++) await delay(100);
     assert.equal(await peerEval('[...document.querySelectorAll("#audioContainer audio")].some(a => a.srcObject?.getAudioTracks().length && !a.paused && a.readyState >= 2)'), true, "Secondary voice carries real bidirectional WebRTC audio");
+    assert.equal(await peerEval('window.PeopleServerRuntime.joinVoiceChannel(' + JSON.stringify(fixture.first.id) + ')'), true);
+    await waitFor('["server-primary", "server-secondary"].every(id => window.PeopleCallBar.getServerController(id).getAudioSamples().some(s => s.username === "BrowserVoicePeer" && s.stream?.getAudioTracks().some(t => t.readyState === "live")))');
+    const energies = await evaluate(`(async () => {
+      const context = new AudioContext(); await context.resume();
+      const meters = ["server-primary", "server-secondary"].map(id => {
+        const sample = window.PeopleCallBar.getServerController(id).getAudioSamples().find(s => s.username === "BrowserVoicePeer");
+        const source = context.createMediaStreamSource(sample.stream), analyser = context.createAnalyser(); source.connect(analyser);
+        return {id, source, analyser, data:new Float32Array(analyser.fftSize), max:0};
+      });
+      for (let i=0;i<80;i++) { for(const m of meters) { m.analyser.getFloatTimeDomainData(m.data); m.max=Math.max(m.max,Math.sqrt(m.data.reduce((sum,v)=>sum+v*v,0)/m.data.length)); } await new Promise(r=>setTimeout(r,50)); }
+      meters.forEach(m=>{m.source.disconnect();m.analyser.disconnect();}); await context.close();
+      return meters.map(({id,max})=>({id,max}));
+    })()`);
+    assert(energies.every(m => m.max > .001), "Both calls receive non-silent fake-device audio: " + JSON.stringify(energies));
+    console.log("PASS: measured non-zero audio energy in both simultaneous voice calls: " + JSON.stringify(energies));
+    await waitFor('document.querySelector(\'#videoStageSecond [data-people-avatar-username="BrowserVoicePeer"]\')?.classList.contains("people-speaking")');
+    await peerEval('window.PeopleCallBar.getServerController("server-primary").mute()');
+    await waitFor('!document.querySelector(\'#videoStageSecond [data-people-avatar-username="BrowserVoicePeer"]\')?.classList.contains("people-speaking") && document.querySelector(\'#videoStage [data-people-avatar-username="BrowserVoicePeer"]\')?.classList.contains("people-speaking")');
+    await peerEval('window.PeopleCallBar.getServerController("server-primary").mute()');
+    console.log("PASS: voice speaking indicators are independent when the same participant speaks in two calls.");
     await checkBar();
     await navigate();
     assert.deepEqual(await evaluate('window.PeopleCallBar.getStates().map(s => s.channelId).sort()'), [fixture.first.id, fixture.second.id].sort(), "Two server sessions retained");
@@ -260,20 +322,24 @@ module.exports = async ({ base, cookie, peerCookie, targets, answer }) => {
     const other = await evaluate('(async () => { const server = (await (await fetch("/api/servers", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:"Other browser server"})})).json()).server; const voice = (await (await fetch("/api/servers/" + server.id + "/channels")).json()).channels.find(c => c.type === "voice"); await window.PeopleServers.refresh(); return {server,voice}; })()');
     await evaluate('window.PeopleServers.openServer(' + JSON.stringify(other.server) + ')');
     await checkBar();
-    const moveSecondary = async channelId => {
+    const rejoinSecondary = async (server, channelId) => {
       await evaluate('window.PeopleCallBar.open("server-secondary")');
       await waitFor('!document.getElementById("videoStageSecond").classList.contains("hidden")');
-      await evaluate('document.querySelector("#videoStageSecond select").blur(); document.querySelector("#videoStageSecond select").focus()');
-      await waitFor('[...document.querySelector("#videoStageSecond select").options].some(o => o.value === ' + JSON.stringify(channelId) + ')');
-      await evaluate('(() => { const move = document.querySelector("#videoStageSecond select"); move.value = ' + JSON.stringify(channelId) + '; move.dispatchEvent(new Event("change")); })()');
+      assert.equal(await evaluate('Boolean(document.querySelector(".people-server-call-move"))'), false, "No dedicated call movement control");
+      await evaluate('document.querySelector("#videoStageSecond [data-people-server-call-control=leave]").click()');
+      await checkBar(1);
+      assert.equal(await evaluate('window.PeopleCallBar.getStates()[0].channelId'), fixture.first.id, "Leaving the secondary preserves the primary voice");
+      await evaluate('window.PeopleServers.openServer(' + JSON.stringify(server) + ')');
+      await evaluate('window.PeopleServerRuntime.joinVoiceChannel(' + JSON.stringify(channelId) + ')');
+      await checkBar();
     };
-    await moveSecondary(other.voice.id);
+    await rejoinSecondary(other.server, other.voice.id);
     await waitFor('window.PeopleCallBar.getStates().find(s => s.id === "server-secondary").serverId === ' + JSON.stringify(other.server.id));
-    assert.equal(await evaluate('window.PeopleCallBar.getStates().find(s => s.id === "server-primary").channelId'), fixture.first.id, "Moving the secondary call preserves the primary voice");
+    assert.equal(await evaluate('window.PeopleCallBar.getStates().find(s => s.id === "server-primary").channelId'), fixture.first.id, "Joining another server preserves the primary voice");
     await evaluate('window.PeopleCallBar.close()');
     await checkBar();
     await evaluate('window.PeopleServers.openServer(' + JSON.stringify(fixture.server) + ')');
-    await moveSecondary(fixture.second.id);
+    await rejoinSecondary(fixture.server, fixture.second.id);
     await waitFor('window.PeopleCallBar.getStates().find(s => s.id === "server-secondary").channelId === ' + JSON.stringify(fixture.second.id));
     await waitFor('[...document.querySelectorAll(".people-global-remote-media")].some(v => v.srcObject?.getAudioTracks().length && !v.paused && v.readyState >= 2)');
     await evaluate('window.PeopleCallBar.open("server-primary")');
@@ -292,7 +358,7 @@ module.exports = async ({ base, cookie, peerCookie, targets, answer }) => {
     await evaluate('document.querySelector("#videoStage [data-people-server-call-control=leave]").click()');
     await waitFor('window.PeopleCallBar.getStates().length === 0 && document.getElementById("peopleCallBar").hidden && !document.body.classList.contains("people-has-calls")');
     assert.deepEqual(exceptions, [], "Browser JavaScript errors");
-    console.log("PASS: real browser original DM panels and independent pointer resizing, native server stages and secondary camera, compact global bar, two accepted DMs, mixed calls, two server voices in one tab, bidirectional WebRTC audio with another browser, navigation through DMs/servers/text/settings, cross-server move preserving the other call, 320/390/1440 widths and reachable composer, privacy including titles, independent microphones/sound/hangup, DM/primary/secondary reconnect, clean final hide, no JavaScript errors.");
+    console.log("PASS: real browser original DM panels and independent pointer resizing, native server stages and secondary camera, compact global bar, two accepted DMs, mixed calls, two server voices in one tab, bidirectional WebRTC audio with another browser, navigation through DMs/servers/text/settings, cross-server leave and join preserving the other call, 320/390/1440 widths and reachable composer, privacy including titles, independent microphones/sound/hangup, DM/primary/secondary reconnect, clean final hide, no JavaScript errors.");
   } finally {
     ws?.close(); browser.kill(); await delay(1000);
     assert(path.dirname(dir) === os.tmpdir() && path.basename(dir).startsWith("people-calls-browser-test-"));

@@ -1,0 +1,11 @@
+.people-audio-unlock { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); z-index: 6500; border: 1px solid var(--muted); border-radius: 12px; padding: 10px 16px; background: var(--panel); color: var(--text); cursor: pointer; }
+.people-audio-unlock[hidden] { display: none; }
+.people-speaking { outline: 3px solid #23a55a; outline-offset: 2px; }
+.people-server-call-participants { display: flex; flex-wrap: wrap; gap: 12px; }
+.people-call-participant { display: inline-flex; align-items: center; gap: 8px; }
+.people-call-participant-avatar { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--brand); flex: 0 0 auto; }
+.people-call-camera-picker { max-width: min(190px, 100%); min-width: 0; min-height: 32px; border-radius: 6px; background: var(--input); color: var(--text); border: 1px solid var(--muted); }
+#authError[data-state="loading"], #authError[data-state="success"] { color: var(--muted) !important; }
+#authError[data-state="loading"]::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: people-connecting 1s linear infinite; }
+@keyframes people-connecting { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { #authError[data-state="loading"]::before { animation: none; } }

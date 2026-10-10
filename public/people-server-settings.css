@@ -1048,3 +1048,7 @@ body.people-server-settings-open {
   }
 }
 /* === PEOPLE_SERVER_MODERATION_PERMISSIONS_V1_CSS_END === */
+.people-role-card[hidden], .people-role-choices[hidden], .people-role-create-card[hidden] { display: none !important; }
+.people-members-tabs, .people-role-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.people-members-tabs button, .people-role-choices button { padding: 10px 14px; border: 1px solid var(--muted); border-radius: 8px; background: var(--input); color: var(--text); cursor: pointer; }
+.people-channel-permissions { max-height: calc(100dvh - 24px); overflow-y: auto; }

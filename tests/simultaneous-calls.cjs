@@ -105,7 +105,7 @@ async function main() {
     if (process.argv.includes("--browser")) {
       const browserUser = await register("BrowserCaller");
       const browserPeer = await register("BrowserVoicePeer");
-      await require("./simultaneous-calls-browser.cjs")({ base, cookie: browserUser.cookie, peerCookie: browserPeer.cookie, targets: [b.username, c.username, d.username], answer: async (index, callId) => {
+      await require("./simultaneous-calls-browser.cjs")({ base, cookie: browserUser.cookie, peerCookie: browserPeer.cookie, targetCookies: [b.cookie, c.cookie], targets: [b.username, c.username, d.username], answer: async (index, callId) => {
         assert.equal((await [sb, sc][index].emit("dm-call-answer", { callId })).ok, true);
       } });
     }
@@ -137,12 +137,12 @@ async function main() {
     assert.equal((await sc.emit("dm-call-answer", { callId: second.callId })).ok, true);
     const third = await sa2.emit("dm-call-start", { targetUsername: d.username });
     assert.equal(third.ok, false);
-    assert.match(third.error, /limite de 2 appels/);
+    assert.match(third.error, /limit of two simultaneous calls/);
     assert.equal((await voice(sa3, v1)).code, "VOICE_LIMIT");
     const e = await register("CallErin");
     const se = await connect(e.cookie);
     const incoming = await se.emit("dm-call-start", { targetUsername: a.username });
-    assert.equal(incoming.ok, false); assert.match(incoming.error, /limite de 2 appels/);
+    assert.equal(incoming.ok, false); assert.match(incoming.error, /limit of two simultaneous calls/);
     assert.equal((await sa3.emit("dm-call-answer", { callId: pendingIncoming.callId })).reason, "limit", "answer also enforces global quota");
     await barrier(sa);
     assert.deepEqual(lastPresence(sa), { accountId: a.id, username: a.username, doubleCall: true });

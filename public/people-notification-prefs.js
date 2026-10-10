@@ -7,25 +7,25 @@
   const SAVE_DELAY = 350;
 
   const MODE_OPTIONS = [
-    ["inherit", "Hériter"],
-    ["all", "Tous les messages"],
-    ["mentions", "Mentions seulement"],
-    ["none", "Rien"]
+    ["inherit", "Default"],
+    ["all", ("" + window.PeopleI18n.t("ui_020dc04d53") + "")],
+    ["mentions", ("" + window.PeopleI18n.t("ui_f5cc59e9dd") + "")],
+    ["none", ("" + window.PeopleI18n.t("ui_dc937b5989") + "")]
   ];
 
   const DEFAULT_MODE_OPTIONS = [
-    ["all", "Tous les messages"],
-    ["mentions", "Mentions seulement"],
-    ["none", "Rien"]
+    ["all", ("" + window.PeopleI18n.t("ui_020dc04d53") + "")],
+    ["mentions", ("" + window.PeopleI18n.t("ui_f5cc59e9dd") + "")],
+    ["none", ("" + window.PeopleI18n.t("ui_dc937b5989") + "")]
   ];
 
   const SOUND_OPTIONS = [
-    ["inherit", "Son global People"],
-    ["classic", "People classique"],
-    ["soft", "Doux"],
+    ["inherit", ("" + window.PeopleI18n.t("ui_2ada042a00") + "")],
+    ["classic", "People Classic"],
+    ["soft", ("" + window.PeopleI18n.t("ui_5964d46729") + "")],
     ["digital", "Digital"],
     ["pop", "Pop"],
-    ["silent", "Silencieux"]
+    ["silent", ("" + window.PeopleI18n.t("ui_ddbcf06726") + "")]
   ];
 
   const MUTE_OPTIONS = [
@@ -33,7 +33,7 @@
     [60 * 60 * 1000, "1 h"],
     [8 * 60 * 60 * 1000, "8 h"],
     [24 * 60 * 60 * 1000, "24 h"],
-    [7 * 24 * 60 * 60 * 1000, "7 jours"]
+    [7 * 24 * 60 * 60 * 1000, "7 days"]
   ];
 
   const DEFAULT_PREFS = Object.freeze({
@@ -165,7 +165,7 @@
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = new Error(data?.error || `Erreur HTTP ${response.status}`);
+      const error = new Error(data?.error || `HTTP error ${response.status}`);
       error.status = response.status;
       throw error;
     }
@@ -323,11 +323,11 @@
 
   function muteLabel(until) {
     const value = activeMute(until);
-    if (!value) return "Pas en sourdine";
+    if (!value) return ("" + window.PeopleI18n.t("ui_0214d61355") + "");
     const delta = value - Date.now();
     if (delta < 60 * 60 * 1000) return `Sourdine encore ${Math.max(1, Math.ceil(delta / 60000))} min`;
     if (delta < 24 * 60 * 60 * 1000) return `Sourdine encore ${Math.ceil(delta / 3600000)} h`;
-    return `Sourdine jusqu'au ${new Date(value).toLocaleString("fr-FR")}`;
+    return `Sourdine jusqu'au ${new Date(value).toLocaleString("en-US")}`;
   }
 
   function optionMarkup(options, selected) {
@@ -351,24 +351,24 @@
           <p id="peopleNotifSubtitle"></p>
         </div>
         <label class="people-notif-field">
-          <span>Recevoir</span>
+          <span>${window.PeopleI18n.t("ui_bac9d15ad9")}</span>
           <select id="peopleNotifMode"></select>
         </label>
         <label class="people-notif-field">
-          <span>Son</span>
+          <span>${window.PeopleI18n.t("ui_46124e0236")}</span>
           <div class="people-notif-sound-row">
             <select id="peopleNotifSound"></select>
-            <button id="peopleNotifPreview" type="button">▶ Tester</button>
+            <button id="peopleNotifPreview" type="button">${window.PeopleI18n.t("ui_c7b1dae4c2")}</button>
           </div>
         </label>
         <div class="people-notif-field">
-          <span>Sourdine temporaire</span>
+          <span>${window.PeopleI18n.t("ui_2fec317d73")}</span>
           <small id="peopleNotifMuteStatus"></small>
           <div class="people-notif-mute-grid" id="peopleNotifMuteGrid"></div>
         </div>
         <div class="people-notif-actions">
-          <button id="peopleNotifReset" class="people-notif-secondary" type="button">Réinitialiser l'exception</button>
-          <button class="people-notif-primary" type="button" data-notif-close="1">Terminé</button>
+          <button id="peopleNotifReset" class="people-notif-secondary" type="button">${window.PeopleI18n.t("ui_9eb37a0eb5")}</button>
+          <button class="people-notif-primary" type="button" data-notif-close="1">${window.PeopleI18n.t("ui_11a6767d56")}</button>
         </div>
       </section>
     `;
@@ -420,7 +420,7 @@
 
     const clearMute = document.createElement("button");
     clearMute.type = "button";
-    clearMute.textContent = "Retirer";
+    clearMute.textContent = ("" + window.PeopleI18n.t("ui_c3812fc4ac") + "");
     clearMute.className = "people-notif-unmute";
     clearMute.addEventListener("click", () => {
       if (!currentScope) return;
@@ -441,10 +441,10 @@
     box.querySelector("#peopleNotifTitle").textContent = currentScope.label || "Notifications";
     box.querySelector("#peopleNotifSubtitle").textContent =
       currentScope.kind === "dm"
-        ? "Réglages pour cette conversation privée."
+        ? ("" + window.PeopleI18n.t("ui_b72b472805") + "")
         : currentScope.kind === "server"
-          ? "Réglages pour tout ce serveur. Les salons peuvent avoir leur propre exception."
-          : "Réglages pour ce salon. Ils remplacent ceux du serveur.";
+          ? ("" + window.PeopleI18n.t("ui_bf612b99f0") + "")
+          : ("" + window.PeopleI18n.t("ui_1546678a84") + "");
 
     box.querySelector("#peopleNotifMode").innerHTML = optionMarkup(MODE_OPTIONS, override.mode);
     box.querySelector("#peopleNotifSound").innerHTML = optionMarkup(SOUND_OPTIONS, override.sound);
@@ -495,29 +495,29 @@
       <div class="people-settings-page-head">
         <span>NOTIFICATIONS</span>
         <h2>Notifications</h2>
-        <p>Choisis ce qui te prévient. Les exceptions se règlent aussi avec clic droit sur un MP, un serveur ou un salon.</p>
+        <p>${window.PeopleI18n.t("ui_d0435b48ad")}</p>
       </div>
       <div class="people-settings-section people-notif-settings-section">
-        <div class="people-settings-section-title"><div><strong>Notifications système</strong><span id="peopleNotifPermissionText">Vérification…</span></div></div>
-        <button id="peopleNotifPermissionButton" class="people-settings-secondary" type="button">Autoriser les notifications</button>
+        <div class="people-settings-section-title"><div><strong>${window.PeopleI18n.t("ui_2e7cb51b68")}</strong><span id="peopleNotifPermissionText">${window.PeopleI18n.t("ui_2e5f79bb94")}</span></div></div>
+        <button id="peopleNotifPermissionButton" class="people-settings-secondary" type="button">${window.PeopleI18n.t("ui_fd38660732")}</button>
       </div>
       <div class="people-settings-section people-notif-settings-section">
-        <div class="people-settings-section-title"><div><strong>Messages privés — valeur par défaut</strong><span>S'applique aux MP sans exception individuelle.</span></div></div>
+        <div class="people-settings-section-title"><div><strong>${window.PeopleI18n.t("ui_7e3ad44b59")}</strong><span>${window.PeopleI18n.t("ui_0560e1c986")}</span></div></div>
         <div class="people-notif-default-grid">
-          <label><span>Recevoir</span><select id="peopleNotifDefaultDmMode"></select></label>
-          <label><span>Son</span><select id="peopleNotifDefaultDmSound"></select></label>
+          <label><span>${window.PeopleI18n.t("ui_bac9d15ad9")}</span><select id="peopleNotifDefaultDmMode"></select></label>
+          <label><span>${window.PeopleI18n.t("ui_46124e0236")}</span><select id="peopleNotifDefaultDmSound"></select></label>
         </div>
       </div>
       <div class="people-settings-section people-notif-settings-section">
-        <div class="people-settings-section-title"><div><strong>Serveurs — valeur par défaut</strong><span>Les réglages d'un serveur, puis d'un salon, prennent priorité.</span></div></div>
+        <div class="people-settings-section-title"><div><strong>${window.PeopleI18n.t("ui_26815c4d0b")}</strong><span>${window.PeopleI18n.t("ui_00350653f1")}</span></div></div>
         <div class="people-notif-default-grid">
-          <label><span>Recevoir</span><select id="peopleNotifDefaultServerMode"></select></label>
-          <label><span>Son</span><select id="peopleNotifDefaultServerSound"></select></label>
+          <label><span>${window.PeopleI18n.t("ui_bac9d15ad9")}</span><select id="peopleNotifDefaultServerMode"></select></label>
+          <label><span>${window.PeopleI18n.t("ui_46124e0236")}</span><select id="peopleNotifDefaultServerSound"></select></label>
         </div>
       </div>
       <div class="people-settings-section people-notif-settings-section">
-        <div class="people-settings-section-title"><div><strong>Exceptions</strong><span>Réinitialise tous les réglages spécifiques MP / serveurs / salons.</span></div></div>
-        <button id="peopleNotifResetAll" class="people-settings-secondary" type="button">Réinitialiser toutes les exceptions</button>
+        <div class="people-settings-section-title"><div><strong>Exceptions</strong><span>${window.PeopleI18n.t("ui_1c9e6133ec")}</span></div></div>
+        <button id="peopleNotifResetAll" class="people-settings-secondary" type="button">${window.PeopleI18n.t("ui_2603a583cb")}</button>
       </div>
     `;
 
@@ -561,7 +561,7 @@
     });
 
     page.querySelector("#peopleNotifResetAll")?.addEventListener("click", () => {
-      if (!confirm("Réinitialiser toutes les exceptions de notifications ?")) return;
+      if (!confirm(("" + window.PeopleI18n.t("ui_a04eafaddc") + ""))) return;
       prefs.dms = {};
       prefs.servers = {};
       prefs.channels = {};
@@ -574,11 +574,11 @@
 
   function permissionText() {
     const permission = window.PeopleNotifications?.permission;
-    if (permission === "desktop-native") return "Gérées par l'application de bureau.";
-    if (permission === "granted") return "Autorisées sur cet appareil.";
-    if (permission === "denied") return "Bloquées par le navigateur / système.";
-    if (permission === "unsupported") return "Non prises en charge dans cet environnement.";
-    return "Autorisation nécessaire pour les notifications système.";
+    if (permission === "desktop-native") return ("" + window.PeopleI18n.t("ui_f9434ea233") + "");
+    if (permission === "granted") return ("" + window.PeopleI18n.t("ui_f16d35cc58") + "");
+    if (permission === "denied") return ("" + window.PeopleI18n.t("ui_91e6528e5c") + "");
+    if (permission === "unsupported") return "Not supported in this environment.";
+    return ("" + window.PeopleI18n.t("ui_d6c6e21d70") + "");
   }
 
   function refreshUi() {
@@ -653,7 +653,7 @@
       return {
         kind: "server",
         serverId: server.dataset.serverId,
-        label: `Serveur — ${server.title || "Serveur"}`,
+        label: `Server — ${server.title || ("" + window.PeopleI18n.t("ui_aef7de28d5") + "")}`,
         menuSelector: ".people-server-context-menu",
         itemClass: "people-server-context-item"
       };
@@ -663,12 +663,12 @@
     if (channel) {
       const state = window.PeopleServerChannels?.getState?.();
       const serverId = String(state?.serverId || window.PeopleServers?.getActiveServer?.()?.id || "");
-      const name = channel.querySelector(".people-server-channel-name")?.textContent?.trim() || "salon";
+      const name = channel.querySelector(".people-server-channel-name")?.textContent?.trim() || "channel";
       return {
         kind: "channel",
         serverId,
         channelId: channel.dataset.channelId,
-        label: `Salon — #${name}`,
+        label: `Channel — #${name}`,
         menuSelector: ".people-channel-context-menu",
         itemClass: "people-channel-menu-item"
       };

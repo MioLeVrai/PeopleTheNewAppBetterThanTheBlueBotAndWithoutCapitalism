@@ -19,7 +19,7 @@
   function bridge() {
     const value = window.PeopleE2EEDevice;
     if (!value?.ensureDevice || !window.crypto?.subtle || !window.indexedDB) {
-      throw new Error("E2EE People indisponible sur cet appareil.");
+      throw new Error("People E2EE is unavailable on this device.");
     }
     return value;
   }
@@ -35,7 +35,7 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
-      const error = new Error(data?.error || "Erreur E2EE serveur.");
+      const error = new Error(data?.error || ("" + window.PeopleI18n.t("ui_3a694932fb") + ""));
       error.code = data?.code || "E2EE_SERVER_ERROR";
       error.status = response.status;
       error.data = data;
@@ -58,7 +58,7 @@
         }
       };
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error("IndexedDB E2EE serveur indisponible."));
+      request.onerror = () => reject(request.error || new Error(("" + window.PeopleI18n.t("ui_f4965bf3ce") + "")));
     });
     return dbPromise;
   }
@@ -250,7 +250,7 @@
 
   async function unwrapChannelKey(payload, device, state, serverId, channelId) {
     if (!payload?.iv || !payload?.ct || !state?.sender?.publicJwk) {
-      throw new Error("Enveloppe E2EE du salon incomplète.");
+      throw new Error(("" + window.PeopleI18n.t("ui_b6a4330b90") + ""));
     }
     const wrapKey = await deriveWrapKey(device, state.sender.publicJwk, {
       serverId,
@@ -279,7 +279,7 @@
     );
     const commitment = await keyCommitment(raw);
     if (!state.commitment || commitment !== String(state.commitment)) {
-      throw new Error("La clé E2EE du salon ne correspond pas à son engagement cryptographique.");
+      throw new Error(("" + window.PeopleI18n.t("ui_dd607bb1dc") + ""));
     }
     return importChannelKey(raw);
   }
@@ -306,7 +306,7 @@
 
   async function uploadPackages(serverId, channelId, epoch, device, rawKey) {
     const recipients = await loadRecipients(serverId, channelId, epoch, device.deviceId);
-    if (!recipients.length) throw new Error("Aucun appareil E2EE autorisé dans ce salon.");
+    if (!recipients.length) throw new Error(("" + window.PeopleI18n.t("ui_3a1b815335") + ""));
 
     for (let offset = 0; offset < recipients.length; offset += 25) {
       const page = recipients.slice(offset, offset + 25);
@@ -376,7 +376,7 @@
       memoryRaw.delete(pendingId);
       rawKey = crypto.getRandomValues(new Uint8Array(32));
       memoryRaw.set(rawId, rawKey);
-      throw new Error("L'epoch E2EE a changé pendant la réservation de clé.");
+      throw new Error(("" + window.PeopleI18n.t("ui_cac8c62188") + ""));
     }
     const key = await importChannelKey(rawKey);
     await saveKey(device.accountId, serverId, channelId, epoch, key);
@@ -410,7 +410,7 @@
 
     const device = await bridge().ensureDevice();
     if (!device.accountId || !device.deviceId || !device.privateKey) {
-      throw new Error("Appareil E2EE invalide.");
+      throw new Error("Invalid E2EE device.");
     }
 
     if (navigator.onLine === false) {
@@ -427,7 +427,7 @@
     await saveState(device.accountId, sid, cid, remote);
 
     if (remote.protocol !== PROTOCOL || remote.suite !== SUITE) {
-      throw new Error("Version E2EE de salon non prise en charge.");
+      throw new Error(("" + window.PeopleI18n.t("ui_0c8aa1a744") + ""));
     }
 
     if (remote.status === "ready") {
@@ -475,7 +475,7 @@
           serverId: String(serverId || ""),
           channelId: String(channelId || ""),
           status: "error",
-          error: err?.message || "Erreur E2EE"
+          error: err?.message || "E2EE error"
         });
         return null;
       })

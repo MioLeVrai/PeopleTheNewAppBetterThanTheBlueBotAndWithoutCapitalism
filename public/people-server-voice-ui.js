@@ -10,11 +10,11 @@
   const selections = new Map();
 
   const CONTROL_SPECS = Object.freeze([
-    { key: "mute", sourceId: "muteButton", icon: "🎙️", label: "Micro" },
-    { key: "sound", icon: "\u{1f50a}", label: "Son" },
-    { key: "camera", sourceId: "cameraButton", icon: "📷", label: "Caméra" },
-    { key: "screen", sourceId: "screenButton", icon: "🖥️", label: "Écran" },
-    { key: "leave", sourceId: "leaveVoiceQuickButton", icon: "📞", label: "Raccrocher", danger: true }
+    { key: "mute", sourceId: "muteButton", icon: "🎙️", label: ("" + window.PeopleI18n.t("ui_186352a881") + "") },
+    { key: "sound", icon: "\u{1f50a}", label: ("" + window.PeopleI18n.t("ui_46124e0236") + "") },
+    { key: "camera", sourceId: "cameraButton", icon: "📷", label: ("" + window.PeopleI18n.t("ui_03494b0d1f") + "") },
+    { key: "screen", sourceId: "screenButton", icon: "🖥️", label: ("" + window.PeopleI18n.t("ui_6e56137e21") + "") },
+    { key: "leave", sourceId: "leaveVoiceQuickButton", icon: "📞", label: ("" + window.PeopleI18n.t("ui_a7ee8300ef") + ""), danger: true }
   ]);
 
   function createControl(spec, bar) {
@@ -57,39 +57,10 @@
       bar.id = "peopleServerCallControls" + (stage.id === "videoStageSecond" ? "Second" : "");
       bar.className = "people-server-call-controls";
       bar.setAttribute("role", "toolbar");
-      bar.setAttribute("aria-label", "Contrôles du vocal");
+      bar.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_fc6a7a46e5") + ""));
 
       for (const spec of CONTROL_SPECS) bar.appendChild(createControl(spec, bar));
       stage.appendChild(bar);
-      const move = document.createElement("select");
-      move.className = "people-server-call-move";
-      move.setAttribute("aria-label", "D\u00e9placer cet appel vers un salon vocal");
-      const reset = () => { move.replaceChildren(new Option("D\u00e9placer cet appel...", "")); };
-      reset();
-      move.addEventListener("focus", async () => {
-        const data = await (await fetch("/api/servers")).json();
-        const results = await Promise.all((data.servers || []).map(async server => {
-          const channels = await (await fetch("/api/servers/" + server.id + "/channels")).json();
-          return (channels.channels || []).filter(channel => channel.type === "voice").map(channel => ({ ...channel, server }));
-        }));
-        reset();
-        for (const channel of results.flat()) {
-          const option = new Option(channel.server.name + " / " + channel.name, channel.id);
-          option.dataset.serverId = channel.server.id; option.dataset.channelName = channel.name;
-          move.append(option);
-        }
-      });
-      move.addEventListener("change", () => {
-        const option = move.selectedOptions[0];
-        if (!option?.value) return;
-        const controller = window.PeopleCallBar.getServerController(bar.dataset.callId);
-        void Promise.resolve(controller.move(option.dataset.serverId, option.value, option.dataset.channelName)).then(() => {
-          const call = window.PeopleCallBar.getStates().find(call => call.id === bar.dataset.callId);
-          if (call) window.PeopleCallBar.open(call.id);
-        }).catch(error => window.alert(error.message));
-        move.value = "";
-      });
-      stage.append(move);
     }
 
     bar.dataset.callId = stage.dataset.callId;
@@ -129,7 +100,7 @@
       stage = document.createElement("section");
       stage.id = "videoStageSecond";
       stage.className = "video-stage people-server-call-stage hidden";
-      stage.setAttribute("aria-label", "Salon vocal secondaire");
+      stage.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_e54015e781") + ""));
       const grid = document.createElement("div");
       grid.className = "video-grid people-server-call-grid";
       stage.append(grid);
@@ -157,8 +128,18 @@
       participants.className = "people-server-call-participants";
       stage.prepend(participants);
     }
-    const text = call.name + " \u00b7 " + roster.map(user => user.username + (user.muted ? " (micro coup\u00e9)" : "")).join(", ");
-    if (participants.textContent !== text) participants.textContent = text;
+    const text = call.name + " \u00b7 " + roster.map(user => user.username + (user.muted ? (" " + window.PeopleI18n.t("ui_7388f8e1ec") + "") : "")).join(", ");
+    if (participants.dataset.roster !== text) {
+      participants.dataset.roster = text;
+      participants.replaceChildren();
+      for (const user of roster) {
+        const item = document.createElement("span"); item.className = "people-call-participant";
+        const avatar = document.createElement("span"); avatar.className = "people-call-participant-avatar";
+        window.PeopleAvatars?.apply(avatar, user.username);
+        const name = document.createElement("span"); name.textContent = user.username + (user.muted ? " (muted)" : "");
+        item.append(avatar, name); participants.append(item);
+      }
+    }
     const bar = ensureControlBar(stage);
     CONTROL_SPECS.forEach(spec => syncOneControl(spec, bar));
     if (call.id === "server-secondary") {

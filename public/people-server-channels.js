@@ -58,7 +58,7 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
-      throw new Error(data?.error || "Action impossible.");
+      throw new Error(data?.error || ("" + window.PeopleI18n.t("ui_4a47d829df") + ""));
     }
     return data;
   }
@@ -81,7 +81,7 @@
     value = "",
     placeholder = "",
     confirmText = "Valider",
-    cancelText = "Annuler",
+    cancelText = ("" + window.PeopleI18n.t("ui_19766ed6cc") + ""),
     danger = false,
     input = true
   } = {}) {
@@ -189,18 +189,18 @@
 
   async function createItem(type, parentId = null) {
     const labels = {
-      category: ["Créer une catégorie", "Nom de la catégorie"],
-      text: ["Créer un salon textuel", "Nom du salon textuel"],
-      voice: ["Créer un salon vocal", "Nom du salon vocal"]
+      category: ["Create Category", "Category name"],
+      text: ["Create Text Channel", "Text channel name"],
+      voice: ["Create Voice Channel", "Voice channel name"]
     };
-    const defaults = { category: "Nouvelle catégorie", text: "nouveau-salon", voice: "Nouveau vocal" };
-    const [title, description] = labels[type] || ["Créer", "Nom"];
+    const defaults = { category: "New category", text: "new-channel", voice: "New voice channel" };
+    const [title, description] = labels[type] || [("" + window.PeopleI18n.t("ui_4759498ac2") + ""), "Nom"];
     const value = await peopleDialog({
       title,
       description,
       value: defaults[type] || "",
       placeholder: defaults[type] || "",
-      confirmText: "Créer"
+      confirmText: ("" + window.PeopleI18n.t("ui_4759498ac2") + "")
     });
     if (value === null) return;
     const name = cleanName(value);
@@ -228,9 +228,9 @@
   async function renameItem(channel) {
     const value = await peopleDialog({
       title: "Renommer",
-      description: `Nouveau nom pour « ${channel.name || "cet élément"} »`,
+      description: `New name for “${channel.name || "this item"}”`,
       value: channel.name || "",
-      confirmText: "Enregistrer"
+      confirmText: ("" + window.PeopleI18n.t("ui_35322b5bb5") + "")
     });
     if (value === null) return;
     const name = cleanName(value);
@@ -254,12 +254,12 @@
   async function moveItem(channel) {
     if (channel.type === "category") return;
     const categories = state.channels.filter((item) => item.type === "category");
-    const choices = ["0 — Sans catégorie", ...categories.map((item, index) => `${index + 1} — ${item.name}`)].join("\n");
+    const choices = [("" + window.PeopleI18n.t("ui_6dce68fcb3") + ""), ...categories.map((item, index) => `${index + 1} — ${item.name}`)].join("\n");
     const raw = await peopleDialog({
-      title: "Déplacer le salon",
-      description: `Choisis la catégorie avec son numéro :\n${choices}`,
+      title: "Move channel",
+      description: `Choose the category by number:\n${choices}`,
       value: "0",
-      confirmText: "Déplacer"
+      confirmText: "Move"
     });
     if (raw === null) return;
     const index = Number(raw);
@@ -281,16 +281,16 @@
   }
 
   async function deleteItem(channel) {
-    const what = channel.type === "category" ? "la catégorie" : channel.type === "voice" ? "le vocal" : "le salon";
+    const what = channel.type === "category" ? ("" + window.PeopleI18n.t("ui_56d386dd07") + "") : channel.type === "voice" ? ("" + window.PeopleI18n.t("ui_3ee593cc06") + "") : ("" + window.PeopleI18n.t("ui_32b477d29c") + "");
     const detail = channel.type === "category"
-      ? "Les salons qu'elle contient seront déplacés hors catégorie."
+      ? ("" + window.PeopleI18n.t("ui_994b2b2a98") + "")
       : channel.type === "text"
-        ? "Son historique sera supprimé définitivement."
-        : "Les personnes qui s'y trouvent seront déconnectées.";
+        ? ("" + window.PeopleI18n.t("ui_4e896c7bad") + "")
+        : ("" + window.PeopleI18n.t("ui_84b43ff4f5") + "");
     const confirmed = await peopleDialog({
-      title: `Supprimer ${what}`,
+      title: `${window.PeopleI18n.t("ui_e2d0a54968")} ${what}`,
       description: `« ${channel.name} »\n\n${detail}`,
-      confirmText: "Supprimer",
+      confirmText: ("" + window.PeopleI18n.t("ui_e2d0a54968") + ""),
       danger: true,
       input: false
     });
@@ -337,9 +337,9 @@
     const box = document.createElement("div");
     box.className = "people-channel-create-menu";
     box.append(
-      menuButton("📁 Créer une catégorie", () => createItem("category", null)),
-      menuButton("#  Créer un salon textuel", () => createItem("text", parentId)),
-      menuButton("🔊 Créer un salon vocal", () => createItem("voice", parentId))
+      menuButton(("" + window.PeopleI18n.t("ui_45526444d5") + ""), () => createItem("category", null)),
+      menuButton(("" + window.PeopleI18n.t("ui_fc84ee20d1") + ""), () => createItem("text", parentId)),
+      menuButton(("" + window.PeopleI18n.t("ui_db9501323b") + ""), () => createItem("voice", parentId))
     );
     placeMenu(box, x, y);
   }
@@ -350,15 +350,16 @@
     const box = document.createElement("div");
     box.className = "people-channel-context-menu";
     box.append(menuButton("Renommer", () => renameItem(channel)));
+    box.append(menuButton("Permissions", () => window.PeopleChannelPermissions.open(state.serverId, channel)));
     if (channel.type !== "category") {
-      box.append(menuButton("Déplacer dans une catégorie", () => moveItem(channel)));
+      box.append(menuButton(("" + window.PeopleI18n.t("ui_2848e4d443") + ""), () => moveItem(channel)));
     } else {
       box.append(
-        menuButton("#  Créer un salon textuel ici", () => createItem("text", channel.id)),
-        menuButton("🔊 Créer un salon vocal ici", () => createItem("voice", channel.id))
+        menuButton(("" + window.PeopleI18n.t("ui_a1de7df694") + ""), () => createItem("text", channel.id)),
+        menuButton(("" + window.PeopleI18n.t("ui_f3ef909c78") + ""), () => createItem("voice", channel.id))
       );
     }
-    box.append(menuButton("Supprimer", () => deleteItem(channel), true));
+    box.append(menuButton(("" + window.PeopleI18n.t("ui_e2d0a54968") + ""), () => deleteItem(channel), true));
     placeMenu(box, event.clientX, event.clientY);
   }
 
@@ -397,12 +398,14 @@
   function memberRow(user) {
     const row = document.createElement("div");
     row.className = "people-server-voice-member";
+    row.dataset.serverId = String(state.serverId || "");
+    row.dataset.channelId = String(user.channelId || "");
     const avatar = document.createElement("div");
     avatar.className = "people-server-voice-member-avatar";
     window.PeopleAvatars?.apply?.(avatar, user.username);
     const name = document.createElement("span");
     name.className = "people-server-voice-member-name";
-    name.textContent = user.username || "Utilisateur";
+    name.textContent = user.username || "User";
     const media = document.createElement("span");
     media.className = "people-server-voice-member-media";
     media.textContent = `${user.screen ? "🖥️ " : user.camera ? "📹 " : ""}${user.muted ? "🔇" : ""}`.trim();
@@ -430,7 +433,7 @@
       button.classList.toggle("active", String(state.activeTextChannelId || "") === String(channel.id));
       button.addEventListener("click", async () => {
         const response = await window.PeopleServerRuntime?.selectTextChannel?.(channel.id);
-        if (response?.ok === false) alert(response.error || "Impossible d'ouvrir ce salon.");
+        if (response?.ok === false) alert(response.error || ("" + window.PeopleI18n.t("ui_c764ed30bd") + ""));
       });
     } else {
       const members = voiceMembers(channel.id);
@@ -448,7 +451,7 @@
       button.classList.toggle("people-channel-no-connect", !canConnect);
       button.addEventListener("click", async () => {
         if (!canConnect) {
-          alert("Tu n'as pas la permission de rejoindre ce vocal.");
+          alert(("" + window.PeopleI18n.t("ui_4875c87d3c") + ""));
           return;
         }
         await window.PeopleServerRuntime?.joinVoiceChannel?.(channel.id);
@@ -500,7 +503,7 @@
       add.type = "button";
       add.className = "people-channel-category-add";
       add.textContent = "+";
-      add.title = "Créer un salon dans cette catégorie";
+      add.title = ("" + window.PeopleI18n.t("ui_9f25e21a9a") + "");
       add.addEventListener("click", (event) => {
         event.stopPropagation();
         const rect = add.getBoundingClientRect();
@@ -544,17 +547,17 @@
     const active = state.channels.find((item) => item.type === "text" && String(item.id) === String(state.activeTextChannelId || ""));
     if (!active) return;
     if (titleName) titleName.textContent = `# ${active.name}`;
-    if (subtitle) subtitle.textContent = `Salon textuel • ${active.name}`;
-    if (welcome) welcome.textContent = `Début du salon #${active.name}.`;
+    if (subtitle) subtitle.textContent = `${window.PeopleI18n.t("ui_c13ae7eea1")} ${active.name}`;
+    if (welcome) welcome.textContent = `${window.PeopleI18n.t("ui_b6001be120")}${active.name}.`;
     if (messageInput) {
       const canSend = canChannel(active, "SEND_MESSAGES");
       messageInput.disabled = !canSend;
       messageInput.placeholder = canSend
-        ? `Message dans #${active.name}`
-        : `Tu n'as pas la permission d'écrire dans #${active.name}`;
+        ? `Message in #${active.name}`
+        : `${window.PeopleI18n.t("ui_1f42e5a3c9")}${active.name}`;
     }
     const h2 = document.querySelector("#messages .welcome h2");
-    if (h2) h2.textContent = `Bienvenue dans # ${active.name}`;
+    if (h2) h2.textContent = `Welcome to # ${active.name}`;
   }
 
   function render() {
@@ -577,7 +580,7 @@
     if (!channels.length) {
       const empty = document.createElement("div");
       empty.className = "people-channel-empty";
-      empty.textContent = "Aucun salon.";
+      empty.textContent = ("" + window.PeopleI18n.t("ui_c9c207c2cd") + "");
       tree.appendChild(empty);
     }
   }
@@ -628,8 +631,8 @@
   // === PEOPLE_SERVER_SETTINGS_V1_CHANNEL_API_START ===
   window.PeopleServerChannels = {
     async create(type, parentId = null) {
-      if (!canManage()) throw new Error("Seul le propriétaire peut gérer les salons pour le moment.");
-      if (!["category", "text", "voice"].includes(String(type || ""))) throw new Error("Type de salon invalide.");
+      if (!canManage()) throw new Error("Only the owner can manage channels at this time.");
+      if (!["category", "text", "voice"].includes(String(type || ""))) throw new Error("Invalid channel type.");
       return createItem(String(type), parentId || null);
     },
     canManage,

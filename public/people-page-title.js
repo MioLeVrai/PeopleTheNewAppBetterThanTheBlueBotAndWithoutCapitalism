@@ -75,9 +75,9 @@
       const serverName = clean(activeServerName?.textContent);
 
       setTitle(
-        serverName && serverName !== "Serveur"
+        serverName && serverName !== ("" + window.PeopleI18n.t("ui_aef7de28d5") + "")
           ? serverName
-          : "Serveur"
+          : ("" + window.PeopleI18n.t("ui_aef7de28d5") + "")
       );
       return;
     }
@@ -86,7 +86,7 @@
       if (visible(dmView)) {
         const dmName = clean(dmHeaderName?.textContent);
 
-        if (dmName && dmName !== "Message privé") {
+        if (dmName && dmName !== ("" + window.PeopleI18n.t("ui_cd3e16057d") + "")) {
           setTitle(dmName, "MP");
         } else {
           setTitle("MP");
@@ -95,15 +95,15 @@
       }
 
       if (visible(friendsView)) {
-        setTitle("Amis");
+        setTitle(("" + window.PeopleI18n.t("ui_bd104d1b98") + ""));
         return;
       }
 
-      setTitle(clean(homeMainTitle?.textContent) || "Accueil");
+      setTitle(clean(homeMainTitle?.textContent) || ("" + window.PeopleI18n.t("ui_3a78695388") + ""));
       return;
     }
 
-    setTitle("Accueil");
+    setTitle(("" + window.PeopleI18n.t("ui_3a78695388") + ""));
   }
 
   function scheduleDetect() {

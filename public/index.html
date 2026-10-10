@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
     <base href="/">
     <!-- PEOPLE_FAVICON_TAB_V1_START -->
@@ -41,14 +41,14 @@
     <div class="join-card auth-card">
       <div class="logo">P</div>
       <h1>People</h1>
-      <p id="authSubtitle">Connecte-toi avec ton pseudo.</p>
+      <p id="authSubtitle">Log in with your username.</p>
 
       <div class="auth-tabs">
         <button id="loginTab" class="auth-tab active" type="button">
-          Connexion
+          Connecting
         </button>
         <button id="registerTab" class="auth-tab" type="button">
-          Creer un compte
+          Create Account
         </button>
       </div>
 
@@ -56,7 +56,7 @@
         <input
           id="usernameInput"
           maxlength="24"
-          placeholder="Pseudo"
+          placeholder="Username"
           autocomplete="username"
           required
         />
@@ -64,30 +64,30 @@
           id="passwordInput"
           type="password"
           maxlength="128"
-          placeholder="Mot de passe"
+          placeholder="Password"
           autocomplete="current-password"
           required
         />
         <div id="authError" class="auth-error" role="status"></div>
         <button id="authSubmit" type="submit">
-          Se connecter
+          Log In
         </button>
       </form>
 
       <p class="auth-note">
-        Pas d'e-mail pour l'instant. Garde bien ton mot de passe.
+        Email recovery is not available yet. Keep your password safe.
       </p>
     </div>
   </div>
 
   <div id="peopleAppShell" class="app people-server-mode">
-    <nav class="server-rail" aria-label="Navigation principale">
+    <nav class="server-rail" aria-label="Main Navigation">
       <button
         id="homeRailButton"
         class="rail-button rail-home"
         type="button"
-        title="Accueil et messages privés"
-        aria-label="Accueil et messages privés"
+        title="Home and Direct Messages"
+        aria-label="Home and Direct Messages"
       >
         🏠
         <span id="homeUnreadBadge" class="rail-badge hidden">0</span>
@@ -98,15 +98,15 @@
       <div
         id="serverRailList"
         class="server-rail-list"
-        aria-label="Tes serveurs"
+        aria-label="Your Servers"
       ></div>
 
       <button
         id="createServerRailButton"
         class="rail-button server-create-button"
         type="button"
-        title="Créer un serveur"
-        aria-label="Créer un serveur"
+        title="Create Server"
+        aria-label="Create Server"
       >
         +
       </button>
@@ -117,21 +117,21 @@
         <div class="server-title home-title">
           <div class="server-icon">🏠</div>
           <div>
-            <strong>Accueil</strong>
-            <span>Amis et messages privés</span>
+            <strong>Home</strong>
+            <span>Friends and Direct Messages</span>
           </div>
         </div>
 
         <div class="channel-group">
           <button id="friendsNavButton" class="channel active">
-            👥 Amis
+            👥 Friends
           </button>
         </div>
 
         <div class="channel-group dm-sidebar-group">
-          <div class="group-label">MESSAGES PRIVÉS</div>
+          <div class="group-label">DIRECT MESSAGES</div>
           <div id="dmConversationList" class="dm-conversation-list">
-            <div class="dm-sidebar-empty">Aucun MP pour l'instant</div>
+            <div class="dm-sidebar-empty">No direct messages yet</div>
           </div>
         </div>
       </section>
@@ -145,10 +145,10 @@
 
           <div>
             <strong id="activeServerName">
-              Serveur
+              Server
             </strong>
             <span>
-              <b id="userCount">0</b> en ligne
+              <b id="userCount">0</b> online
             </span>
           </div>
 
@@ -157,8 +157,8 @@
               id="serverChannelCreateButton"
               class="server-invite-button"
               type="button"
-              title="Créer une catégorie ou un salon"
-              aria-label="Créer une catégorie ou un salon"
+              title="Create Category or Channel"
+              aria-label="Create Category or Channel"
             >
               ＋
             </button>
@@ -166,8 +166,8 @@
               id="serverInviteButton"
               class="server-invite-button"
               type="button"
-              title="Copier le lien d'invitation"
-              aria-label="Copier le lien d'invitation"
+              title="Copy Invitation Link"
+              aria-label="Copy Invitation Link"
             >
               🔗
             </button>
@@ -178,11 +178,11 @@
 
         <div class="people-server-voice-bridge" aria-hidden="true">
           <button id="voiceButton" class="channel" type="button">
-            🔊 vocal <span id="voiceCount"></span>
+            🔊 voice <span id="voiceCount"></span>
           </button>
-          <div id="voiceStatus" class="voice-status">Pas connecté</div>
+          <div id="voiceStatus" class="voice-status">Disconnected</div>
           <div id="voiceUsers" class="voice-users">
-            <div class="voice-empty">Personne dans le vocal</div>
+            <div class="voice-empty">No one in voice</div>
           </div>
         </div>
       </section>
@@ -192,17 +192,17 @@
           class="avatar profile-avatar-button"
           id="avatar"
           type="button"
-          title="Ouvrir mon profil"
-          aria-label="Ouvrir mon profil"
+          title="Open My Profile"
+          aria-label="Open My Profile"
         >?</button>
 
         <button
           id="profileInfoButton"
           class="profile-copy profile-copy-button"
           type="button"
-          title="Ouvrir mon profil"
+          title="Open My Profile"
         >
-          <strong id="profileName">Invité</strong>
+          <strong id="profileName">Guest</strong>
           <span id="micState"></span>
         </button>
 
@@ -210,24 +210,24 @@
           <button
             id="muteButton"
             class="icon-btn"
-            title="Activer/couper le micro"
+            title="Toggle Microphone"
           >🎙️</button>
           <button
             id="cameraButton"
             class="icon-btn"
-            title="Activer/couper la caméra"
+            title="Toggle Camera"
           >📷</button>
           <button
             id="screenButton"
             class="icon-btn"
-            title="Partager l'écran"
-            aria-label="Partager l'écran"
+            title="Share Screen"
+            aria-label="Share Screen"
           >🖥️</button>
           <button
             id="leaveVoiceQuickButton"
             class="icon-btn"
-            title="Quitter le vocal"
-            aria-label="Quitter le vocal"
+            title="Leave Voice"
+            aria-label="Leave Voice"
             disabled
           >📞</button>
         </div>
@@ -237,16 +237,16 @@
     <main id="peopleMain" class="main">
       <header class="topbar">
         <div>
-          <strong id="activeTextChannelName"># général</strong>
-          <span id="activeTextChannelSubtitle">Salon général</span>
+          <strong id="activeTextChannelName"># general</strong>
+          <span id="activeTextChannelSubtitle">General Channel</span>
         </div>
 
         <button
           id="onlinePanelToggle"
           class="online-panel-toggle"
           type="button"
-          title="Afficher les personnes en ligne"
-          aria-label="Afficher les personnes en ligne"
+          title="Show Online Members"
+          aria-label="Show Online Members"
         >
           👥 <span id="onlinePanelToggleCount">0</span>
         </button>
@@ -255,7 +255,7 @@
       <section
         id="videoStage"
         class="video-stage hidden"
-        aria-label="Caméras du vocal"
+        aria-label="Voice Cameras"
       >
         <div id="videoGrid" class="video-grid"></div>
       </section>
@@ -263,8 +263,8 @@
       <section id="messages" class="messages">
         <div class="welcome">
           <div class="hash">#</div>
-          <h2>Bienvenue dans # général</h2>
-          <p id="serverWelcomeText">Le salon texte général.</p>
+          <h2>Welcome to #general</h2>
+          <p id="serverWelcomeText">The general text channel.</p>
         </div>
       </section>
 
@@ -273,8 +273,8 @@
           id="messageImageButton"
           class="composer-image-button"
           type="button"
-          title="Envoyer une pièce jointe (25 Mo max)"
-          aria-label="Envoyer une pièce jointe"
+          title="Send Attachment (25 MB max)"
+          aria-label="Send Attachment"
         >📎</button>
         <input
           id="messageImageInput"
@@ -289,32 +289,31 @@
         <input
           id="messageInput"
           maxlength="1000"
-          placeholder="Message dans #général"
+          placeholder="Message #general"
           autocomplete="off"
         />
-        <button type="submit">Envoyer</button>
+        <button type="submit">Send</button>
       </form>
     </main>
 
     <main id="homeMain" class="home-main hidden">
       <header class="home-topbar">
         <div>
-          <strong id="homeMainTitle">Amis</strong>
-          <span id="homeMainSubtitle">Tes contacts People</span>
+          <strong id="homeMainTitle">Friends</strong>
+          <span id="homeMainSubtitle">Your People Contacts</span>
         </div>
       </header>
 
       <section id="friendsView" class="friends-view">
         <div class="friends-search-card">
-          <h2>Retrouver quelqu'un</h2>
+          <h2>Find Someone</h2>
           <p>
-            Cherche un compte People, ouvre son profil,
-            ajoute-le à tes amis ou envoie-lui un MP.
+            Find a People account, open their profile, add them as a friend or send a direct message.
           </p>
           <input
             id="peopleSearchInput"
             maxlength="50"
-            placeholder="Chercher un pseudo..."
+            placeholder="Search usernames..."
             autocomplete="off"
           />
         </div>
@@ -322,35 +321,35 @@
         <!-- === PEOPLE_FRIEND_REQUESTS_UI_V2_START === -->
         <div class="home-section friend-requests-section">
           <div class="home-section-title">
-            <strong>Demandes d'ami</strong>
+            <strong>Friend Requests</strong>
             <span id="friendRequestsCount">0</span>
           </div>
 
           <div class="friend-request-columns">
             <div class="friend-request-column">
               <div class="friend-request-label">
-                À accepter
+                Incoming
               </div>
               <div
                 id="incomingFriendRequests"
                 class="friend-request-list"
               >
                 <div class="home-empty">
-                  Aucune demande reçue.
+                  No incoming requests.
                 </div>
               </div>
             </div>
 
             <div class="friend-request-column">
               <div class="friend-request-label">
-                Envoyées
+                Sent
               </div>
               <div
                 id="outgoingFriendRequests"
                 class="friend-request-list"
               >
                 <div class="home-empty">
-                  Aucune demande en attente.
+                  No pending requests.
                 </div>
               </div>
             </div>
@@ -360,11 +359,11 @@
 
         <div class="home-section">
           <div class="home-section-title">
-            <strong>Mes amis</strong>
+            <strong>My Friends</strong>
             <span id="friendsCount">0</span>
           </div>
           <div id="friendsList" class="people-card-list">
-            <div class="home-empty">Aucun ami pour l'instant.</div>
+            <div class="home-empty">No friends yet.</div>
           </div>
         </div>
 
@@ -386,7 +385,7 @@
             id="dmBackButton"
             class="dm-back-button"
             type="button"
-            title="Retour aux amis"
+            title="Back to Friends"
           >←</button>
 
           <button
@@ -396,7 +395,7 @@
           >
             <span id="dmHeaderAvatar" class="dm-header-avatar">?</span>
             <span>
-              <strong id="dmHeaderName">Message privé</strong>
+              <strong id="dmHeaderName">Direct message</strong>
               <small id="dmHeaderStatus"></small>
             </span>
           </button>
@@ -404,8 +403,8 @@
 
         <div id="dmMessages" class="dm-messages">
           <div class="dm-welcome">
-            <h2 id="dmWelcomeTitle">Message privé</h2>
-            <p>Début de votre conversation sur People.</p>
+            <h2 id="dmWelcomeTitle">Direct message</h2>
+            <p>Start of your conversation on People.</p>
           </div>
         </div>
 
@@ -414,8 +413,8 @@
             id="dmImageButton"
             class="composer-image-button"
             type="button"
-            title="Envoyer une pièce jointe (25 Mo max)"
-            aria-label="Envoyer une pièce jointe"
+            title="Send Attachment (25 MB max)"
+            aria-label="Send Attachment"
           >📎</button>
           <input
             id="dmImageInput"
@@ -430,10 +429,10 @@
           <input
             id="dmInput"
             maxlength="2000"
-            placeholder="Message privé..."
+            placeholder="Direct message..."
             autocomplete="off"
           />
-          <button type="submit">Envoyer</button>
+          <button type="submit">Send</button>
         </form>
       </section>
     </main>
@@ -441,24 +440,24 @@
     <aside
       id="onlinePanel"
       class="online-panel"
-      aria-label="Membres du serveur"
+      aria-label="Server Members"
     >
       <div class="online-panel-header">
         <div>
-          <strong>Membres</strong>
-          <span id="onlinePanelCount">0 personne</span>
+          <strong>Members</strong>
+          <span id="onlinePanelCount">0 people</span>
         </div>
         <button
           id="onlinePanelClose"
           class="online-panel-close"
           type="button"
-          aria-label="Fermer la liste des membres"
-          title="Fermer"
+          aria-label="Close Member List"
+          title="Close"
         >✕</button>
       </div>
 
       <div id="onlineUsersList" class="online-users-list">
-        <div class="online-users-empty">Chargement des membres...</div>
+        <div class="online-users-empty">Loading members...</div>
       </div>
     </aside>
   </div>
@@ -467,8 +466,8 @@
     id="logoutButton"
     class="people-fixed-logout"
     type="button"
-    title="Se deconnecter"
-    aria-label="Se deconnecter"
+    title="Log Out"
+    aria-label="Log Out"
   >🚪</button>
 
 <div id="profileModal" class="profile-modal hidden">
@@ -478,7 +477,7 @@
         id="profileModalClose"
         class="profile-modal-close"
         type="button"
-        aria-label="Fermer"
+        aria-label="Close"
       >✕</button>
 
       <div class="profile-card-head">
@@ -497,7 +496,7 @@
               class="profile-avatar-upload-button"
               type="button"
             >
-              Changer la photo
+              Change Photo
             </button>
 
             <input
@@ -509,7 +508,7 @@
           </div>
         </div>
         <div>
-          <h2 id="profileModalName">Profil</h2>
+          <h2 id="profileModalName">Profile</h2>
           <span id="profileModalOnline" class="profile-online-state"></span>
         </div>
       </div>
@@ -522,28 +521,28 @@
           <textarea
             id="profileDescriptionInput"
             maxlength="280"
-            placeholder="Écris une petite description..."
+            placeholder="Write a short bio..."
           ></textarea>
           <div class="profile-description-counter">
             <span id="profileDescriptionCount">0</span>/280
           </div>
           <button id="profileSaveButton" type="button">
-            Enregistrer
+            Save Changes
           </button>
         </div>
       </div>
 
       <div class="profile-card-section">
-        <strong>Membre depuis</strong>
+        <strong>Member Since</strong>
         <p id="profileCreatedAt">—</p>
       </div>
 
       <div id="profileActions" class="profile-modal-actions">
         <button id="profileDmButton" type="button">
-          Envoyer un MP
+          Send Message
         </button>
         <button id="profileFriendButton" type="button">
-          Ajouter en ami
+          Add Friend
         </button>
       </div>
     </section>
@@ -564,16 +563,15 @@
         id="createServerModalClose"
         class="people-server-modal-close"
         type="button"
-        aria-label="Fermer"
+        aria-label="Close"
       >✕</button>
 
       <h2 id="createServerTitle">
-        Créer ton serveur
+        Create Your Server
       </h2>
 
       <p>
-        Pour cette V1, il aura automatiquement un
-        # général et un 🔊 vocal. Pas d'autres salons pour l'instant.
+        Your server starts with a general text channel and a voice channel. You can create more channels in server settings.
       </p>
 
       <form
@@ -581,14 +579,14 @@
         class="people-server-form"
       >
         <label for="createServerNameInput">
-          NOM DU SERVEUR
+          SERVER NAME
         </label>
 
         <input
           id="createServerNameInput"
           maxlength="40"
           minlength="2"
-          placeholder="Mon serveur"
+          placeholder="My Server"
           autocomplete="off"
           required
         />
@@ -602,7 +600,7 @@
           class="people-server-primary"
           type="submit"
         >
-          Créer
+          Create
         </button>
       </form>
     </section>
@@ -621,7 +619,7 @@
         id="serverInviteModalClose"
         class="people-server-modal-close"
         type="button"
-        aria-label="Fermer"
+        aria-label="Close"
       >✕</button>
 
       <div
@@ -630,14 +628,14 @@
       >?</div>
 
       <!-- PEOPLE_INVITE_UNAVAILABLE_UI_V1 -->
-      <p id="inviteIntroText">Tu as reçu une invitation pour rejoindre</p>
+      <p id="inviteIntroText">You have been invited to join</p>
 
       <h2 id="inviteServerName">
-        Serveur
+        Server
       </h2>
 
       <p id="inviteServerMembers">
-        0 membre
+        0 members
       </p>
 
       <div
@@ -650,7 +648,7 @@
         class="people-server-primary"
         type="button"
       >
-        Rejoindre le serveur
+        Join Server
       </button>
     </section>
   </div>
@@ -658,6 +656,7 @@
 
   <div id="audioContainer"></div>
 
+  <script src="people-i18n.js?v=20261010"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="people-offline.js?v=people-offline-v1-20260916"></script>
   <script src="people-avatars.js"></script>
@@ -685,8 +684,15 @@
       <script src="people-appearance-settings-v2.js?v=people-appearance-settings-v2-3-20260911a"></script>
       <script src="people-theme-studio.js?v=people-theme-studio-v1"></script>
   <script src="people-unread.js?v=people-unread-v1-20260916"></script>
-  <script src="people-presence.js?v=20261008"></script>
+  <script src="people-presence.js?v=20261010"></script>
+  <link rel="stylesheet" href="people-avatar-presence.css?v=20261010" />
+  <script src="people-avatar-presence.js?v=20261010"></script>
   <script src="people-ergonomics.js?v=20261009b"></script>
   <script src="people-call-bar.js?v=20261010-call-interfaces"></script>
+  <link rel="stylesheet" href="people-call-media.css?v=20261010" />
+  <script src="people-call-media.js?v=20261010"></script>
+  <script src="people-speaking.js?v=20261010"></script>
+  <script src="people-typing.js?v=20261010"></script>
+  <script src="people-channel-permissions.js?v=20261010"></script>
 </body>
 </html>

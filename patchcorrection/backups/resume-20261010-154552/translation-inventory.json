@@ -1,0 +1,1537 @@
+[
+  {
+    "text": "(base64url/base64 ou 64 caractères hex).",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 185,
+        "context": " const err = new Error( \"PEOPLE_MESSAGE_ENCRYPTION_KEY doit contenir exactement 32 octets \" + \"(base64url/base64 ou 64 caractères hex).\" ); "
+      }
+    ]
+  },
+  {
+    "text": "Ajoute cette variable dans Render > Environment avant de démarrer People.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 215,
+        "context": " const err = new Error( \"PEOPLE_MESSAGE_ENCRYPTION_KEY manque. \" + \"Ajoute cette variable dans Render > Environment avant de démarrer People.\" ); "
+      }
+    ]
+  },
+  {
+    "text": "description, created_at ",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 1661,
+        "context": "onst result = await peoplePool.query( \"SELECT id, username, username_key, password_hash, \" + \"description, created_at \" + \"FROM"
+      },
+      {
+        "file": "server.js",
+        "line": 1692,
+        "context": "onst result = await peoplePool.query( \"SELECT id, username, username_key, password_hash, \" + \"description, created_at \" + \"FROM"
+      }
+    ]
+  },
+  {
+    "text": "SET description = $1 ",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 1768,
+        "context": "onst result = await peoplePool.query( \"UPDATE people_accounts \" + \"SET description = $1 \" + \"WHER"
+      }
+    ]
+  },
+  {
+    "text": "RETURNING id, username, description, created_at",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 1770,
+        "context": "onst result = await peoplePool.query( \"UPDATE people_accounts \" + \"SET description = $1 \" + \"WHERE id = $2 \" + \"RETURNING id, username, description, created_at\", [clean"
+      }
+    ]
+  },
+  {
+    "text": "ADD COLUMN IF NOT EXISTS description VARCHAR(280) NOT NULL DEFAULT ''",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 4570,
+        "context": "turn; } await peoplePool.query( \"ALTER TABLE people_accounts \" + \"ADD COLUMN IF NOT EXISTS description VARCHAR(280) NOT NULL DEFAULT ''\" ); awa"
+      }
+    ]
+  },
+  {
+    "text": "Couleur invalide pour ",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 5727,
+        "context": " ok: false, error: \"Couleur invalide pour \" + key + \".\" "
+      }
+    ]
+  },
+  {
+    "text": "Cette personne t'a deja envoye une demande. ",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 6235,
+        "context": " ok: false, error: \"Cette personne t'a deja envoye une demande. \" + \"Accepte-la dans Demandes d'ami.\" }); "
+      }
+    ]
+  },
+  {
+    "text": "Accepte-la dans Demandes d'ami.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 6236,
+        "context": " ok: false, error: \"Cette personne t'a deja envoye une demande. \" + \"Accepte-la dans Demandes d'ami.\" }); "
+      }
+    ]
+  },
+  {
+    "text": "Le contenu doit être un Buffer.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 7369,
+        "context": "er) { if (!Buffer.isBuffer(buffer)) throw new TypeError(\"Le contenu doit être un Buffer.\"); if (people"
+      }
+    ]
+  },
+  {
+    "text": "La pièce jointe doit faire moins de ",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 7830,
+        "context": "on({ ok: false, error: `La pièce jointe doit faire moins de ${PEOPLE_MESSAGE_IMAGE_MAX_MB} Mo.` }); "
+      }
+    ]
+  },
+  {
+    "text": "people-notification-prefs.local.json",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 8217,
+        "context": "=== const PEOPLE_LOCAL_NOTIFICATION_PREFS = pathAccounts.join( __dirname, \"people-notification-prefs.local.json\" ); const PEOP"
+      }
+    ]
+  },
+  {
+    "text": "/api/notification-preferences",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 8422,
+        "context": "ficationPrefs(store); return prefs; } app.get(\"/api/notification-preferences\", async (req, res) => { try { const session = peopleSessionForRequest(req, res); if (!session"
+      },
+      {
+        "file": "server.js",
+        "line": 8440,
+        "context": "\"ui_ebd0be49fc\") + \"\") }); } }); app.put(\"/api/notification-preferences\", async (req, res) => { try { const session = peopleSessionForRequest(req, res); if (!session) ret"
+      },
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 177,
+        "context": "erver() { try { const data = await api(\"/api/notification-preferences\"); if (dat"
+      },
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 199,
+        "context": "n false; try { const data = await api(\"/api/notification-preferences\", { method: \"PUT\", body: JSON.stringify({ prefs }) }); if (dat"
+      }
+    ]
+  },
+  {
+    "text": "Impossible de modifier la réaction.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 8813,
+        "context": " 500).json({ ok: false, error: err?.code === \"REACTION_INVALID\" ? (\"\" + peopleText(\"ui_45800ef2db\") + \"\") : \"Impossible de modifier la réaction.\" }); } "
+      }
+    ]
+  },
+  {
+    "text": " serveur(s) vide(s) nettoyé(s).",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 9621,
+        "context": "ted > 0 ) { console.log( \"[People] \" + deleted + \" serveur(s) vide(s) nettoyé(s).\" ); } "
+      }
+    ]
+  },
+  {
+    "text": "général",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 10992,
+        "context": "sid, \"text\"); if (!text) text = await peopleCreateServerChannel(sid, \"text\", \"général\", null); let vo"
+      },
+      {
+        "file": "server.js",
+        "line": 11015,
+        "context": "s.randomUUID(), serverId: sid, type: \"text\", name: \"général\", pare"
+      },
+      {
+        "file": "server.js",
+        "line": 13033,
+        "context": "hannel(server.id, \"text\"))) { await peopleCreateServerChannel(server.id, \"text\", \"général\", null); } "
+      }
+    ]
+  },
+  {
+    "text": "vocal",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 10994,
+        "context": ", \"voice\"); if (!voice) voice = await peopleCreateServerChannel(sid, \"voice\", \"vocal\", null); await "
+      },
+      {
+        "file": "server.js",
+        "line": 11022,
+        "context": ".randomUUID(), serverId: sid, type: \"voice\", name: \"vocal\", pare"
+      },
+      {
+        "file": "server.js",
+        "line": 13036,
+        "context": "annel(server.id, \"voice\"))) { await peopleCreateServerChannel(server.id, \"voice\", \"vocal\", null); } "
+      }
+    ]
+  },
+  {
+    "text": "Nom ou type de salon invalide.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11072,
+        "context": " res.status(status).json({ ok: false, error: status === 400 ? \"Nom ou type de salon invalide.\" : \"Impossible de créer cet élément.\" }); } }); "
+      }
+    ]
+  },
+  {
+    "text": "Impossible de créer cet élément.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11072,
+        "context": " res.status(status).json({ ok: false, error: status === 400 ? \"Nom ou type de salon invalide.\" : \"Impossible de créer cet élément.\" }); } }); "
+      }
+    ]
+  },
+  {
+    "text": "Nom de salon invalide.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11089,
+        "context": " res.status(status).json({ ok: false, error: status === 400 ? \"Nom de salon invalide.\" : \"Impossible de modifier cet élément.\" }); } }); "
+      }
+    ]
+  },
+  {
+    "text": "Impossible de modifier cet élément.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11089,
+        "context": " res.status(status).json({ ok: false, error: status === 400 ? \"Nom de salon invalide.\" : \"Impossible de modifier cet élément.\" }); } }); "
+      }
+    ]
+  },
+  {
+    "text": "Voir les salons",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11117,
+        "context": "eze([ { key: \"VIEW_CHANNEL\", bit: 1 << 0, label: \"Voir les salons\", group: \"Salon"
+      }
+    ]
+  },
+  {
+    "text": "Envoyer des messages",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11118,
+        "context": "\" }, { key: \"SEND_MESSAGES\", bit: 1 << 1, label: \"Envoyer des messages\", group: \"Texte"
+      }
+    ]
+  },
+  {
+    "text": "Ajouter des réactions",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11120,
+        "context": "\" }, { key: \"ADD_REACTIONS\", bit: 1 << 3, label: \"Ajouter des réactions\", group: \"Texte"
+      }
+    ]
+  },
+  {
+    "text": "Rejoindre les vocaux",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11121,
+        "context": "\"Texte\" }, { key: \"CONNECT\", bit: 1 << 4, label: \"Rejoindre les vocaux\", group: \"Vocal"
+      }
+    ]
+  },
+  {
+    "text": "Vocal",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11121,
+        "context": " bit: 1 << 4, label: \"Rejoindre les vocaux\", group: \"Vocal\" }, { key: \""
+      },
+      {
+        "file": "server.js",
+        "line": 11122,
+        "context": " key: \"SPEAK\", bit: 1 << 5, label: \"Parler\", group: \"Vocal\" }, { key: \""
+      },
+      {
+        "file": "server.js",
+        "line": 11123,
+        "context": " 1 << 6, label: \"Caméra et partage d'écran\", group: \"Vocal\" }, { key: \""
+      }
+    ]
+  },
+  {
+    "text": "Caméra et partage d'écran",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11123,
+        "context": " \"Vocal\" }, { key: \"STREAM\", bit: 1 << 6, label: \"Caméra et partage d'écran\", group: \"Vocal"
+      }
+    ]
+  },
+  {
+    "text": "Créer / copier des invitations",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11124,
+        "context": "\" }, { key: \"CREATE_INVITE\", bit: 1 << 7, label: \"Créer / copier des invitations\", group: (\"\" + "
+      }
+    ]
+  },
+  {
+    "text": "Gérer les messages",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11125,
+        "context": "}, { key: \"MANAGE_MESSAGES\", bit: 1 << 8, label: \"Gérer les messages\", group: \"Modér"
+      }
+    ]
+  },
+  {
+    "text": "Modération",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11125,
+        "context": "\", bit: 1 << 8, label: \"Gérer les messages\", group: \"Modération\" }, { key: \""
+      },
+      {
+        "file": "server.js",
+        "line": 11128,
+        "context": " bit: 1 << 11, label: \"Exclure des membres\", group: \"Modération\" }, { key: \""
+      },
+      {
+        "file": "server.js",
+        "line": 11129,
+        "context": ", bit: 1 << 12, label: \"Bannir des membres\", group: \"Modération\" }, { key: \""
+      },
+      {
+        "file": "server.js",
+        "line": 11132,
+        "context": ", label: \"Déconnecter les membres du vocal\", group: \"Modération\" } ]); cons"
+      },
+      {
+        "file": "public/people-server-settings.js",
+        "line": 961,
+        "context": "propres à chaque salon.\"], moderation: [\"Modération\", \"Outils de sécurité, journal d’actions et paramètres de modération.\"] }; con"
+      }
+    ]
+  },
+  {
+    "text": "Gérer les salons",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11126,
+        "context": "}, { key: \"MANAGE_CHANNELS\", bit: 1 << 9, label: \"Gérer les salons\", group: (\"\" + "
+      }
+    ]
+  },
+  {
+    "text": "Gérer les rôles",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11127,
+        "context": ") }, { key: \"MANAGE_ROLES\", bit: 1 << 10, label: \"Gérer les rôles\", group: (\"\" + "
+      }
+    ]
+  },
+  {
+    "text": "Bannir des membres",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11129,
+        "context": "n\" }, { key: \"BAN_MEMBERS\", bit: 1 << 12, label: \"Bannir des membres\", group: \"Modér"
+      }
+    ]
+  },
+  {
+    "text": "Gérer le serveur",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11130,
+        "context": " }, { key: \"MANAGE_SERVER\", bit: 1 << 13, label: \"Gérer le serveur\", group: (\"\" + "
+      }
+    ]
+  },
+  {
+    "text": "Avancé",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11131,
+        "context": "TOR\", bit: 1 << 14, label: \"Administrateur\", group: \"Avancé\" }, { key: \""
+      }
+    ]
+  },
+  {
+    "text": "Déconnecter les membres du vocal",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11132,
+        "context": "\" }, { key: \"MOVE_MEMBERS\", bit: 1 << 15, label: \"Déconnecter les membres du vocal\", group: \"Modér"
+      }
+    ]
+  },
+  {
+    "text": "Tu ne peux pas te modérer toi-même.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11769,
+        "context": "get || actor === target) return { ok: false, reason: \"Tu ne peux pas te modérer toi-même.\" }; const se"
+      }
+    ]
+  },
+  {
+    "text": "Le propriétaire du serveur ne peut pas être modéré.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11772,
+        "context": "ver.ownerId) === target) return { ok: false, reason: \"Le propriétaire du serveur ne peut pas être modéré.\" }; const ac"
+      }
+    ]
+  },
+  {
+    "text": "Tu n'as pas cette permission de modération.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11775,
+        "context": "ask, permission)) { return { ok: false, reason: \"Tu n'as pas cette permission de modération.\" }; } if "
+      }
+    ]
+  },
+  {
+    "text": "Ce membre a un rôle égal ou supérieur au tien.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11782,
+        "context": "Position || 0)) { return { ok: false, reason: \"Ce membre a un rôle égal ou supérieur au tien.\" }; } }"
+      }
+    ]
+  },
+  {
+    "text": "Impossible de créer ce rôle.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 11977,
+        "context": "us(bad ? 400 : 500).json({ ok: false, error: err?.code === \"ROLE_PERMISSION_ESCALATION\" ? (\"\" + peopleText(\"ui_8d00408b0c\") + \"\") : \"Impossible de créer ce rôle.\" }); } }"
+      }
+    ]
+  },
+  {
+    "text": "Impossible de supprimer ce rôle.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12007,
+        "context": "ARCHY\" ? 400 : 500).json({ ok: false, error: err?.code === \"ROLE_HIERARCHY\" ? (\"\" + peopleText(\"ui_06835fcdd4\") + \"\") : \"Impossible de supprimer ce rôle.\" }); } }); "
+      }
+    ]
+  },
+  {
+    "text": "Tu ne peux pas attribuer ou retirer un rôle égal ou supérieur au tien.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12045,
+        "context": " res.status(status).json({ ok: false, error: err?.code === \"ROLE_HIERARCHY\" ? \"Tu ne peux pas attribuer ou retirer un rôle égal ou supérieur au tien.\" : \"Impossible de mo"
+      }
+    ]
+  },
+  {
+    "text": "Impossible de modifier les rôles de ce membre.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12045,
+        "context": " res.status(status).json({ ok: false, error: err?.code === \"ROLE_HIERARCHY\" ? \"Tu ne peux pas attribuer ou retirer un rôle égal ou supérieur au tien.\" : \"Impossible de mo"
+      }
+    ]
+  },
+  {
+    "text": "Tu ne peux pas autoriser une permission que tu ne possèdes pas.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12084,
+        "context": " ? (\"\" + peopleText(\"ui_06835fcdd4\") + \"\") : err?.code === \"ROLE_PERMISSION_ESCALATION\" ? \"Tu ne peux pas autoriser une permission que tu ne possèdes pas.\" : \"Impossible "
+      }
+    ]
+  },
+  {
+    "text": "Impossible de modifier ces permissions.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12084,
+        "context": " ? (\"\" + peopleText(\"ui_06835fcdd4\") + \"\") : err?.code === \"ROLE_PERMISSION_ESCALATION\" ? \"Tu ne peux pas autoriser une permission que tu ne possèdes pas.\" : \"Impossible "
+      }
+    ]
+  },
+  {
+    "text": "Cet appareil E2EE n'est pas enregistré.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12832,
+        "context": "ui_2843250447\") + \"\")], DEVICE_UNKNOWN: [400, \"Cet appareil E2EE n'est pas enregistré.\"], INVALID:"
+      }
+    ]
+  },
+  {
+    "text": "Requête E2EE invalide.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12833,
+        "context": " E2EE n'est pas enregistré.\"], INVALID: [400, \"Requête E2EE invalide.\"], CLAIMED:"
+      }
+    ]
+  },
+  {
+    "text": "Un autre appareil prépare déjà la clé de ce salon.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12834,
+        "context": "00, \"Requête E2EE invalide.\"], CLAIMED: [409, \"Un autre appareil prépare déjà la clé de ce salon.\"], NOT_PEND"
+      }
+    ]
+  },
+  {
+    "text": "Cet appareil ne possède plus le verrou de génération de clé.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12836,
+        "context": "E n'est plus en attente.\"], CLAIM_LOST: [409, \"Cet appareil ne possède plus le verrou de génération de clé.\"], RECIPIEN"
+      }
+    ]
+  },
+  {
+    "text": "La liste des appareils autorisés a changé pendant la rotation.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12838,
+        "context": "est invalide.\"], RECIPIENT_SET_CHANGED: [409, \"La liste des appareils autorisés a changé pendant la rotation.\"], NO_RECIP"
+      }
+    ]
+  },
+  {
+    "text": "Aucun appareil E2EE autorisé n'est disponible.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 12839,
+        "context": " pendant la rotation.\"], NO_RECIPIENTS: [409, \"Aucun appareil E2EE autorisé n'est disponible.\"] }; const"
+      }
+    ]
+  },
+  {
+    "text": "📞 Appel refusé",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 15563,
+        "context": "fd0\") + \"\"); } const labels = { declined: \"📞 Appel refusé\", cancelle"
+      }
+    ]
+  },
+  {
+    "text": "📞 Appel annulé",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 15565,
+        "context": " declined: \"📞 Appel refusé\", cancelled: \"📞 Appel annulé\", timeout:"
+      }
+    ]
+  },
+  {
+    "text": "📞 Appel manqué",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 15567,
+        "context": " cancelled: \"📞 Appel annulé\", timeout: \"📞 Appel manqué\", \"alone-t"
+      }
+    ]
+  },
+  {
+    "text": "📞 Appel interrompu",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 15573,
+        "context": "\"\" + peopleText(\"ui_5ae2519a59\") + \"\"), disconnected: \"📞 Appel interrompu\", hangup: "
+      }
+    ]
+  },
+  {
+    "text": "Impossible de rejoindre cet appel.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 16981,
+        "context": "ason, error: joined.reason === \"limit\" ? (\"\" + peopleText(\"ui_baa245c544\") + \"\") : \"Impossible de rejoindre cet appel.\" }"
+      }
+    ]
+  },
+  {
+    "text": "Tu n'as pas la permission de parler dans ce vocal.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 18486,
+        "context": "{ socket.emit(\"system-message\", { text: \"Tu n'as pas la permission de parler dans ce vocal.\", time: Date.no"
+      }
+    ]
+  },
+  {
+    "text": "Tu n'as pas la permission d'activer ta caméra dans ce vocal.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 18505,
+        "context": ") { socket.emit(\"system-message\", { text: \"Tu n'as pas la permission d'activer ta caméra dans ce vocal.\", time: Date.no"
+      }
+    ]
+  },
+  {
+    "text": "Tu n'as pas la permission de partager ton écran dans ce vocal.",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 18521,
+        "context": ") { socket.emit(\"system-message\", { text: \"Tu n'as pas la permission de partager ton écran dans ce vocal.\", time: Date.no"
+      }
+    ]
+  },
+  {
+    "text": " serveur(s) + ",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 18943,
+        "context": "IT\" ); console.log( \"[People] Chiffrement messages : \" + migratedGeneral + \" serveur(s) + \" + mig"
+      }
+    ]
+  },
+  {
+    "text": " image(s) migrée(s).",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 18947,
+        "context": "IT\" ); console.log( \"[People] Chiffrement messages : \" + migratedGeneral + \" serveur(s) + \" + migratedDm + \" MP + \" + migratedImages + \" image(s) migrée(s).\" ); "
+      }
+    ]
+  },
+  {
+    "text": " image(s) locale(s) migrée(s).",
+    "uses": [
+      {
+        "file": "server.js",
+        "line": 19066,
+        "context": " 1; } } console.log( \"[People] Chiffrement messages local vérifié; \" + migratedLocalImages + \" image(s) locale(s) migrée(s).\" ); } // ="
+      }
+    ]
+  },
+  {
+    "text": "système",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 561,
+        "context": " ).trim(); if ( !username || username.toLocaleLowerCase( \"fr-FR\" ) === \"système\" || userna"
+      },
+      {
+        "file": "public/people-social.js",
+        "line": 2347,
+        "context": "im(); if ( !username || username.toLocaleLowerCase( \"fr-FR\" ) === \"système\" || user"
+      }
+    ]
+  },
+  {
+    "text": "Le serveur n'a pas répondu.",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 2128,
+        "context": "| { ok: false, error: \"Le serveur n'a pas répondu.\" }"
+      },
+      {
+        "file": "public/app.js",
+        "line": 2287,
+        "context": " => { resolve(value || { ok: false, error: \"Le serveur n'a pas répondu.\" }); });"
+      }
+    ]
+  },
+  {
+    "text": "Ce serveur n'a pas encore été synchronisé sur cet appareil.",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 2188,
+        "context": "flinePayload) { return { ok: false, error: \"Ce serveur n'a pas encore été synchronisé sur cet appareil.\" }; } "
+      }
+    ]
+  },
+  {
+    "text": "Ce salon n'a pas encore été synchronisé sur cet appareil.",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 2275,
+        "context": "if (!history) { return { ok: false, error: \"Ce salon n'a pas encore été synchronisé sur cet appareil.\" }; } "
+      }
+    ]
+  },
+  {
+    "text": "Le serveur vocal n'a pas répondu.",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 3377,
+        "context": "| { ok: false, error: \"Le serveur vocal n'a pas répondu.\" }"
+      },
+      {
+        "file": "public/app.js",
+        "line": 3388,
+        "context": "h({ ok: false, error: \"Le serveur vocal n'a pas répondu.\" }"
+      }
+    ]
+  },
+  {
+    "text": "ICE candidate ignoré",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 4171,
+        "context": "ate(candidate)); } catch (err) { console.warn(\"ICE candidate ignoré\", err); } } "
+      }
+    ]
+  },
+  {
+    "text": "Impossible de créer l'offre",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 4421,
+        "context": "eOffer(peer.id); } catch (err) { console.error(\"Impossible de créer l'offre\", err); } } "
+      }
+    ]
+  },
+  {
+    "text": "Erreur offre WebRTC",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 4447,
+        "context": "Description }); } catch (err) { console.error(\"Erreur offre WebRTC\", err); requestP"
+      }
+    ]
+  },
+  {
+    "text": "Erreur réponse WebRTC",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 4462,
+        "context": "andidates(from, pc); } catch (err) { console.error(\"Erreur réponse WebRTC\", err); requestP"
+      }
+    ]
+  },
+  {
+    "text": "ICE candidate refusé",
+    "uses": [
+      {
+        "file": "public/app.js",
+        "line": 4480,
+        "context": "ndidate(candidate)); } catch (err) { console.warn(\"ICE candidate refusé\", err); } }); "
+      }
+    ]
+  },
+  {
+    "text": "Thème importé",
+    "uses": [
+      {
+        "file": "public/people-appearance-settings-v2.js",
+        "line": 106,
+        "context": " 1] }; return { name: typeof value?.name === \"string\" && value.name.trim() ? value.name.trim().slice(0, 80) : \"Thème importé\", palette"
+      }
+    ]
+  },
+  {
+    "text": "Thème personnalisé People",
+    "uses": [
+      {
+        "file": "public/people-appearance-settings-v2.js",
+        "line": 337,
+        "context": "people-theme\", version: 2, name: \"Thème personnalisé People\", expo"
+      }
+    ]
+  },
+  {
+    "text": "En cours",
+    "uses": [
+      {
+        "file": "public/people-call-bar.js",
+        "line": 266,
+        "context": " \"\")} ${index + 1}`; const status = { active: \"En cours\", incoming: \"En"
+      }
+    ]
+  },
+  {
+    "text": "Tu as atteint la limite de 2 appels simultanés. Raccroche un appel pour continuer.",
+    "uses": [
+      {
+        "file": "public/people-call-bar.js",
+        "line": 312,
+        "context": "=> call.phase !== \"incoming\").length >= 2) { window.alert(\"Tu as atteint la limite de 2 appels simultanés. Raccroche un appel pour continuer.\"); return false;"
+      },
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 3759,
+        "context": " if (free) return free.start(); window.alert(\"Tu as atteint la limite de 2 appels simultanés. Raccroche un appel pour continuer.\"); } }; "
+      }
+    ]
+  },
+  {
+    "text": "Aucun",
+    "uses": [
+      {
+        "file": "public/people-camera-effects.js",
+        "line": 22,
+        "context": "EFFECTS = Object.freeze([ { id: \"none\", label: \"Aucun\", icon: \"✕\", co"
+      }
+    ]
+  },
+  {
+    "text": "Mosaïque",
+    "uses": [
+      {
+        "file": "public/people-camera-effects.js",
+        "line": 28,
+        "context": " cover: \"medium\" }, { id: \"pixel-face\", label: \"Mosaïque\", icon: \"▓\", co"
+      }
+    ]
+  },
+  {
+    "text": "Appel refusé",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2544,
+        "context": " reason ) { const map = { declined: \"Appel refusé\", cancel"
+      },
+      {
+        "file": "public/people-social.js",
+        "line": 4060,
+        "context": " ); } const labels = { declined: \"Appel refusé\", cancel"
+      }
+    ]
+  },
+  {
+    "text": "Appel annulé",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2546,
+        "context": " declined: \"Appel refusé\", cancelled: \"Appel annulé\", timeou"
+      },
+      {
+        "file": "public/people-social.js",
+        "line": 4062,
+        "context": " declined: \"Appel refusé\", cancelled: \"Appel annulé\", timeou"
+      }
+    ]
+  },
+  {
+    "text": "Pas de réponse",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2548,
+        "context": " cancelled: \"Appel annulé\", timeout: \"Pas de réponse\", hangup"
+      }
+    ]
+  },
+  {
+    "text": "Tu as quitté l'appel",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2552,
+        "context": ".PeopleI18n.t(\"ui_00ff74289a\") + \"\"), left: \"Tu as quitté l'appel\", empty:"
+      }
+    ]
+  },
+  {
+    "text": "Appel fermé après 3 min seul",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2556,
+        "context": ".PeopleI18n.t(\"ui_00ff74289a\") + \"\"), \"alone-timeout\": \"Appel fermé après 3 min seul\", discon"
+      }
+    ]
+  },
+  {
+    "text": "Connexion quittée",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2558,
+        "context": " \"Appel fermé après 3 min seul\", disconnected: \"Connexion quittée\", unavai"
+      }
+    ]
+  },
+  {
+    "text": "Appel indisponible",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2560,
+        "context": "nected: \"Connexion quittée\", unavailable: \"Appel indisponible\", limit:"
+      }
+    ]
+  },
+  {
+    "text": "Tu as atteint la limite de 2 appels simultanés",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2562,
+        "context": "lable: \"Appel indisponible\", limit: \"Tu as atteint la limite de 2 appels simultanés\", \"joine"
+      }
+    ]
+  },
+  {
+    "text": "Appel rejoint ailleurs",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2564,
+        "context": "nt la limite de 2 appels simultanés\", \"joined-elsewhere\": \"Appel rejoint ailleurs\", \"answe"
+      }
+    ]
+  },
+  {
+    "text": "Appel pris ailleurs",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2566,
+        "context": "\": \"Appel rejoint ailleurs\", \"answered-elsewhere\": \"Appel pris ailleurs\" }; "
+      }
+    ]
+  },
+  {
+    "text": "Notification",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 2743,
+        "context": " if ( !payload?.silent && \"Notification\" in window && No"
+      },
+      {
+        "file": "public/people-local-controls.js",
+        "line": 507,
+        "context": "eturn \"desktop-native\"; } if (!(\"Notification\" in window)) return \"unsu"
+      },
+      {
+        "file": "public/people-local-controls.js",
+        "line": 911,
+        "context": "in navigator, notificationSupported: \"Notification\" in window, deskt"
+      },
+      {
+        "file": "public/people-social.js",
+        "line": 6436,
+        "context": "ationDecision?.allowed !== false && \"Notification\" in window && No"
+      }
+    ]
+  },
+  {
+    "text": "<span>↘️</span><small>Réduire</small>",
+    "uses": [
+      {
+        "file": "public/people-dm-calls.js",
+        "line": 4530,
+        "context": "opleI18n.t(\"ui_6028381ee0\") + \"\") ); miniButton.innerHTML = \"<span>↘️</span><small>Réduire</small>\"; miniButt"
+      }
+    ]
+  },
+  {
+    "text": "Salon texte",
+    "uses": [
+      {
+        "file": "public/people-ergonomics.js",
+        "line": 38,
+        "context": "(\".people-server-channel-name\").textContent, kind: \"Salon texte\", source }); "
+      }
+    ]
+  },
+  {
+    "text": "Reset all notification overrides?",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 266,
+        "context": " \"ui_2603a583cb\": \"Reset All Overrides\", \"ui_a04eafaddc\": \"Reset all notification overrides?\", \"ui_f9434ea"
+      }
+    ]
+  },
+  {
+    "text": "Unknown date",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 592,
+        "context": "ot been synchronized on this device yet.\", \"ui_ad224bb89c\": \"Unknown date\", \"ui_06a6948"
+      }
+    ]
+  },
+  {
+    "text": "No description.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 593,
+        "context": " yet.\", \"ui_ad224bb89c\": \"Unknown date\", \"ui_06a6948209\": \"No description.\", \"ui_68b2b4f"
+      }
+    ]
+  },
+  {
+    "text": "Unable to load notification settings.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 736,
+        "context": "\": \"Unable to mark this channel as read.\", \"ui_ebd0be49fc\": \"Unable to load notification settings.\", \"ui_1493339"
+      }
+    ]
+  },
+  {
+    "text": "Invalid notification settings.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 737,
+        "context": ": \"Unable to load notification settings.\", \"ui_1493339986\": \"Invalid notification settings.\", \"ui_b93d0ab"
+      }
+    ]
+  },
+  {
+    "text": "Too many notification settings.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 738,
+        "context": "339986\": \"Invalid notification settings.\", \"ui_b93d0ab0e7\": \"Too many notification settings.\", \"ui_498474f"
+      }
+    ]
+  },
+  {
+    "text": "Unable to save notification settings.",
+    "uses": [
+      {
+        "file": "public/people-i18n.js",
+        "line": 739,
+        "context": "ab0e7\": \"Too many notification settings.\", \"ui_498474f13d\": \"Unable to save notification settings.\", \"ui_6b9f0ba"
+      }
+    ]
+  },
+  {
+    "text": "Service Worker sans réponse (ancienne version ou timeout)",
+    "uses": [
+      {
+        "file": "public/people-local-controls.js",
+        "line": 662,
+        "context": "ish({ ok: false, error: \"Service Worker sans réponse (ancienne version ou timeout)\" })"
+      }
+    ]
+  },
+  {
+    "text": "Réponse vide du Service Worker",
+    "uses": [
+      {
+        "file": "public/people-local-controls.js",
+        "line": 667,
+        "context": " finish(event.data || { ok: false, error: \"Réponse vide du Service Worker\" }); "
+      }
+    ]
+  },
+  {
+    "text": "Les notifications système fonctionnent.",
+    "uses": [
+      {
+        "file": "public/people-local-controls.js",
+        "line": 898,
+        "context": "tification( \"People — test\", browserNotificationOptions(\"Les notifications système fonctionnent.\", { tag: `people-test-${Date.now()}`, renotify: true, data: { url: window"
+      }
+    ]
+  },
+  {
+    "text": "people-notification-prefs-v1:",
+    "uses": [
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 6,
+        "context": "IFICATION_PREFS_CLIENT_V1_START === const STORAGE_PREFIX = \"people-notification-prefs-v1:\"; const SAVE_"
+      }
+    ]
+  },
+  {
+    "text": "Erreur HTTP ",
+    "uses": [
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 168,
+        "context": " const error = new Error(data?.error || `Erreur HTTP ${response.status}`); error."
+      }
+    ]
+  },
+  {
+    "text": "Serveur — ",
+    "uses": [
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 656,
+        "context": "rId: server.dataset.serverId, label: `Serveur — ${server.title || (\"\" + window.PeopleI18n.t(\"ui_aef7de28d5\") + \"\")}`, menuS"
+      }
+    ]
+  },
+  {
+    "text": "salon",
+    "uses": [
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 666,
+        "context": "iveServer?.()?.id || \"\"); const name = channel.querySelector(\".people-server-channel-name\")?.textContent?.trim() || \"salon\"; return "
+      },
+      {
+        "file": "public/people-server-settings.js",
+        "line": 1002,
+        "context": "window.PeopleI18n.t(\"ui_e31ab643c4\") + \"\") : entry.path.includes(\"/channels\") ? \"salon\" : (\"\" + window.PeopleI18n.t(\"ui_b3eacd3343\") + \"\"); r"
+      }
+    ]
+  },
+  {
+    "text": "Salon — #",
+    "uses": [
+      {
+        "file": "public/people-notification-prefs.js",
+        "line": 671,
+        "context": "d: channel.dataset.channelId, label: `Salon — #${name}`, menuS"
+      }
+    ]
+  },
+  {
+    "text": "/people-notification-prefs.js",
+    "uses": [
+      {
+        "file": "public/people-notifications-sw.js",
+        "line": 25,
+        "context": "dmin-presence\"; const PEOPLE_SHELL_ASSETS = [ \"/people-presence.js\", \"/people-presence.css\", \"/manifest.webmanifest\", \"/people-app-192.png\", \"/people-app-512.png\", \"/\", \""
+      }
+    ]
+  },
+  {
+    "text": "/people-notification-prefs.css",
+    "uses": [
+      {
+        "file": "public/people-notifications-sw.js",
+        "line": 44,
+        "context": "dmin-presence\"; const PEOPLE_SHELL_ASSETS = [ \"/people-presence.js\", \"/people-presence.css\", \"/manifest.webmanifest\", \"/people-app-192.png\", \"/people-app-512.png\", \"/\", \""
+      }
+    ]
+  },
+  {
+    "text": "Erreur d'envoi",
+    "uses": [
+      {
+        "file": "public/people-offline.js",
+        "line": 265,
+        "context": ".attempts || 0) + 1, lastError: String(err?.message || err || \"Erreur d'envoi\").slice(0, 500)"
+      }
+    ]
+  },
+  {
+    "text": "Créer une catégorie",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 192,
+        "context": "null) { const labels = { category: [\"Créer une catégorie\", \"Nom de la catégorie\"], text: ["
+      }
+    ]
+  },
+  {
+    "text": "Nom de la catégorie",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 192,
+        "context": "null) { const labels = { category: [\"Créer une catégorie\", \"Nom de la catégorie\"], text: ["
+      }
+    ]
+  },
+  {
+    "text": "Créer un salon textuel",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 193,
+        "context": "égorie\", \"Nom de la catégorie\"], text: [\"Créer un salon textuel\", \"Nom du salon textuel\"], voice: "
+      }
+    ]
+  },
+  {
+    "text": "Nom du salon textuel",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 193,
+        "context": "égorie\", \"Nom de la catégorie\"], text: [\"Créer un salon textuel\", \"Nom du salon textuel\"], voice: "
+      }
+    ]
+  },
+  {
+    "text": "Créer un salon vocal",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 194,
+        "context": "tuel\", \"Nom du salon textuel\"], voice: [\"Créer un salon vocal\", \"Nom du salon vocal\"] }; con"
+      }
+    ]
+  },
+  {
+    "text": "Nom du salon vocal",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 194,
+        "context": "tuel\", \"Nom du salon textuel\"], voice: [\"Créer un salon vocal\", \"Nom du salon vocal\"] }; con"
+      }
+    ]
+  },
+  {
+    "text": "Nouvelle catégorie",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 196,
+        "context": " salon vocal\"] }; const defaults = { category: \"Nouvelle catégorie\", text: \"nouvea"
+      }
+    ]
+  },
+  {
+    "text": "nouveau-salon",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 196,
+        "context": "defaults = { category: \"Nouvelle catégorie\", text: \"nouveau-salon\", voice: \"Nouve"
+      }
+    ]
+  },
+  {
+    "text": "Nouveau vocal",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 196,
+        "context": "\"Nouvelle catégorie\", text: \"nouveau-salon\", voice: \"Nouveau vocal\" }; const ["
+      }
+    ]
+  },
+  {
+    "text": "cet élément",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 231,
+        "context": "r\", description: `Nouveau nom pour « ${channel.name || \"cet élément\"} »`, val"
+      }
+    ]
+  },
+  {
+    "text": "Déplacer le salon",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 259,
+        "context": "; const raw = await peopleDialog({ title: \"Déplacer le salon\", descrip"
+      }
+    ]
+  },
+  {
+    "text": "Choisis la catégorie avec son numéro :\n",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 260,
+        "context": "tle: \"Déplacer le salon\", description: `Choisis la catégorie avec son numéro :\\n${choices}`, value: "
+      }
+    ]
+  },
+  {
+    "text": "Déplacer",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 262,
+        "context": "méro :\\n${choices}`, value: \"0\", confirmText: \"Déplacer\" }); if"
+      }
+    ]
+  },
+  {
+    "text": "Seul le propriétaire peut gérer les salons pour le moment.",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 632,
+        "context": "ntId = null) { if (!canManage()) throw new Error(\"Seul le propriétaire peut gérer les salons pour le moment.\"); if (![\""
+      }
+    ]
+  },
+  {
+    "text": "Type de salon invalide.",
+    "uses": [
+      {
+        "file": "public/people-server-channels.js",
+        "line": 633,
+        "context": "\"voice\"].includes(String(type || \"\"))) throw new Error(\"Type de salon invalide.\"); return "
+      }
+    ]
+  },
+  {
+    "text": "Erreur E2EE",
+    "uses": [
+      {
+        "file": "public/people-server-e2ee.js",
+        "line": 478,
+        "context": " status: \"error\", error: err?.message || \"Erreur E2EE\" }); "
+      }
+    ]
+  },
+  {
+    "text": "</label>\n      <div class=\"people-server-settings-copy-row\">\n        <input readonly value=\"Chargement…\" />\n        <button type=\"button\">",
+    "uses": [
+      {
+        "file": "public/people-server-settings.js",
+        "line": 416,
+        "context": "-settings-invite-card\"; card.innerHTML = ` <label>${window.PeopleI18n.t(\"ui_5c09c50c68\")}</label> <div class=\"people-server-settings-copy-row\"> <input readonly value=\"Cha"
+      }
+    ]
+  },
+  {
+    "text": "Rôles personnalisés et permissions globales ou propres à chaque salon.",
+    "uses": [
+      {
+        "file": "public/people-server-settings.js",
+        "line": 960,
+        "context": "id) { const definitions = { roles: [(\"\" + window.PeopleI18n.t(\"ui_1fa0387819\") + \"\"), \"Rôles personnalisés et permissions globales ou propres à chaque salon.\"], moderat"
+      }
+    ]
+  },
+  {
+    "text": "Outils de sécurité, journal d’actions et paramètres de modération.",
+    "uses": [
+      {
+        "file": "public/people-server-settings.js",
+        "line": 961,
+        "context": "propres à chaque salon.\"], moderation: [\"Modération\", \"Outils de sécurité, journal d’actions et paramètres de modération.\"] }; con"
+      }
+    ]
+  },
+  {
+    "text": "Création",
+    "uses": [
+      {
+        "file": "public/people-server-settings.js",
+        "line": 997,
+        "context": "ot.id)}/audit`); const actions = { POST: \"Création\", PUT: \"Modific"
+      }
+    ]
+  },
+  {
+    "text": "people-settings-notification-sound-v1",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 29,
+        "context": "============= const SOUND_KEYS = { notification: \"people-settings-notification-sound-v1\", ringtone"
+      }
+    ]
+  },
+  {
+    "text": "Une notification plus douce.",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 45,
+        "context": ".PeopleI18n.t(\"ui_5964d46729\") + \"\"), description: \"Une notification plus douce.\" }, {"
+      }
+    ]
+  },
+  {
+    "text": "Une notification vibe retro comme on aime.",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 51,
+        "context": "d: \"digital\", name: \"Digital\", description: \"Une notification vibe retro comme on aime.\" }, {"
+      }
+    ]
+  },
+  {
+    "text": "Une notification plus petite, rapide et lumineuse.",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 57,
+        "context": " id: \"pop\", name: \"Pop\", description: \"Une notification plus petite, rapide et lumineuse.\" } ]; "
+      }
+    ]
+  },
+  {
+    "text": "Une sonnerie rythmée.",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 72,
+        "context": " id: \"pulse\", name: \"Pulse\", description: \"Une sonnerie rythmée.\" }, {"
+      }
+    ]
+  },
+  {
+    "text": "Rétro",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 76,
+        "context": ".\" }, { id: \"retro\", name: \"Rétro\", descri"
+      }
+    ]
+  },
+  {
+    "text": "Une sonnerie plus discrète.",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 90,
+        "context": " id: \"bright\", name: \"Claire\", description: \"Une sonnerie plus discrète.\" } ]; "
+      }
+    ]
+  },
+  {
+    "text": "notification",
+    "uses": [
+      {
+        "file": "public/people-settings.js",
+        "line": 4049,
+        "context": "onFragment .appendChild( soundCard( sound, \"notification\" ) ); "
+      },
+      {
+        "file": "public/people-settings.js",
+        "line": 4147,
+        "context": "ener( \"click\", (event) => { handleSoundClick( event, \"notification\", notifications ); } ); "
+      }
+    ]
+  },
+  {
+    "text": "Appel manqué — pas de réponse",
+    "uses": [
+      {
+        "file": "public/people-social.js",
+        "line": 4064,
+        "context": " cancelled: \"Appel annulé\", timeout: \"Appel manqué — pas de réponse\", \"alone"
+      }
+    ]
+  },
+  {
+    "text": "Appel interrompu",
+    "uses": [
+      {
+        "file": "public/people-social.js",
+        "line": 4070,
+        "context": ".PeopleI18n.t(\"ui_00ff74289a\") + \"\"), disconnected: \"Appel interrompu\", hangup"
+      }
+    ]
+  },
+  {
+    "text": "people-ping-toast people-dm-notification-toast",
+    "uses": [
+      {
+        "file": "public/people-social.js",
+        "line": 6216,
+        "context": "eateElement( \"div\" ); toast.className = \"people-ping-toast people-dm-notification-toast\"; const "
+      }
+    ]
+  }
+]

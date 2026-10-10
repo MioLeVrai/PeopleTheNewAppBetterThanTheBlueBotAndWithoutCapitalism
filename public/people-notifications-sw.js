@@ -1,8 +1,19 @@
 "use strict";
 
-const PEOPLE_NOTIFICATIONS_SW_VERSION = "20261008-admin-presence";
-const PEOPLE_SHELL_CACHE = "people-shell-20261008-admin-presence";
+const PEOPLE_NOTIFICATIONS_SW_VERSION = "20261010-resume";
+const PEOPLE_SHELL_CACHE = "people-shell-20261010-resume";
 const PEOPLE_SHELL_ASSETS = [
+  "/people-i18n.js",
+  "/people-avatar-presence.js",
+  "/people-avatar-presence.css",
+  "/people-call-bar.js",
+  "/people-ergonomics.js",
+  "/people-ergonomics.css",
+  "/people-call-media.js",
+  "/people-call-media.css",
+  "/people-speaking.js",
+  "/people-typing.js",
+  "/people-channel-permissions.js",
   "/people-presence.js",
   "/people-presence.css",
   "/manifest.webmanifest",

@@ -47,7 +47,7 @@
         }
       };
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error("IndexedDB indisponible."));
+      request.onerror = () => reject(request.error || new Error("IndexedDB is unavailable."));
     });
     return dbPromise;
   }
@@ -65,15 +65,15 @@
         return;
       }
       tx.oncomplete = () => resolve(result);
-      tx.onerror = () => reject(tx.error || new Error("IndexedDB erreur."));
-      tx.onabort = () => reject(tx.error || new Error("IndexedDB annulé."));
+      tx.onerror = () => reject(tx.error || new Error(("" + window.PeopleI18n.t("ui_7db8d2b831") + "")));
+      tx.onabort = () => reject(tx.error || new Error(("" + window.PeopleI18n.t("ui_49a2502fee") + "")));
     });
   }
 
   async function requestValue(request) {
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error("IndexedDB erreur."));
+      request.onerror = () => reject(request.error || new Error(("" + window.PeopleI18n.t("ui_7db8d2b831") + "")));
     });
   }
 
@@ -85,7 +85,7 @@
         const tx = db.transaction(SECURE_STORE, "readonly");
         const req = tx.objectStore(SECURE_STORE).get(KEY_RECORD);
         req.onsuccess = () => resolve(req.result?.value || null);
-        req.onerror = () => reject(req.error || new Error("Clé locale indisponible."));
+        req.onerror = () => reject(req.error || new Error(("" + window.PeopleI18n.t("ui_3561da6d15") + "")));
       });
       if (existing) return existing;
 
@@ -135,7 +135,7 @@
       const tx = db.transaction(SECURE_STORE, "readonly");
       const req = tx.objectStore(SECURE_STORE).get(key);
       req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error || new Error("Cache local indisponible."));
+      req.onerror = () => reject(req.error || new Error("Local cache is unavailable."));
     });
     if (!record || record.kind !== "secure") return null;
     try {
@@ -184,7 +184,7 @@
       const tx = db.transaction(QUEUE_STORE, "readonly");
       const req = tx.objectStore(QUEUE_STORE).getAll();
       req.onsuccess = () => resolve(Array.isArray(req.result) ? req.result : []);
-      req.onerror = () => reject(req.error || new Error("File hors ligne indisponible."));
+      req.onerror = () => reject(req.error || new Error(("" + window.PeopleI18n.t("ui_5406a4312e") + "")));
     });
     const out = [];
     const currentAccountId = accountId();
@@ -229,13 +229,13 @@
     }
     if (offline) {
       el.textContent = pendingCount > 0
-        ? `Hors ligne • ${pendingCount} message${pendingCount > 1 ? "s" : ""} en attente`
-        : "Hors ligne • les messages texte seront envoyés à la reconnexion";
+        ? `${window.PeopleI18n.t("ui_71a5b4a36d")} ${pendingCount} message${pendingCount > 1 ? "s" : ""} pending`
+        : ("" + window.PeopleI18n.t("ui_69f6a5eff5") + "");
       el.classList.add("offline");
     } else {
       el.textContent = pendingCount > 0
-        ? `Reconnexion • envoi de ${pendingCount} message${pendingCount > 1 ? "s" : ""}…`
-        : "Connexion rétablie";
+        ? `Reconnecting • sending ${pendingCount} message${pendingCount > 1 ? "s" : ""}…`
+        : ("" + window.PeopleI18n.t("ui_8b6721dc2a") + "");
       el.classList.remove("offline");
     }
     el.classList.add("show");
@@ -243,7 +243,7 @@
 
   async function enqueue(type, payload) {
     const currentAccountId = accountId();
-    if (!currentAccountId) throw new Error("Compte People indisponible pour le mode hors ligne.");
+    if (!currentAccountId) throw new Error(("" + window.PeopleI18n.t("ui_c3acbf41e8") + ""));
     const id = clean(payload?.clientId) || `${type}-${Date.now().toString(36)}-${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}`;
     const sealed = await seal({ ...payload, clientId: id });
     await transaction(QUEUE_STORE, "readwrite", (store) => {
@@ -262,7 +262,7 @@
     const next = {
       ...record,
       attempts: Number(record.attempts || 0) + 1,
-      lastError: String(err?.message || err || "Erreur d'envoi").slice(0, 500)
+      lastError: String(err?.message || err || "Send failed").slice(0, 500)
     };
     delete next.payload;
     await transaction(QUEUE_STORE, "readwrite", (store) => store.put(next));
@@ -284,7 +284,7 @@
     );
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
-      throw new Error(data?.error || "Impossible d'envoyer le message serveur.");
+      throw new Error(data?.error || ("" + window.PeopleI18n.t("ui_35532d599f") + ""));
     }
     if (data?.message) {
       await appendServerMessage(payload.serverId, payload.channelId, data.message);
@@ -443,6 +443,10 @@
     const pending = await pendingDm(username);
     return { ...cached, messages: mergeById(cached.messages || [], pending) };
   }
+  async function forgetDmView(username) {
+    if (!accountId()) return;
+    await transaction(SECURE_STORE, "readwrite", store => store.delete(accountKey(`dm:${usernameKey(username)}`)));
+  }
 
   async function cacheConversations(conversations, unreadTotal = 0) {
     if (!accountId()) return;
@@ -545,6 +549,7 @@
     appendServerMessage,
     cacheDmView,
     getDmView,
+    forgetDmView,
     cacheConversations,
     getConversations,
     queueServer,

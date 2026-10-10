@@ -29,7 +29,7 @@
     overlay.className = "people-image-viewer hidden";
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
-    overlay.setAttribute("aria-label", "Image en plein écran");
+    overlay.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_37b1eae5af") + ""));
 
     viewport = document.createElement("div");
     viewport.className = "people-image-viewer-viewport";
@@ -42,13 +42,13 @@
     closeButton = document.createElement("button");
     closeButton.className = "people-image-viewer-close";
     closeButton.type = "button";
-    closeButton.setAttribute("aria-label", "Fermer l’image");
-    closeButton.title = "Fermer";
+    closeButton.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_b0a8fec1bc") + ""));
+    closeButton.title = ("" + window.PeopleI18n.t("ui_7d9eb7acb1") + "");
     closeButton.textContent = "×";
 
     hint = document.createElement("div");
     hint.className = "people-image-viewer-hint";
-    hint.textContent = "Clic droit : zoom · Maintiens et glisse : déplacer · Échap : fermer";
+    hint.textContent = ("" + window.PeopleI18n.t("ui_0759490322") + "");
 
     viewport.appendChild(image);
     overlay.append(viewport, closeButton, hint);

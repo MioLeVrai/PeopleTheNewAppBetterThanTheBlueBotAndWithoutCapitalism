@@ -34,27 +34,27 @@
   const NOTIFICATION_SOUNDS = [
     {
       id: "classic",
-      name: "People classique",
+      name: "People Classic",
       description:
-        "Le double bip actuel de People."
+        "People's current double beep."
     },
     {
       id: "soft",
-      name: "Doux",
+      name: ("" + window.PeopleI18n.t("ui_5964d46729") + ""),
       description:
-        "Une notification plus douce."
+        "A softer notification."
     },
     {
       id: "digital",
       name: "Digital",
       description:
-        "Une notification vibe retro comme on aime."
+        "A retro notification sound."
     },
     {
       id: "pop",
       name: "Pop",
       description:
-        "Une notification plus petite, rapide et lumineuse."
+        "A short, bright notification."
     }
   ];
 
@@ -63,31 +63,31 @@
       id: "people",
       name: "People",
       description:
-        "La sonnerie actuelle."
+        "The current ringtone."
     },
     {
       id: "pulse",
       name: "Pulse",
       description:
-        "Une sonnerie rythmée."
+        "A rhythmic ringtone."
     },
     {
       id: "retro",
-      name: "Rétro",
+      name: "Retro",
       description:
-        "Une sonnerie de vieille console."
+        "A classic console ringtone."
     },
     {
       id: "calm",
       name: "Calme",
       description:
-        "Une sonnerie plus douce et moins agressive."
+        "A softer, gentler ringtone."
     },
     {
       id: "bright",
       name: "Claire",
       description:
-        "Une sonnerie plus discrète."
+        "A more subtle ringtone."
     }
   ];
 
@@ -1219,11 +1219,11 @@
     "button";
 
   settingsButton.title =
-    "Paramètres";
+    ("" + window.PeopleI18n.t("ui_74a883a037") + "");
 
   settingsButton.setAttribute(
     "aria-label",
-    "Ouvrir les paramètres"
+    ("" + window.PeopleI18n.t("ui_3f940108cb") + "")
   );
 
   settingsButton.textContent =
@@ -1258,7 +1258,7 @@
       class="people-settings-shell"
       role="dialog"
       aria-modal="true"
-      aria-label="Paramètres People"
+      aria-label="${window.PeopleI18n.t("ui_16c9b02227")}"
     >
       <aside
         class="people-settings-nav"
@@ -1267,7 +1267,7 @@
           class="people-settings-nav-head"
         >
           <span>PEOPLE</span>
-          <strong>Paramètres</strong>
+          <strong>${window.PeopleI18n.t("ui_74a883a037")}</strong>
         </div>
 
         <button
@@ -1276,7 +1276,7 @@
           data-settings-tab="profile"
         >
           <span>👤</span>
-          Profil
+          ${window.PeopleI18n.t("ui_d696a35bdd")}
         </button>
 
         <button
@@ -1285,7 +1285,7 @@
           data-settings-tab="appearance"
         >
           <span>🎨</span>
-          Apparence
+          ${window.PeopleI18n.t("ui_3907fa7f80")}
         </button>
 
         <button
@@ -1294,7 +1294,7 @@
           data-settings-tab="sounds"
         >
           <span>🔔</span>
-          Sons
+          ${window.PeopleI18n.t("ui_6f305c4b18")}
         </button>
       </aside>
 
@@ -1305,7 +1305,7 @@
           id="peopleSettingsClose"
           class="people-settings-close"
           type="button"
-          aria-label="Fermer"
+          aria-label="${window.PeopleI18n.t("ui_7d9eb7acb1")}"
         >✕</button>
 
         <section
@@ -1315,10 +1315,10 @@
           <div
             class="people-settings-page-head"
           >
-            <span>MON COMPTE</span>
-            <h2>Profil</h2>
+            <span>${window.PeopleI18n.t("ui_63931eea0e")}</span>
+            <h2>${window.PeopleI18n.t("ui_d696a35bdd")}</h2>
             <p>
-              Modifie les informations visibles sur ton profil People.
+              ${window.PeopleI18n.t("ui_931e5b72a5")}
             </p>
           </div>
 
@@ -1338,7 +1338,7 @@
                 class="people-settings-secondary"
                 type="button"
               >
-                Changer la photo
+                ${window.PeopleI18n.t("ui_c6bc15c0f0")}
               </button>
 
               <input
@@ -1353,7 +1353,7 @@
               class="people-settings-profile-copy"
             >
               <label>
-                Nom d'utilisateur
+                ${window.PeopleI18n.t("ui_e3b89e9d33")}
               </label>
 
               <div
@@ -1364,7 +1364,7 @@
               </div>
 
               <small>
-                Le changement de pseudo n'est pas encore disponible.
+                ${window.PeopleI18n.t("ui_309d1a1b31")}
               </small>
             </div>
           </div>
@@ -1378,7 +1378,7 @@
               <div>
                 <strong>Bio</strong>
                 <span>
-                  Visible sur ta fiche de profil.
+                  ${window.PeopleI18n.t("ui_e1f3b1081c")}
                 </span>
               </div>
 
@@ -1391,7 +1391,7 @@
             <textarea
               id="peopleSettingsBio"
               maxlength="280"
-              placeholder="Écris une petite description..."
+              placeholder="${window.PeopleI18n.t("ui_c57e3f7a13")}"
             ></textarea>
 
             <div
@@ -1407,7 +1407,7 @@
                 class="people-settings-primary"
                 type="button"
               >
-                Enregistrer
+                ${window.PeopleI18n.t("ui_35322b5bb5")}
               </button>
             </div>
           </div>
@@ -1420,10 +1420,10 @@
           <div
             class="people-settings-page-head"
           >
-            <span>PERSONNALISATION</span>
-            <h2>Apparence</h2>
+            <span>${window.PeopleI18n.t("ui_3598197fe8")}</span>
+            <h2>${window.PeopleI18n.t("ui_3907fa7f80")}</h2>
             <p>
-              Prévisualise ton thème en direct, puis enregistre seulement quand le résultat te plaît. Tes réglages suivent ton compte.
+              ${window.PeopleI18n.t("ui_e6f3bdc8c7")}
             </p>
           </div>
 
@@ -1434,9 +1434,9 @@
               class="people-settings-section-title"
             >
               <div>
-                <strong>Préréglages</strong>
+                <strong>${window.PeopleI18n.t("ui_954f93fe1c")}</strong>
                 <span>
-                  Choisis une base. Rien n'est envoyé au serveur tant que tu n'appuies pas sur Enregistrer.
+                  ${window.PeopleI18n.t("ui_344afa1480")}
                 </span>
               </div>
             </div>
@@ -1453,8 +1453,8 @@
                 <span class="people-settings-theme-preview people-theme-preview-dark">
                   <i></i><b></b><em></em>
                 </span>
-                <strong>Sombre</strong>
-                <small>Le thème People classique.</small>
+                <strong>${window.PeopleI18n.t("ui_60acc53f13")}</strong>
+                <small>${window.PeopleI18n.t("ui_56e70740f8")}</small>
               </button>
 
               <button
@@ -1465,8 +1465,8 @@
                 <span class="people-settings-theme-preview people-theme-preview-midnight">
                   <i></i><b></b><em></em>
                 </span>
-                <strong>Minuit</strong>
-                <small>Des noirs plus profonds.</small>
+                <strong>${window.PeopleI18n.t("ui_aa996cf21f")}</strong>
+                <small>${window.PeopleI18n.t("ui_678c2290b7")}</small>
               </button>
 
               <button
@@ -1477,8 +1477,8 @@
                 <span class="people-settings-theme-preview people-theme-preview-light">
                   <i></i><b></b><em></em>
                 </span>
-                <strong>Clair</strong>
-                <small>Une interface lumineuse.</small>
+                <strong>${window.PeopleI18n.t("ui_dbcd5e7bb7")}</strong>
+                <small>${window.PeopleI18n.t("ui_c0e8b9e9c7")}</small>
               </button>
 
               <button
@@ -1489,8 +1489,8 @@
                 <span class="people-settings-theme-preview people-theme-preview-system">
                   <i></i><b></b><em></em>
                 </span>
-                <strong>Système</strong>
-                <small>Suit le thème de l'appareil.</small>
+                <strong>${window.PeopleI18n.t("ui_6725e7bbcd")}</strong>
+                <small>${window.PeopleI18n.t("ui_814d15cfb1")}</small>
               </button>
 
               <button
@@ -1501,8 +1501,8 @@
                 <span class="people-settings-theme-preview people-theme-preview-custom">
                   <i></i><b></b><em></em>
                 </span>
-                <strong>Personnalisé</strong>
-                <small>Tes 5 couleurs exactes.</small>
+                <strong>${window.PeopleI18n.t("ui_494ca78f73")}</strong>
+                <small>${window.PeopleI18n.t("ui_6ae2970397")}</small>
               </button>
             </div>
           </div>
@@ -1515,22 +1515,22 @@
               class="people-settings-section-title people-settings-palette-title"
             >
               <div>
-                <strong>Palette personnalisée</strong>
+                <strong>${window.PeopleI18n.t("ui_02f96b9343")}</strong>
                 <span>
-                  Modifie une couleur pour passer en mode personnalisé. Tu peux annuler tous les changements avant de sauvegarder.
+                  ${window.PeopleI18n.t("ui_09d2347687")}
                 </span>
               </div>
 
               <span
                 id="peopleSettingsCustomBadge"
                 class="people-settings-custom-badge"
-              >Personnalisé</span>
+              >${window.PeopleI18n.t("ui_494ca78f73")}</span>
             </div>
 
             <div
               id="peopleSettingsPalettePreview"
               class="people-settings-palette-preview"
-              aria-label="Aperçu réaliste de l'interface People"
+              aria-label="${window.PeopleI18n.t("ui_ac5002b4af")}"
             >
               <div class="people-settings-preview-rail">
                 <span class="people-settings-preview-rail-icon active">⌂</span>
@@ -1544,17 +1544,17 @@
                 <div class="people-settings-preview-sidebar-head">
                   <span class="people-settings-preview-home-icon">⌂</span>
                   <span class="people-settings-preview-head-copy">
-                    <b>Accueil</b>
-                    <i>Amis et messages privés</i>
+                    <b>${window.PeopleI18n.t("ui_3a78695388")}</b>
+                    <i>${window.PeopleI18n.t("ui_3efbf04fd3")}</i>
                   </span>
                 </div>
 
                 <div class="people-settings-preview-nav active">
                   <span>●●</span>
-                  <b>Amis</b>
+                  <b>${window.PeopleI18n.t("ui_bd104d1b98")}</b>
                 </div>
 
-                <div class="people-settings-preview-label">MESSAGES PRIVÉS</div>
+                <div class="people-settings-preview-label">${window.PeopleI18n.t("ui_4d645258f9")}</div>
 
                 <div class="people-settings-preview-dm-list">
                   <span class="people-settings-preview-dm"><i></i><b></b></span>
@@ -1572,27 +1572,27 @@
 
               <div class="people-settings-preview-main">
                 <div class="people-settings-preview-topbar">
-                  <span><b>Amis</b><i>Tes contacts People</i></span>
+                  <span><b>${window.PeopleI18n.t("ui_bd104d1b98")}</b><i>${window.PeopleI18n.t("ui_7310659deb")}</i></span>
                 </div>
 
                 <div class="people-settings-preview-content">
                   <div class="people-settings-preview-search-card">
-                    <b>Retrouver quelqu'un</b>
+                    <b>${window.PeopleI18n.t("ui_c070d28bbe")}</b>
                     <i></i>
                     <span></span>
                   </div>
 
                   <div class="people-settings-preview-section-title">
-                    <b>DEMANDES D'AMI</b><span>0</span>
+                    <b>${window.PeopleI18n.t("ui_018c62e292")}</b><span>0</span>
                   </div>
 
                   <div class="people-settings-preview-request-grid">
-                    <div><b>À ACCEPTER</b><i></i></div>
-                    <div><b>ENVOYÉES</b><i></i></div>
+                    <div><b>${window.PeopleI18n.t("ui_4118a9cff9")}</b><i></i></div>
+                    <div><b>${window.PeopleI18n.t("ui_608dbf6658")}</b><i></i></div>
                   </div>
 
                   <div class="people-settings-preview-section-title friends">
-                    <b>MES AMIS</b><span>6</span>
+                    <b>${window.PeopleI18n.t("ui_dc5a40b1c1")}</b><span>6</span>
                   </div>
 
                   <div class="people-settings-preview-friends">
@@ -1611,17 +1611,17 @@
             </div>
 
             <div class="people-settings-preview-note">
-              Cet aperçu reprend les mêmes rôles de couleur que l'application : rail, panneau, fond, texte, champs et accent.
+              ${window.PeopleI18n.t("ui_82ffe25667")}
             </div>
 
             <div class="people-settings-palette-list">
               <div class="people-settings-palette-row" data-palette-key="background">
                 <div class="people-settings-palette-copy">
-                  <strong>Fond principal</strong>
-                  <span>Chat et zone centrale.</span>
+                  <strong>${window.PeopleI18n.t("ui_e02ff63f05")}</strong>
+                  <span>${window.PeopleI18n.t("ui_16b9c86c73")}</span>
                 </div>
-                <input type="color" value="#100E1A" data-palette-picker="background" aria-label="Fond principal" />
-                <input class="people-settings-hex-input" type="text" value="#100E1A" maxlength="7" spellcheck="false" data-palette-hex="background" aria-label="Fond principal en hexadécimal" />
+                <input type="color" value="#100E1A" data-palette-picker="background" aria-label="${window.PeopleI18n.t("ui_e02ff63f05")}" />
+                <input class="people-settings-hex-input" type="text" value="#100E1A" maxlength="7" spellcheck="false" data-palette-hex="background" aria-label="${window.PeopleI18n.t("ui_fe5a8684bc")}" />
                 <div class="people-settings-rgb" data-palette-rgb="background">
                   <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
                   <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
@@ -1631,11 +1631,11 @@
 
               <div class="people-settings-palette-row" data-palette-key="panel">
                 <div class="people-settings-palette-copy">
-                  <strong>Panneaux</strong>
-                  <span>Barres, cartes et zones élevées.</span>
+                  <strong>${window.PeopleI18n.t("ui_d010ff3906")}</strong>
+                  <span>${window.PeopleI18n.t("ui_54644ee4e5")}</span>
                 </div>
-                <input type="color" value="#181524" data-palette-picker="panel" aria-label="Panneaux" />
-                <input class="people-settings-hex-input" type="text" value="#181524" maxlength="7" spellcheck="false" data-palette-hex="panel" aria-label="Panneaux en hexadécimal" />
+                <input type="color" value="#181524" data-palette-picker="panel" aria-label="${window.PeopleI18n.t("ui_d010ff3906")}" />
+                <input class="people-settings-hex-input" type="text" value="#181524" maxlength="7" spellcheck="false" data-palette-hex="panel" aria-label="${window.PeopleI18n.t("ui_8f9d16b5da")}" />
                 <div class="people-settings-rgb" data-palette-rgb="panel">
                   <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
                   <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
@@ -1645,11 +1645,11 @@
 
               <div class="people-settings-palette-row" data-palette-key="secondary">
                 <div class="people-settings-palette-copy">
-                  <strong>Fond secondaire</strong>
-                  <span>Rail des serveurs, menus et champs.</span>
+                  <strong>${window.PeopleI18n.t("ui_4b2919fe2c")}</strong>
+                  <span>${window.PeopleI18n.t("ui_81ee0152cc")}</span>
                 </div>
-                <input type="color" value="#090811" data-palette-picker="secondary" aria-label="Fond secondaire" />
-                <input class="people-settings-hex-input" type="text" value="#090811" maxlength="7" spellcheck="false" data-palette-hex="secondary" aria-label="Fond secondaire en hexadécimal" />
+                <input type="color" value="#090811" data-palette-picker="secondary" aria-label="${window.PeopleI18n.t("ui_4b2919fe2c")}" />
+                <input class="people-settings-hex-input" type="text" value="#090811" maxlength="7" spellcheck="false" data-palette-hex="secondary" aria-label="${window.PeopleI18n.t("ui_690307a14a")}" />
                 <div class="people-settings-rgb" data-palette-rgb="secondary">
                   <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
                   <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
@@ -1659,11 +1659,11 @@
 
               <div class="people-settings-palette-row" data-palette-key="text">
                 <div class="people-settings-palette-copy">
-                  <strong>Texte principal</strong>
-                  <span>Messages, titres et texte important.</span>
+                  <strong>${window.PeopleI18n.t("ui_dc299d2d90")}</strong>
+                  <span>${window.PeopleI18n.t("ui_d7eca5b338")}</span>
                 </div>
-                <input type="color" value="#F2EFF8" data-palette-picker="text" aria-label="Texte principal" />
-                <input class="people-settings-hex-input" type="text" value="#F2EFF8" maxlength="7" spellcheck="false" data-palette-hex="text" aria-label="Texte principal en hexadécimal" />
+                <input type="color" value="#F2EFF8" data-palette-picker="text" aria-label="${window.PeopleI18n.t("ui_dc299d2d90")}" />
+                <input class="people-settings-hex-input" type="text" value="#F2EFF8" maxlength="7" spellcheck="false" data-palette-hex="text" aria-label="${window.PeopleI18n.t("ui_514e9e8506")}" />
                 <div class="people-settings-rgb" data-palette-rgb="text">
                   <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
                   <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
@@ -1674,10 +1674,10 @@
               <div class="people-settings-palette-row" data-palette-key="accent">
                 <div class="people-settings-palette-copy">
                   <strong>Accent</strong>
-                  <span>Boutons, sélections et éléments actifs.</span>
+                  <span>${window.PeopleI18n.t("ui_2614d6688c")}</span>
                 </div>
                 <input type="color" value="#67589D" data-palette-picker="accent" aria-label="Accent" />
-                <input class="people-settings-hex-input" type="text" value="#67589D" maxlength="7" spellcheck="false" data-palette-hex="accent" aria-label="Accent en hexadécimal" />
+                <input class="people-settings-hex-input" type="text" value="#67589D" maxlength="7" spellcheck="false" data-palette-hex="accent" aria-label="${window.PeopleI18n.t("ui_fd36df7331")}" />
                 <div class="people-settings-rgb" data-palette-rgb="accent">
                   <label>R<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="r" /></label>
                   <label>G<input class="people-settings-rgb-input" type="number" min="0" max="255" data-rgb-channel="g" /></label>
@@ -1700,7 +1700,7 @@
                 type="button"
                 disabled
               >
-                Annuler
+                ${window.PeopleI18n.t("ui_19766ed6cc")}
               </button>
 
               <button
@@ -1708,7 +1708,7 @@
                 class="people-settings-secondary"
                 type="button"
               >
-                Valeurs par défaut
+                ${window.PeopleI18n.t("ui_610b7468ce")}
               </button>
 
               <button
@@ -1717,7 +1717,7 @@
                 type="button"
                 disabled
               >
-                Enregistrer
+                ${window.PeopleI18n.t("ui_35322b5bb5")}
               </button>
             </div>
           </div>
@@ -1731,9 +1731,9 @@
             class="people-settings-page-head"
           >
             <span>AUDIO</span>
-            <h2>Sons</h2>
+            <h2>${window.PeopleI18n.t("ui_6f305c4b18")}</h2>
             <p>
-              Choisis les sons utilisés uniquement sur cet appareil.
+              ${window.PeopleI18n.t("ui_5272617c1f")}
             </p>
           </div>
 
@@ -1744,9 +1744,9 @@
               class="people-settings-section-title"
             >
               <div>
-                <strong>Périphériques audio / vidéo</strong>
+                <strong>${window.PeopleI18n.t("ui_90c9d8de7a")}</strong>
                 <span>
-                  Choisis le micro, la caméra et le casque ou haut-parleur utilisés par les vocaux et appels.
+                  ${window.PeopleI18n.t("ui_80a6f9d129")}
                 </span>
               </div>
             </div>
@@ -1757,13 +1757,13 @@
               <label
                 class="people-settings-device-field"
               >
-                <span>Entrée — Microphone</span>
+                <span>${window.PeopleI18n.t("ui_8042fd7c1b")}</span>
 
                 <select
                   id="peopleSettingsAudioInput"
                 >
                   <option value="">
-                    Microphone par défaut
+                    ${window.PeopleI18n.t("ui_6b4a8c64d6")}
                   </option>
                 </select>
               </label>
@@ -1771,27 +1771,13 @@
               <label
                 class="people-settings-device-field"
               >
-                <span>Vidéo — Caméra</span>
-
-                <select
-                  id="peopleSettingsVideoInput"
-                >
-                  <option value="">
-                    Caméra par défaut
-                  </option>
-                </select>
-              </label>
-
-              <label
-                class="people-settings-device-field"
-              >
-                <span>Sortie — Casque / haut-parleurs</span>
+                <span>${window.PeopleI18n.t("ui_e222cb81a8")}</span>
 
                 <select
                   id="peopleSettingsAudioOutput"
                 >
                   <option value="">
-                    Sortie par défaut
+                    ${window.PeopleI18n.t("ui_ec736c0471")}
                   </option>
                 </select>
               </label>
@@ -1810,7 +1796,7 @@
                 class="people-settings-secondary"
                 type="button"
               >
-                Détecter / actualiser
+                ${window.PeopleI18n.t("ui_f4580acacf")}
               </button>
             </div>
           </div>
@@ -1822,9 +1808,9 @@
               class="people-settings-section-title"
             >
               <div>
-                <strong>Sonnerie d'appel</strong>
+                <strong>${window.PeopleI18n.t("ui_2cfecf2a37")}</strong>
                 <span>
-                  Son joué quand quelqu'un t'appelle en MP.
+                  ${window.PeopleI18n.t("ui_19d0c5ee7c")}
                 </span>
               </div>
             </div>
@@ -1844,7 +1830,7 @@
               <div>
                 <strong>Notifications</strong>
                 <span>
-                  Utilisé pour les MP et les @pings.
+                  ${window.PeopleI18n.t("ui_0a7d692438")}
                 </span>
               </div>
             </div>
@@ -2021,7 +2007,7 @@
     ) {
       throw new Error(
         data?.error ||
-        "Erreur People."
+        ("" + window.PeopleI18n.t("ui_49e6c692bb") + "")
       );
     }
 
@@ -2366,8 +2352,8 @@
         appearanceSaving || !dirty;
       appearanceSave.textContent =
         appearanceSaving
-          ? "Enregistrement…"
-          : "Enregistrer";
+          ? "Saving..."
+          : ("" + window.PeopleI18n.t("ui_35322b5bb5") + "");
     }
 
     if (appearanceCancel) {
@@ -2417,8 +2403,8 @@
     if (appearanceCustomBadge) {
       appearanceCustomBadge.textContent =
         appearance.theme === "custom"
-          ? "Personnalisé actif"
-          : "Palette mémorisée";
+          ? ("" + window.PeopleI18n.t("ui_2cab6f2a71") + "")
+          : ("" + window.PeopleI18n.t("ui_68033a3a52") + "");
     }
 
     const palette = {
@@ -2564,7 +2550,7 @@
 
     if (options.status !== false) {
       setAppearanceStatus(
-        "Aperçu local — pense à enregistrer."
+        ("" + window.PeopleI18n.t("ui_6023dad373") + "")
       );
     }
 
@@ -2591,7 +2577,7 @@
       options.status !== false
     ) {
       setAppearanceStatus(
-        "Modifications annulées."
+        ("" + window.PeopleI18n.t("ui_95071425fc") + "")
       );
     }
   }
@@ -2606,7 +2592,7 @@
 
     if (!window.PeopleAppearance?.save) {
       setAppearanceStatus(
-        "Module d'apparence indisponible.",
+        "Appearance module is unavailable.",
         "error"
       );
       return;
@@ -2615,7 +2601,7 @@
     appearanceSaving = true;
     setAppearanceButtons();
     setAppearanceStatus(
-      "Enregistrement…"
+      "Saving..."
     );
 
     const wanted =
@@ -2634,7 +2620,7 @@
 
       updateAppearanceControls();
       setAppearanceStatus(
-        "Apparence enregistrée ✓",
+        ("" + window.PeopleI18n.t("ui_aa98227417") + ""),
         "success"
       );
     } catch (err) {
@@ -2644,7 +2630,7 @@
       updateAppearanceControls();
       setAppearanceStatus(
         err?.message ||
-        "Impossible d'enregistrer l'apparence. Les changements ont été annulés.",
+        ("" + window.PeopleI18n.t("ui_30a6d7d7a3") + ""),
         "error"
       );
     } finally {
@@ -2669,7 +2655,7 @@
       updateAppearanceControls();
       setAppearanceStatus(
         err?.message ||
-        "La synchronisation du thème a échoué.",
+        ("" + window.PeopleI18n.t("ui_a24d43e692") + ""),
         "error"
       );
     }
@@ -2863,7 +2849,7 @@
 
           if (!appearanceValidHex(target.value)) {
             setAppearanceStatus(
-              "Couleur HEX incomplète — exemple : #12ABEF."
+              ("" + window.PeopleI18n.t("ui_ad44ae5a55") + "")
             );
             return;
           }
@@ -2917,7 +2903,7 @@
           target.matches("[data-appearance-gradient-enabled], [data-appearance-gradient-direction], [data-appearance-gradient-intensity], [data-appearance-gradient-color]")
         ) {
           setAppearanceStatus(
-            "Aperçu local — pense à enregistrer."
+            ("" + window.PeopleI18n.t("ui_6023dad373") + "")
           );
           return;
         }
@@ -2928,7 +2914,7 @@
         if (!value) {
           updateAppearanceControls();
           setAppearanceStatus(
-            "Valeur de couleur invalide.",
+            ("" + window.PeopleI18n.t("ui_22e1a409be") + ""),
             "error"
           );
           return;
@@ -2940,7 +2926,7 @@
           { status: false }
         );
         setAppearanceStatus(
-          "Aperçu local — pense à enregistrer."
+          ("" + window.PeopleI18n.t("ui_6023dad373") + "")
         );
       }
     );
@@ -2955,7 +2941,7 @@
           appearanceDefaults()
         );
         setAppearanceStatus(
-          "Valeurs par défaut prévisualisées — clique sur Enregistrer pour confirmer."
+          ("" + window.PeopleI18n.t("ui_e9557f61dd") + "")
         );
       }
     );
@@ -3120,7 +3106,7 @@
         !currentUser?.username
       ) {
         throw new Error(
-          "Compte People introuvable."
+          ("" + window.PeopleI18n.t("ui_3162ab4066") + "")
         );
       }
 
@@ -3167,7 +3153,7 @@
     } catch (err) {
       setStatus(
         err?.message ||
-        "Impossible de charger le profil.",
+        ("" + window.PeopleI18n.t("ui_503622bf69") + ""),
         "error"
       );
     }
@@ -3199,18 +3185,19 @@
   }
 
   const callPrivacy = document.createElement("section");
-  callPrivacy.innerHTML = `<h3>Confidentialité des appels</h3>
-    <label><input type="checkbox"> Afficher avec qui je suis en double appel</label>
-    <p>Le double appel reste toujours visible. Désactivé, aucun interlocuteur n'est communiqué par cet indicateur.</p>
+  callPrivacy.innerHTML = `<h3>${window.PeopleI18n.t("ui_230ae4811a")}</h3>
+    <label><input type="checkbox"> ${window.PeopleI18n.t("ui_ba1823c68c")}</label>
+    <p>${window.PeopleI18n.t("ui_4b8837cab1")}</p>
     <p role="status"></p>`;
   modal.querySelector('[data-settings-page="profile"]').append(callPrivacy);
   const callPrivacyInput = callPrivacy.querySelector("input");
+  callPrivacyInput.dataset.callPrivacy = "";
   const callPrivacyFeedback = callPrivacy.querySelector('[role="status"]');
   async function loadCallPrivacy() {
     callPrivacyInput.disabled = true;
     try {
       const response = await fetch("/api/call-privacy");
-      if (!response.ok) throw new Error("Impossible de charger la confidentialité des appels.");
+      if (!response.ok) throw new Error(("" + window.PeopleI18n.t("ui_bc25a04220") + ""));
       const data = await response.json();
       callPrivacyInput.checked = data.showInterlocutors === true;
       callPrivacyFeedback.textContent = "";
@@ -3221,8 +3208,8 @@
     callPrivacyInput.disabled = true;
     try {
       const response = await fetch("/api/call-privacy", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ showInterlocutors: callPrivacyInput.checked }) });
-      if (!response.ok) throw new Error("Impossible d'enregistrer la confidentialité des appels.");
-      callPrivacyFeedback.textContent = "Réglage enregistré.";
+      if (!response.ok) throw new Error(("" + window.PeopleI18n.t("ui_ab029fe154") + ""));
+      callPrivacyFeedback.textContent = ("" + window.PeopleI18n.t("ui_9cd9058f10") + "");
     } catch (err) {
       callPrivacyInput.checked = !callPrivacyInput.checked;
       callPrivacyFeedback.textContent = err.message;
@@ -3274,7 +3261,7 @@
         true;
 
       setStatus(
-        "Enregistrement…"
+        "Saving..."
       );
 
       try {
@@ -3304,13 +3291,13 @@
         updateBioCounter();
 
         setStatus(
-          "Bio enregistrée ✓",
+          ("" + window.PeopleI18n.t("ui_8653c240eb") + ""),
           "success"
         );
       } catch (err) {
         setStatus(
           err?.message ||
-          "Impossible d'enregistrer la bio.",
+          ("" + window.PeopleI18n.t("ui_c1a256ac25") + ""),
           "error"
         );
       } finally {
@@ -3344,7 +3331,7 @@
           )
       ) {
         setStatus(
-          "Format d'image non supporté.",
+          ("" + window.PeopleI18n.t("ui_6f9c7e85d0") + ""),
           "error"
         );
 
@@ -3358,7 +3345,7 @@
         true;
 
       setStatus(
-        "Préparation de la photo…"
+        ("" + window.PeopleI18n.t("ui_02736040b8") + "")
       );
 
       try {
@@ -3386,12 +3373,12 @@
           !prepared?.blob
         ) {
           throw new Error(
-            "Impossible de préparer la photo."
+            ("" + window.PeopleI18n.t("ui_8572b43613") + "")
           );
         }
 
         setStatus(
-          "Envoi de la photo…"
+          "Uploading picture..."
         );
 
         const response =
@@ -3427,7 +3414,7 @@
         ) {
           throw new Error(
             data?.error ||
-            "Impossible de changer la photo."
+            ("" + window.PeopleI18n.t("ui_6c45c0c963") + "")
           );
         }
 
@@ -3464,13 +3451,13 @@
         }
 
         setStatus(
-          "Photo enregistrée ✓",
+          ("" + window.PeopleI18n.t("ui_4976516689") + ""),
           "success"
         );
       } catch (err) {
         setStatus(
           err?.message ||
-          "Impossible de changer la photo.",
+          ("" + window.PeopleI18n.t("ui_6c45c0c963") + ""),
           "error"
         );
       } finally {
@@ -3546,11 +3533,11 @@
     fallback.textContent =
       kind ===
         "input"
-        ? "Microphone par défaut"
+        ? ("" + window.PeopleI18n.t("ui_6b4a8c64d6") + "")
         : kind ===
             "camera"
-          ? "Caméra par défaut"
-          : "Sortie par défaut";
+          ? ("" + window.PeopleI18n.t("ui_08ff2c201b") + "")
+          : ("" + window.PeopleI18n.t("ui_ec736c0471") + "");
 
     fragment.appendChild(
       fallback
@@ -3597,7 +3584,7 @@
             ? "Microphone"
             : kind ===
                 "camera"
-              ? "Caméra"
+              ? ("" + window.PeopleI18n.t("ui_03494b0d1f") + "")
               : "Sortie audio",
           visibleIndex
         );
@@ -3662,7 +3649,7 @@
         audioDeviceStatus
       ) {
         audioDeviceStatus.textContent =
-          "Ce navigateur ne permet pas de choisir les périphériques audio / vidéo.";
+          ("" + window.PeopleI18n.t("ui_b683b00aa9") + "");
       }
 
       return;
@@ -3679,7 +3666,7 @@
       audioDeviceStatus
     ) {
       audioDeviceStatus.textContent =
-        "Recherche des périphériques…";
+        ("" + window.PeopleI18n.t("ui_ce5dccd688") + "");
     }
 
     try {
@@ -3801,16 +3788,16 @@
           !outputSupported
         ) {
           audioDeviceStatus.textContent =
-            "Micro et caméra sélectionnables. Le choix de sortie n'est pas supporté par ce navigateur.";
+            ("" + window.PeopleI18n.t("ui_abdc86990d") + "");
         } else if (
           !hasNamedInput ||
           !hasNamedCamera
         ) {
           audioDeviceStatus.textContent =
-            "Clique sur Détecter / actualiser pour afficher les noms des micros et caméras.";
+            ("" + window.PeopleI18n.t("ui_b14325f3dc") + "");
         } else {
           audioDeviceStatus.textContent =
-            "Les changements sont appliqués automatiquement.";
+            ("" + window.PeopleI18n.t("ui_b96f217868") + "");
         }
       }
 
@@ -3822,7 +3809,7 @@
       ) {
         audioDeviceStatus.textContent =
           err?.message ||
-          "Impossible de charger les périphériques.";
+          ("" + window.PeopleI18n.t("ui_da68d1cf52") + "");
       }
     } finally {
       if (
@@ -3873,7 +3860,7 @@
           audioDeviceStatus
         ) {
           audioDeviceStatus.textContent =
-            "Micro changé ✓";
+            ("" + window.PeopleI18n.t("ui_b7e97c9641") + "");
         }
       }
     );
@@ -3891,7 +3878,7 @@
           audioDeviceStatus
         ) {
           audioDeviceStatus.textContent =
-            "Caméra changée ✓";
+            ("" + window.PeopleI18n.t("ui_45b2613ed5") + "");
         }
       }
     );
@@ -3909,7 +3896,7 @@
           audioDeviceStatus
         ) {
           audioDeviceStatus.textContent =
-            "Sortie audio changée ✓";
+            ("" + window.PeopleI18n.t("ui_738e1a2cee") + "");
         }
       }
     );
@@ -3977,7 +3964,7 @@
 
       <span
         class="people-settings-sound-preview"
-        title="Écouter"
+        title="${window.PeopleI18n.t("ui_6027436127")}"
       >▶</span>
     `;
 

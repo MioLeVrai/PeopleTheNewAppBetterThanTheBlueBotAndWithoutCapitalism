@@ -87,7 +87,7 @@ function peopleDeleteGeneralMessageFromServer(
             reject(
               new Error(
                 response?.error ||
-                "Suppression impossible."
+                ("" + window.PeopleI18n.t("ui_ddc2e6a006") + "")
               )
             );
 
@@ -119,7 +119,7 @@ function peopleEditGeneralMessageFromServer(
             reject(
               new Error(
                 response?.error ||
-                "Modification impossible."
+                ("" + window.PeopleI18n.t("ui_b9ab4fea4b") + "")
               )
             );
             return;
@@ -388,7 +388,7 @@ function peopleUpdateServerEffectsButton() {
   const info = window.PeopleCameraEffects?.getSelectedEffectInfo?.();
   button.classList.toggle("people-face-effects-active", selected !== "none");
   button.classList.toggle("hidden", !cameraEnabled || screenEnabled);
-  button.title = `Effets de visage${selected !== "none" ? ` • ${info?.label || selected}` : ""}`;
+  button.title = `Face effects${selected !== "none" ? ` • ${info?.label || selected}` : ""}`;
 }
 
 window.addEventListener("people-camera-effect-changed", peopleUpdateServerEffectsButton);
@@ -417,6 +417,7 @@ function initials(name) {
 }
 
 function timeText(ts) {
+  if (!ts || Number.isNaN(new Date(ts).getTime())) return "—";
   return new Date(ts).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit"
@@ -570,7 +571,7 @@ function peopleProfileUsername(
 }
 
 function peopleOpenProfileFromUi(
-  username
+  username, source = null
 ) {
   const clean =
     peopleProfileUsername(
@@ -586,6 +587,7 @@ function peopleOpenProfileFromUi(
       "people-open-profile",
       {
         detail: {
+          serverId: source?.closest('#peopleMain, #onlineUsersList, .voice-user') ? peopleActiveServerId : null,
           username:
             clean
         }
@@ -657,7 +659,7 @@ function peopleBindProfileUi(
       event.stopPropagation();
 
       peopleOpenProfileFromUi(
-        element.dataset.peopleProfileUsername
+        element.dataset.peopleProfileUsername, element
       );
     }
   );
@@ -678,7 +680,7 @@ function peopleBindProfileUi(
       event.stopPropagation();
 
       peopleOpenProfileFromUi(
-        element.dataset.peopleProfileUsername
+        element.dataset.peopleProfileUsername, element
       );
     }
   );
@@ -1021,6 +1023,13 @@ function peopleGeneralTextLine(
   if (grouped) {
     text.title =
       timeText(data.time);
+    const time = document.createElement("time");
+    time.className = "people-grouped-time";
+    time.textContent = timeText(data.time);
+    if (data.time && !Number.isNaN(new Date(data.time).getTime())) {
+      time.dateTime = new Date(data.time).toISOString(); time.title = new Date(data.time).toLocaleString("en-US");
+    }
+    unit.append(time);
   }
 
   unit.appendChild(text);
@@ -1098,8 +1107,15 @@ function addChatMessage(
   const messageTime =
     peopleMessageTime(data.time);
 
+  if (!peopleGeneralGroup || new Date(messageTime).toDateString() !== new Date(peopleGeneralGroup.lastTime).toDateString()) {
+    const day = document.createElement("div"); day.className = "people-message-day";
+    day.textContent = new Date(messageTime).toLocaleDateString("en-US", { dateStyle: "long" });
+    target.append(day);
+  }
+
   const sameGroup =
     peopleGeneralGroup &&
+    new Date(messageTime).toDateString() === new Date(peopleGeneralGroup.lastTime).toDateString() &&
     peopleGeneralGroup.username ===
       String(data.username || "") &&
     peopleGeneralGroup.count <
@@ -1178,6 +1194,9 @@ function addChatMessage(
 
   time.textContent =
     timeText(data.time);
+  if (data.time && !Number.isNaN(new Date(data.time).getTime())) {
+    time.dateTime = new Date(data.time).toISOString(); time.title = new Date(data.time).toLocaleString("en-US");
+  }
 
   head.append(
     strong,
@@ -1284,24 +1303,24 @@ function peopleSyncVoiceUiContext() {
       )
     ) {
       voiceStatus.textContent =
-        "Connecté au vocal";
+        ("" + window.PeopleI18n.t("ui_13dac1621e") + "");
 
       voiceStatus.classList.add(
         "connected"
       );
 
       voiceButton.childNodes[0].nodeValue =
-        "🔊 quitter le vocal ";
+        ("" + window.PeopleI18n.t("ui_e3ec602299") + " ");
     } else if (selected) {
       voiceStatus.textContent =
-        "Déjà connecté à un vocal";
+        ("" + window.PeopleI18n.t("ui_68f7a0edc7") + "");
 
       voiceStatus.classList.remove(
         "connected"
       );
 
       voiceButton.childNodes[0].nodeValue =
-        "🔊 vocal ";
+        ("" + window.PeopleI18n.t("ui_5d581f4b0b") + " ");
     }
 
     if (
@@ -1318,14 +1337,14 @@ function peopleSyncVoiceUiContext() {
 
   if (selected) {
     voiceStatus.textContent =
-      "Pas connecté";
+      ("" + window.PeopleI18n.t("ui_04dfac3671") + "");
 
     voiceStatus.classList.remove(
       "connected"
     );
 
     voiceButton.childNodes[0].nodeValue =
-      "🔊 vocal ";
+      ("" + window.PeopleI18n.t("ui_5d581f4b0b") + " ");
   }
 
   peopleSyncVoiceVideoContext();
@@ -1585,7 +1604,7 @@ function renderVoiceUsers(roster) {
   if (!lastVoiceRoster.length) {
     const empty = document.createElement("div");
     empty.className = "voice-empty";
-    empty.textContent = "Personne dans le vocal";
+    empty.textContent = ("" + window.PeopleI18n.t("ui_983b19135d") + "");
     voiceUsers.appendChild(empty);
     syncVideoTilesWithRoster();
     return;
@@ -1642,18 +1661,18 @@ function renderVoiceUsers(roster) {
 
     if (user.screen) {
       const screen = document.createElement("span");
-      screen.title = "Partage d'écran actif";
+      screen.title = ("" + window.PeopleI18n.t("ui_eab9e887f7") + "");
       screen.textContent = "🖥️";
       icons.appendChild(screen);
     } else if (user.camera) {
       const cam = document.createElement("span");
-      cam.title = "Caméra activée";
+      cam.title = ("" + window.PeopleI18n.t("ui_071a189a5d") + "");
       cam.textContent = "📹";
       icons.appendChild(cam);
     }
 
     const mic = document.createElement("span");
-    mic.title = user.muted ? "Micro coupé" : "Micro activé";
+    mic.title = user.muted ? ("" + window.PeopleI18n.t("ui_984fdad8bb") + "") : ("" + window.PeopleI18n.t("ui_891fd46129") + "");
     mic.textContent = user.muted ? "🔇" : "🎙️";
     icons.appendChild(mic);
 
@@ -1710,8 +1729,8 @@ function ensureVideoTile(peerId, displayName, isLocal = false, host = videoGrid,
       effectsButton.className = "people-video-effects-button";
       effectsButton.type = "button";
       effectsButton.textContent = "✨";
-      effectsButton.title = "Effets de visage";
-      effectsButton.setAttribute("aria-label", "Effets de visage");
+      effectsButton.title = "Face effects";
+      effectsButton.setAttribute("aria-label", "Face effects");
       effectsButton.addEventListener("click", (event) => {
         event.stopPropagation();
         window.PeopleCameraEffects?.togglePicker?.(effectsButton);
@@ -1806,7 +1825,7 @@ function syncVideoTilesWithRoster() {
 
     if (label) {
       label.textContent = screenEnabled
-        ? `${username || "Moi"} • partage d'écran`
+        ? `${username || "Moi"} ${window.PeopleI18n.t("ui_95a4c65c09")}`
         : `${username || "Moi"} (toi)`;
     }
   } else {
@@ -1832,7 +1851,7 @@ function syncVideoTilesWithRoster() {
 
       if (label) {
         label.textContent = user.screen
-          ? `${user.username} • partage d'écran`
+          ? `${user.username} ${window.PeopleI18n.t("ui_95a4c65c09")}`
           : user.username;
       }
     } else {
@@ -1890,7 +1909,7 @@ function attachLocalPreview() {
 
   if (label) {
     label.textContent = screenEnabled
-      ? `${username || "Moi"} • partage d'écran`
+      ? `${username || "Moi"} ${window.PeopleI18n.t("ui_95a4c65c09")}`
       : `${username || "Moi"} (toi)`;
   }
 
@@ -1913,6 +1932,7 @@ function attachRemoteMedia(peerId, stream) {
 
     audio.srcObject = new MediaStream(audioTracks);
     audio.muted = Boolean(window.PeopleCallBar?.isServerSoundMuted());
+    void window.PeopleCallMedia?.play(audio);
 
     void window.PeopleAudioDevices
       ?.applyOutput?.(
@@ -1934,14 +1954,14 @@ function attachRemoteMedia(peerId, stream) {
   const videoTracks = stream.getVideoTracks();
   if (videoTracks.length) {
     const user = getVoiceUser(peerId);
-    const tile = ensureVideoTile(peerId, user?.username || "Caméra", false);
+    const tile = ensureVideoTile(peerId, user?.username || ("" + window.PeopleI18n.t("ui_03494b0d1f") + ""), false);
     tile.classList.toggle("screen-share", Boolean(user?.screen));
 
     const label = tile.querySelector(".video-label");
     if (label) {
       label.textContent = user?.screen
-        ? `${user?.username || "Utilisateur"} • partage d'écran`
-        : (user?.username || "Caméra");
+        ? `${user?.username || "User"} ${window.PeopleI18n.t("ui_95a4c65c09")}`
+        : (user?.username || ("" + window.PeopleI18n.t("ui_03494b0d1f") + ""));
     }
 
     const video = tile.querySelector("video");
@@ -2105,7 +2125,7 @@ function peopleSelectServerSocket(
             response || {
               ok: false,
               error:
-                "Le serveur n'a pas répondu."
+                "The server did not respond."
             }
           );
         }
@@ -2138,7 +2158,7 @@ window.PeopleServerRuntime = {
     if (!server?.id) {
       return {
         ok: false,
-        error: "Serveur invalide."
+        error: ("" + window.PeopleI18n.t("ui_01fa56bf10") + "")
       };
     }
 
@@ -2165,7 +2185,7 @@ window.PeopleServerRuntime = {
     if (navigator.onLine === false) {
       const offlinePayload = await window.PeopleOffline?.getServerPayload?.(serverId).catch(() => null);
       if (!offlinePayload) {
-        return { ok: false, error: "Ce serveur n'a pas encore été synchronisé sur cet appareil." };
+        return { ok: false, error: "This server has not been synced on this device yet." };
       }
       if (
         requestVersion === peopleServerSelectRequestVersion &&
@@ -2247,12 +2267,12 @@ window.PeopleServerRuntime = {
   async selectTextChannel(channelId) {
     const sid = String(peopleActiveServerId || "");
     const cid = String(channelId || "");
-    if (!sid || !cid) return { ok: false, error: "Salon invalide." };
+    if (!sid || !cid) return { ok: false, error: ("" + window.PeopleI18n.t("ui_b02aa16d76") + "") };
 
     if (navigator.onLine === false) {
       const history = await window.PeopleOffline?.getServerChannel?.(sid, cid).catch(() => null);
       if (!history) {
-        return { ok: false, error: "Ce salon n'a pas encore été synchronisé sur cet appareil." };
+        return { ok: false, error: "This channel has not been synced on this device yet." };
       }
       peopleActiveTextChannelId = cid;
       peopleGeneralReplyController?.clear();
@@ -2264,7 +2284,7 @@ window.PeopleServerRuntime = {
 
     const response = await new Promise((resolve) => {
       socket.emit("server-channel-select", { serverId: sid, channelId: cid }, (value) => {
-        resolve(value || { ok: false, error: "Le serveur n'a pas répondu." });
+        resolve(value || { ok: false, error: "The server did not respond." });
       });
     });
 
@@ -2382,15 +2402,15 @@ function setAuthMode(mode) {
   if (authSubmit) {
     authSubmit.textContent =
       authMode === "register"
-        ? "Creer mon compte"
-        : "Se connecter";
+        ? ("" + window.PeopleI18n.t("ui_0dffe234b4") + "")
+        : ("" + window.PeopleI18n.t("ui_2ded4a3ee6") + "");
   }
 
   if (authSubtitle) {
     authSubtitle.textContent =
       authMode === "register"
-        ? "Choisis un pseudo unique et un mot de passe."
-        : "Connecte-toi avec ton pseudo.";
+        ? ("" + window.PeopleI18n.t("ui_730d73d4d2") + "")
+        : ("" + window.PeopleI18n.t("ui_d541d291cc") + "");
   }
 
   if (passwordInput) {
@@ -2441,6 +2461,7 @@ async function bootstrapAuth() {
     const data = await response.json();
 
     if (!applyAuthenticatedUser(data.user)) {
+      if (authError) authError.dataset.state = "error";
       joinScreen.classList.remove("hidden");
       return;
     }
@@ -2475,10 +2496,12 @@ joinForm.addEventListener("submit", async (e) => {
   const password = passwordInput.value;
 
   if (authError) {
+    authError.dataset.state = "loading";
+    authError.setAttribute("role", "status");
     authError.textContent =
       authMode === "register"
-        ? "Creation du compte..."
-        : "Connexion...";
+        ? ("" + window.PeopleI18n.t("ui_7dd3701aa3") + "")
+        : ("" + window.PeopleI18n.t("ui_5f04ae9ed6") + "");
   }
 
   try {
@@ -2504,26 +2527,29 @@ joinForm.addEventListener("submit", async (e) => {
       .catch(() => ({}));
 
     if (!response.ok || !data.ok) {
+      if (authError) authError.dataset.state = "error";
       if (authError) {
         authError.textContent =
-          data.error || "Impossible de se connecter.";
+          data.error || ("" + window.PeopleI18n.t("ui_7662db4a73") + "");
       }
       return;
     }
 
     if (!applyAuthenticatedUser(data.user)) {
       if (authError) {
-        authError.textContent = "Compte invalide.";
+        authError.textContent = ("" + window.PeopleI18n.t("ui_6f6f63d060") + "");
       }
       return;
     }
 
+    if (authError) { authError.dataset.state = "success"; authError.textContent = "Connected"; }
     passwordInput.value = "";
     await reconnectSocketAfterAuth();
     messageInput.focus();
   } catch {
     if (authError) {
-      authError.textContent = "Serveur indisponible.";
+      authError.dataset.state = "error";
+      authError.textContent = "Server unavailable. Please try again.";
     }
   }
 });
@@ -2548,7 +2574,7 @@ socket.on("auth-required", () => {
 
   if (authError) {
     authError.textContent =
-      "Ta session a expire. Reconnecte-toi.";
+      ("" + window.PeopleI18n.t("ui_d2c470b449") + "");
   }
 });
 
@@ -2560,7 +2586,7 @@ messageForm.addEventListener(
     e.preventDefault();
 
     if (!peopleActiveServerId) {
-      alert("Choisis d'abord un serveur.");
+      alert(("" + window.PeopleI18n.t("ui_ca6475770f") + ""));
       return;
     }
 
@@ -2591,7 +2617,7 @@ messageForm.addEventListener(
 
     if (navigator.onLine === false) {
       if (files.length) {
-        alert("Les pièces jointes demandent une connexion. Ton texte reste dans le champ.");
+        alert(("" + window.PeopleI18n.t("ui_1450f50383") + ""));
         return;
       }
 
@@ -2861,6 +2887,10 @@ socket.on("server-updated", ({ server } = {}) => {
   if (!server?.id) return;
   window.dispatchEvent(new CustomEvent("people-server-updated", { detail: { server } }));
 });
+socket.on("people-account-deleted", () => {
+  const channelId = window.PeopleServerRuntime?.getActiveTextChannelId?.();
+  if (channelId) void window.PeopleServerRuntime.selectTextChannel(channelId).catch(error => console.error("[People deleted user history]", error));
+});
 // === PEOPLE_SERVER_SETTINGS_V1_SOCKET_END ===
 
 socket.on("chat-history", renderChatHistory);
@@ -3018,7 +3048,7 @@ async function peopleSwitchVoiceInputDevice() {
     updateMicUi();
 
     voiceStatus.textContent =
-      "Micro changé ✓";
+      ("" + window.PeopleI18n.t("ui_b7e97c9641") + "");
 
     if (
       activeVoiceServerId &&
@@ -3042,7 +3072,7 @@ async function peopleSwitchVoiceInputDevice() {
     );
 
     voiceStatus.textContent =
-      "Impossible d'utiliser ce micro";
+      ("" + window.PeopleI18n.t("ui_a820fa889f") + "");
   }
 }
 
@@ -3116,13 +3146,13 @@ function peopleSyncUnifiedCallControls() {
 
     muteButton.title =
       dmCall.muted
-        ? "Réactiver le micro de l'appel MP"
-        : "Couper le micro de l'appel MP";
+        ? ("" + window.PeopleI18n.t("ui_31a6831195") + "")
+        : ("" + window.PeopleI18n.t("ui_502b31df05") + "");
 
     micState.textContent =
       dmCall.muted
-        ? "appel MP • micro coupé"
-        : "appel MP";
+        ? ("" + window.PeopleI18n.t("ui_8a4cb6c251") + "")
+        : ("" + window.PeopleI18n.t("ui_035474e0cf") + "");
 
     cameraButton.textContent =
       dmCall.camera
@@ -3144,8 +3174,8 @@ function peopleSyncUnifiedCallControls() {
 
     cameraButton.title =
       dmCall.camera
-        ? "Couper la caméra de l'appel MP"
-        : "Activer la caméra de l'appel MP";
+        ? ("" + window.PeopleI18n.t("ui_17b572a488") + "")
+        : ("" + window.PeopleI18n.t("ui_1b007c2083") + "");
 
     if (screenButton) {
       screenButton.textContent =
@@ -3166,8 +3196,8 @@ function peopleSyncUnifiedCallControls() {
 
       screenButton.title =
         dmCall.screen
-          ? "Arrêter le partage d'écran de l'appel MP"
-          : "Partager l'écran dans l'appel MP";
+          ? ("" + window.PeopleI18n.t("ui_ad5bff5e27") + "")
+          : ("" + window.PeopleI18n.t("ui_b20a831973") + "");
     }
 
     if (
@@ -3179,12 +3209,12 @@ function peopleSyncUnifiedCallControls() {
       leaveVoiceQuickButton.title =
         dmCall.phase ===
           "incoming"
-          ? "Refuser l'appel MP"
+          ? ("" + window.PeopleI18n.t("ui_6a2b44cb9d") + "")
           : (
               dmCall.phase ===
                 "outgoing"
-                ? "Annuler l'appel MP"
-                : "Raccrocher l'appel MP"
+                ? ("" + window.PeopleI18n.t("ui_57e0c6b8ba") + "")
+                : ("" + window.PeopleI18n.t("ui_b57fe431c1") + "")
             );
     }
 
@@ -3199,8 +3229,8 @@ function peopleSyncUnifiedCallControls() {
 
     leaveVoiceQuickButton.title =
       voiceJoined
-        ? "Quitter le vocal"
-        : "Aucun appel/vocal en cours";
+        ? ("" + window.PeopleI18n.t("ui_e2ebd1f789") + "")
+        : ("" + window.PeopleI18n.t("ui_e0a0fa647a") + "");
   }
 
   return false;
@@ -3225,11 +3255,11 @@ function updateMicUi() {
   if (!voiceJoined || !localStream) {
     muteButton.textContent = micMuted ? "🔇" : "🎙️";
     micState.textContent = micMuted
-      ? "micro coupé"
+      ? ("" + window.PeopleI18n.t("ui_8fdb32ddbb") + "")
       : "";
     muteButton.title = micMuted
-      ? "Réactiver le micro avant de rejoindre"
-      : "Couper le micro avant de rejoindre";
+      ? ("" + window.PeopleI18n.t("ui_0185629d20") + "")
+      : ("" + window.PeopleI18n.t("ui_abe6c7ebf7") + "");
 
     peopleSyncUnifiedCallControls();
     return;
@@ -3240,7 +3270,7 @@ function updateMicUi() {
   }
 
   muteButton.textContent = micMuted ? "🔇" : "🎙️";
-  micState.textContent = micMuted ? "micro coupé" : "micro activé";
+  micState.textContent = micMuted ? ("" + window.PeopleI18n.t("ui_8fdb32ddbb") + "") : ("" + window.PeopleI18n.t("ui_2b4a1e18d9") + "");
 
   socket.emit("voice-mute", { muted: micMuted });
 
@@ -3266,11 +3296,11 @@ function updateCameraUi() {
   );
 
   if (!voiceJoined && !cameraEnabled) {
-    cameraButton.title = "Rejoins le vocal pour activer la caméra";
+    cameraButton.title = ("" + window.PeopleI18n.t("ui_edb80ad755") + "");
   } else {
     cameraButton.title = cameraEnabled
-      ? "Couper la caméra"
-      : "Activer la caméra";
+      ? ("" + window.PeopleI18n.t("ui_1ad85c324f") + "")
+      : ("" + window.PeopleI18n.t("ui_e9e96a7d12") + "");
   }
 
   peopleSyncUnifiedCallControls();
@@ -3310,11 +3340,11 @@ function updateScreenUi() {
 
   screenButton.title =
     screenEnabled
-      ? "Arrêter le partage d'écran"
+      ? ("" + window.PeopleI18n.t("ui_4fa4028bb8") + "")
       : (
           voiceJoined
-            ? "Partager l'écran"
-            : "Rejoins le vocal pour partager ton écran"
+            ? ("" + window.PeopleI18n.t("ui_94601469e0") + "")
+            : ("" + window.PeopleI18n.t("ui_5dd32064a0") + "")
         );
 }
 
@@ -3348,7 +3378,7 @@ function peopleVoiceJoinRequest(
             response || {
               ok: false,
               error:
-                "Le serveur vocal n'a pas répondu."
+                "The voice server did not respond."
             }
           );
         };
@@ -3359,7 +3389,7 @@ function peopleVoiceJoinRequest(
             finish({
               ok: false,
               error:
-                "Le serveur vocal n'a pas répondu."
+                "The voice server did not respond."
             });
           },
           7000
@@ -3441,14 +3471,14 @@ function peopleVoiceRejectJoin(
 
   voiceStatus.textContent =
     response?.error ||
-    "Impossible de rejoindre le vocal.";
+    ("" + window.PeopleI18n.t("ui_ea9b754ec7") + "");
 
   voiceStatus.classList.remove(
     "connected"
   );
 
   voiceButton.childNodes[0].nodeValue =
-    "🔊 vocal ";
+    ("" + window.PeopleI18n.t("ui_5d581f4b0b") + " ");
 
   if (
     leaveVoiceQuickButton
@@ -3467,7 +3497,7 @@ async function joinVoice(channelId = peopleRequestedVoiceChannelId) {
   if (voiceJoined) return true;
 
   try {
-    voiceStatus.textContent = "Connexion au vocal...";
+    voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_f502d0fd70") + "");
     await ensureLocalAudio();
 
     const targetVoiceServerId =
@@ -3478,7 +3508,7 @@ async function joinVoice(channelId = peopleRequestedVoiceChannelId) {
 
     if (!targetVoiceServerId) {
       throw new Error(
-        "Choisis un serveur avant de rejoindre son vocal."
+        ("" + window.PeopleI18n.t("ui_fe6485d341") + "")
       );
     }
 
@@ -3538,9 +3568,9 @@ async function joinVoice(channelId = peopleRequestedVoiceChannelId) {
     voiceStatus.classList.remove("connected");
 
     if (err && err.name === "NotAllowedError") {
-      voiceStatus.textContent = "Autorise le micro dans le navigateur";
+      voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_fdcaa7ecf0") + "");
     } else {
-      voiceStatus.textContent = "Micro indisponible";
+      voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_f8c4acaa26") + "");
     }
 
     return false;
@@ -3559,7 +3589,7 @@ async function peopleSwitchVoiceChannel(channelId) {
   }
 
   if (!targetServerId || !targetChannelId) {
-    voiceStatus.textContent = "Salon vocal invalide";
+    voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_8474cb51bd") + "");
     return false;
   }
 
@@ -3570,7 +3600,7 @@ async function peopleSwitchVoiceChannel(channelId) {
   const previousRequestedChannelId = peopleRequestedVoiceChannelId;
   peopleVoiceSwitchInProgress = true;
   peopleRequestedVoiceChannelId = targetChannelId;
-  voiceStatus.textContent = "Changement de vocal...";
+  voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_68b33868fb") + "");
 
   try {
     /*
@@ -3585,7 +3615,7 @@ async function peopleSwitchVoiceChannel(channelId) {
 
     if (!response?.ok) {
       peopleRequestedVoiceChannelId = previousRequestedChannelId;
-      voiceStatus.textContent = response?.error || "Impossible de changer de vocal.";
+      voiceStatus.textContent = response?.error || ("" + window.PeopleI18n.t("ui_7a5b41dfe0") + "");
       peopleSyncVoiceUiContext();
       return false;
     }
@@ -3616,7 +3646,7 @@ async function peopleSwitchVoiceChannel(channelId) {
   } catch (err) {
     console.error("[People changement vocal]", err);
     peopleRequestedVoiceChannelId = previousRequestedChannelId;
-    voiceStatus.textContent = "Impossible de changer de vocal.";
+    voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_7a5b41dfe0") + "");
     peopleSyncVoiceUiContext();
     return false;
   } finally {
@@ -3629,7 +3659,7 @@ async function enableCamera() {
   if (cameraEnabled) return;
 
   if (!voiceJoined) {
-    voiceStatus.textContent = "Rejoins le vocal pour activer la caméra";
+    voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_edb80ad755") + "");
     updateCameraUi();
     return;
   }
@@ -3656,7 +3686,7 @@ async function enableCamera() {
     });
 
     const track = cameraStream.getVideoTracks()[0];
-    if (!track) throw new Error("Aucune caméra disponible");
+    if (!track) throw new Error(("" + window.PeopleI18n.t("ui_5883f6d0a6") + ""));
 
     cameraTrack = track;
     cameraEnabled = true;
@@ -3691,11 +3721,11 @@ async function enableCamera() {
     updateCameraUi();
 
     if (err && err.name === "NotAllowedError") {
-      voiceStatus.textContent = "Autorise la caméra dans le navigateur";
+      voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_88c36a6321") + "");
     } else if (err && err.name === "NotFoundError") {
-      voiceStatus.textContent = "Aucune caméra trouvée";
+      voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_36abc25bd7") + "");
     } else {
-      voiceStatus.textContent = "Caméra indisponible";
+      voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_06cc3b14a4") + "");
     }
   }
 }
@@ -3732,7 +3762,7 @@ async function peopleSwitchVoiceCameraDevice() {
       replacementStream.getVideoTracks()[0];
 
     if (!newTrack) {
-      throw new Error("Aucune caméra disponible");
+      throw new Error(("" + window.PeopleI18n.t("ui_5883f6d0a6") + ""));
     }
 
     cameraTrack = newTrack;
@@ -3768,7 +3798,7 @@ async function peopleSwitchVoiceCameraDevice() {
 
     updateCameraUi();
     voiceStatus.textContent =
-      "Caméra changée ✓";
+      ("" + window.PeopleI18n.t("ui_45b2613ed5") + "");
   } catch (err) {
     console.warn(
       "[People changement caméra vocal]",
@@ -3776,7 +3806,7 @@ async function peopleSwitchVoiceCameraDevice() {
     );
 
     voiceStatus.textContent =
-      "Impossible d'utiliser cette caméra";
+      ("" + window.PeopleI18n.t("ui_6eeaccffa9") + "");
   }
 }
 
@@ -3827,14 +3857,14 @@ async function enableScreenShare() {
 
   if (!voiceJoined) {
     voiceStatus.textContent =
-      "Rejoins le vocal pour partager ton écran";
+      ("" + window.PeopleI18n.t("ui_5dd32064a0") + "");
     updateScreenUi();
     return;
   }
 
   if (!navigator.mediaDevices?.getDisplayMedia) {
     voiceStatus.textContent =
-      "Le partage d'écran n'est pas disponible ici";
+      ("" + window.PeopleI18n.t("ui_ec200da2f1") + "");
     return;
   }
 
@@ -3859,7 +3889,7 @@ async function enableScreenShare() {
 
     if (!track) {
       throw new Error(
-        "Aucun écran sélectionné."
+        ("" + window.PeopleI18n.t("ui_d9f3f97c8e") + "")
       );
     }
 
@@ -3889,7 +3919,7 @@ async function enableScreenShare() {
     await rebuildPeersForMediaChange();
 
     voiceStatus.textContent =
-      "Partage d'écran actif";
+      ("" + window.PeopleI18n.t("ui_eab9e887f7") + "");
   } catch (err) {
     console.warn(
       "[People partage écran vocal]",
@@ -3902,7 +3932,7 @@ async function enableScreenShare() {
 
     if (err?.name !== "NotAllowedError") {
       voiceStatus.textContent =
-        "Partage d'écran indisponible";
+        ("" + window.PeopleI18n.t("ui_f4f7a9f35d") + "");
     }
   }
 }
@@ -3939,7 +3969,7 @@ async function disableScreenShare({
     await rebuildPeersForMediaChange();
 
     voiceStatus.textContent =
-      "Connecté au vocal";
+      ("" + window.PeopleI18n.t("ui_13dac1621e") + "");
   }
 }
 
@@ -3987,9 +4017,9 @@ function leaveVoice() {
 
   removeVideoTile(socket.id || "local", true);
   micMuted = false;
-  voiceStatus.textContent = "Pas connecté";
+  voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_04dfac3671") + "");
   voiceStatus.classList.remove("connected");
-  voiceButton.childNodes[0].nodeValue = "🔊 vocal ";
+  voiceButton.childNodes[0].nodeValue = ("" + window.PeopleI18n.t("ui_5d581f4b0b") + " ");
   voiceCount.textContent = lastVoiceRoster.length ? `(${lastVoiceRoster.length})` : "";
   updateMicUi();
   updateCameraUi();
@@ -4020,7 +4050,7 @@ voiceButton.addEventListener(
 
     const fallbackVoice = peopleServerChannels.find((item) => item?.type === "voice");
     if (!fallbackVoice) {
-      voiceStatus.textContent = "Aucun salon vocal sur ce serveur";
+      voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_09be27ec49") + "");
       return;
     }
 
@@ -4087,7 +4117,7 @@ cameraButton.addEventListener(
     }
 
     if (!voiceJoined && !cameraEnabled) {
-      voiceStatus.textContent = "Rejoins le vocal pour activer la caméra";
+      voiceStatus.textContent = ("" + window.PeopleI18n.t("ui_edb80ad755") + "");
       updateCameraUi();
       return;
     }
@@ -4115,7 +4145,7 @@ screenButton?.addEventListener(
 
     if (!voiceJoined && !screenEnabled) {
       voiceStatus.textContent =
-        "Rejoins le vocal pour partager ton écran";
+        ("" + window.PeopleI18n.t("ui_5dd32064a0") + "");
       updateScreenUi();
       return;
     }
@@ -4142,7 +4172,7 @@ async function flushCandidates(peerId, pc) {
     try {
       await pc.addIceCandidate(new RTCIceCandidate(candidate));
     } catch (err) {
-      console.warn("ICE candidate ignoré", err);
+      console.warn("ICE candidate ignored", err);
     }
   }
 
@@ -4392,7 +4422,7 @@ socket.on("voice-peers", async (existingPeers) => {
     try {
       await makeOffer(peer.id);
     } catch (err) {
-      console.error("Impossible de créer l'offre", err);
+      console.error("Unable to create the offer", err);
     }
   }
 });
@@ -4418,7 +4448,7 @@ socket.on("webrtc-offer", async ({ from, sdp }) => {
       sdp: pc.localDescription
     });
   } catch (err) {
-    console.error("Erreur offre WebRTC", err);
+    console.error("WebRTC offer error", err);
     requestPeerRecovery(from);
   }
 });
@@ -4433,7 +4463,7 @@ socket.on("webrtc-answer", async ({ from, sdp }) => {
     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
     await flushCandidates(from, pc);
   } catch (err) {
-    console.error("Erreur réponse WebRTC", err);
+    console.error("WebRTC answer error", err);
     requestPeerRecovery(from);
   }
 });
@@ -4451,7 +4481,7 @@ socket.on("webrtc-ice-candidate", async ({ from, candidate }) => {
   try {
     await pc.addIceCandidate(new RTCIceCandidate(candidate));
   } catch (err) {
-    console.warn("ICE candidate refusé", err);
+    console.warn("ICE candidate rejected", err);
   }
 });
 
@@ -4583,7 +4613,7 @@ function peopleRenderOnlineUsers(roster) {
 
   if (onlinePanelCount) {
     onlinePanelCount.textContent =
-      `${online.length} en ligne • ${offline.length} hors ligne`;
+      `${online.length} en ligne • ${offline.length} ${window.PeopleI18n.t("ui_8e2c7ac508")}`;
   }
 
   if (onlinePanelToggleCount) {
@@ -4612,7 +4642,7 @@ function peopleRenderOnlineUsers(roster) {
       "online-users-empty";
 
     empty.textContent =
-      "Aucun membre";
+      ("" + window.PeopleI18n.t("ui_54ee6a46f2") + "");
 
     onlineUsersList.appendChild(
       empty
@@ -4735,12 +4765,12 @@ function peopleRenderOnlineUsers(roster) {
         )
           ? (
               user.username ||
-              "Invité"
+              ("" + window.PeopleI18n.t("ui_5ed8944a85") + "")
             ) +
             " (toi)"
           : (
               user.username ||
-              "Invité"
+              ("" + window.PeopleI18n.t("ui_5ed8944a85") + "")
             );
 
       // === PEOPLE_MEMBER_PROFILE_V3 ===
@@ -4763,8 +4793,8 @@ function peopleRenderOnlineUsers(roster) {
 
       status.textContent =
         isOnline
-          ? "En ligne"
-          : "Hors ligne";
+          ? ("" + window.PeopleI18n.t("ui_0d21bd5202") + "")
+          : ("" + window.PeopleI18n.t("ui_a1794783aa") + "");
 
       const dot =
         document.createElement(
@@ -4783,8 +4813,8 @@ function peopleRenderOnlineUsers(roster) {
       dot.setAttribute(
         "aria-label",
         isOnline
-          ? "En ligne"
-          : "Hors ligne"
+          ? ("" + window.PeopleI18n.t("ui_0d21bd5202") + "")
+          : ("" + window.PeopleI18n.t("ui_a1794783aa") + "")
       );
 
       const presence = user.status || (isOnline ? "online" : "offline");
@@ -4806,13 +4836,13 @@ function peopleRenderOnlineUsers(roster) {
   }
 
   appendSection(
-    "EN LIGNE",
+    ("" + window.PeopleI18n.t("ui_ac7e248139") + ""),
     online,
     true
   );
 
   appendSection(
-    "HORS LIGNE",
+    ("" + window.PeopleI18n.t("ui_5c3ce8d496") + ""),
     offline,
     false
   );

@@ -220,10 +220,6 @@
   position: relative; left: auto; bottom: auto; transform: none;
   flex-wrap: wrap; width: fit-content; margin: 12px auto 0;
 }
-.people-server-call-move {
-  display: block; width: 100%; min-width: 0; max-width: 100%; margin-top: 8px; min-height: 32px;
-  background: var(--input); color: var(--text); border: 1px solid var(--panel); border-radius: 6px;
-}
 
 /* The native stage shares one column with the server messages. */
 .main { grid-template-columns: minmax(0, 1fr); }

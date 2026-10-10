@@ -268,7 +268,7 @@
       "people-avatar-image";
 
     image.alt =
-      "Photo de profil de " +
+      "Profile picture of " +
       name;
 
     /*
@@ -375,7 +375,7 @@
 
         if (!response.ok) {
           throw new Error(
-            "Avatar indisponible."
+            "Avatar unavailable."
           );
         }
 

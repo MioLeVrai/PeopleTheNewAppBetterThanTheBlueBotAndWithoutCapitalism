@@ -26,7 +26,7 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
-      throw new Error(data?.error || "Action impossible.");
+      throw new Error(data?.error || ("" + window.PeopleI18n.t("ui_4a47d829df") + ""));
     }
     return data;
   }
@@ -142,7 +142,7 @@
         badge.textContent = count > 99 ? "99+" : String(count);
         badge.title = count === 1
           ? "1 message non lu"
-          : `${count} messages non lus`;
+          : `${count}  unread messages`;
       });
   }
 
@@ -200,7 +200,7 @@
     const label = count > 99
       ? "Nouveaux messages • 99+"
       : count === 1
-        ? "1 nouveau message"
+        ? "1 new message"
         : `${count} nouveaux messages`;
     const el = divider(label);
     target.parentNode?.insertBefore(el, target);
@@ -374,7 +374,7 @@
     const label = count >= 99
       ? "Nouveaux messages"
       : count === 1
-        ? "1 nouveau message"
+        ? "1 new message"
         : `${count} nouveaux messages`;
     const el = divider(label);
     target.parentNode?.insertBefore(el, target);
@@ -509,7 +509,7 @@
       bindSocket();
     }
 
-    console.log(`[People] ${VERSION} prêt.`);
+    console.log(`[People] ${VERSION} ${window.PeopleI18n.t("ui_dc0dfabde6")}`);
   }
 
   if (document.readyState === "loading") {

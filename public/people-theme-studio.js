@@ -6,10 +6,10 @@
 
   const PALETTE_KEYS = ["background", "panel", "secondary", "text", "accent"];
   const PALETTE_LABELS = {
-    background: "Fond principal",
-    panel: "Panneaux",
-    secondary: "Fond secondaire",
-    text: "Texte principal",
+    background: ("" + window.PeopleI18n.t("ui_e02ff63f05") + ""),
+    panel: ("" + window.PeopleI18n.t("ui_d010ff3906") + ""),
+    secondary: ("" + window.PeopleI18n.t("ui_4b2919fe2c") + ""),
+    text: ("" + window.PeopleI18n.t("ui_dc299d2d90") + ""),
     accent: "Accent"
   };
   const DEFAULT_STOPS = ["#5865F2", "#8B5CF6", "#EB459E"];
@@ -159,7 +159,7 @@
     preview.style.setProperty("--preview-global-rail-overlay", rgba(palette.secondary, 0.78 + (1 - power) * 0.10));
   }
 
-  function dispatchDraft(appearance, status = "Aperçu local — pense à enregistrer.") {
+  function dispatchDraft(appearance, status = ("" + window.PeopleI18n.t("ui_6023dad373") + "")) {
     window.dispatchEvent(new CustomEvent("people-theme-studio-draft", {
       detail: { appearance: clone(appearance), status }
     }));
@@ -189,12 +189,12 @@
     picker.value = color;
     picker.dataset.peopleGradientStop = String(index);
     picker.dataset.peopleGradientScope = scope;
-    picker.setAttribute("aria-label", `Couleur ${index + 1} du dégradé`);
+    picker.setAttribute("aria-label", `${window.PeopleI18n.t("ui_6b73191a0a")} ${index + 1} ${window.PeopleI18n.t("ui_90c1c16351")}`);
     wrapper.appendChild(picker);
 
     const badge = document.createElement("span");
-    badge.textContent = count === 3 && index === 0 ? "Début"
-      : count === 3 && index === 1 ? "Milieu"
+    badge.textContent = count === 3 && index === 0 ? ("" + window.PeopleI18n.t("ui_e4bb9f1ece") + "")
+      : count === 3 && index === 1 ? ("" + window.PeopleI18n.t("ui_d93006ec2e") + "")
       : count === 3 && index === 2 ? "Fin"
       : String(index + 1);
     wrapper.appendChild(badge);
@@ -203,7 +203,7 @@
       const remove = document.createElement("button");
       remove.type = "button";
       remove.textContent = "×";
-      remove.title = "Retirer cette couleur";
+      remove.title = ("" + window.PeopleI18n.t("ui_fb74e03813") + "");
       remove.dataset.peopleGradientRemove = String(index);
       remove.dataset.peopleGradientScope = scope;
       wrapper.appendChild(remove);
@@ -233,13 +233,13 @@
       add.type = "button";
       add.className = "people-gradient-add-stop";
       add.dataset.peopleGradientAdd = "settings";
-      add.textContent = "+ Ajouter une couleur";
+      add.textContent = ("" + window.PeopleI18n.t("ui_b452305bbd") + "");
       bar.parentElement?.appendChild(add);
     }
     add.disabled = gradient.colors.length >= MAX_STOPS;
     add.textContent = gradient.colors.length >= MAX_STOPS
       ? `Maximum ${MAX_STOPS} couleurs`
-      : `+ Ajouter une couleur (${gradient.colors.length}/${MAX_STOPS})`;
+      : `${window.PeopleI18n.t("ui_eeb07f3a7b")}${gradient.colors.length}/${MAX_STOPS})`;
   }
 
   function updateGradientColors(scope, updater) {
@@ -259,7 +259,7 @@
     };
 
     if (scope === "studio") {
-      studioDraft = previewDraft(base, "Modifications en direct — non enregistrées.");
+      studioDraft = previewDraft(base, ("" + window.PeopleI18n.t("ui_b7f6eed601") + ""));
       return;
     }
     previewDraft(base);
@@ -296,10 +296,10 @@
     row.className = "people-theme-studio-launch-row people-appearance-advanced-content";
     row.innerHTML = `
       <div>
-        <strong>Aperçu grandeur nature</strong>
-        <span>Vois le thème directement sur ton vrai People pendant que tu le modifies.</span>
+        <strong>${window.PeopleI18n.t("ui_d61b13d11a")}</strong>
+        <span>${window.PeopleI18n.t("ui_87c7a6adbd")}</span>
       </div>
-      <button type="button" class="people-settings-secondary" data-people-theme-studio-open>Voir dans People</button>
+      <button type="button" class="people-settings-secondary" data-people-theme-studio-open>${window.PeopleI18n.t("ui_19f7d43472")}</button>
     `;
     (note || preview).insertAdjacentElement("afterend", row);
 
@@ -311,27 +311,27 @@
     return `
       <aside class="people-theme-studio" data-people-theme-studio hidden>
         <header class="people-theme-studio-head">
-          <div><span>APPARENCE</span><strong>Modifier People en direct</strong></div>
-          <button type="button" data-people-theme-studio-close aria-label="Fermer">×</button>
+          <div><span>${window.PeopleI18n.t("ui_a69553c035")}</span><strong>${window.PeopleI18n.t("ui_18d39b8005")}</strong></div>
+          <button type="button" data-people-theme-studio-close aria-label="${window.PeopleI18n.t("ui_7d9eb7acb1")}">×</button>
         </header>
         <div class="people-theme-studio-scroll">
           <section class="people-theme-studio-section">
-            <div class="people-theme-studio-title"><strong>Couleurs principales</strong><span>Modifie les surfaces et l'accent.</span></div>
+            <div class="people-theme-studio-title"><strong>${window.PeopleI18n.t("ui_a7b2327054")}</strong><span>${window.PeopleI18n.t("ui_dfa2e0b368")}</span></div>
             <div class="people-theme-studio-palette" data-studio-palette></div>
           </section>
           <section class="people-theme-studio-section">
-            <div class="people-theme-studio-title"><strong>Dégradé global</strong><span>Un seul dégradé traverse toute l'interface.</span></div>
-            <label class="people-theme-studio-toggle"><span>Activer le dégradé</span><input type="checkbox" data-studio-gradient-enabled /></label>
+            <div class="people-theme-studio-title"><strong>${window.PeopleI18n.t("ui_a316191592")}</strong><span>${window.PeopleI18n.t("ui_78f5d8fed6")}</span></div>
+            <label class="people-theme-studio-toggle"><span>${window.PeopleI18n.t("ui_1a933eafc9")}</span><input type="checkbox" data-studio-gradient-enabled /></label>
             <div class="people-theme-studio-gradient-bar" data-studio-gradient-bar></div>
-            <button type="button" class="people-gradient-add-stop studio" data-people-gradient-add="studio">+ Ajouter une couleur</button>
+            <button type="button" class="people-gradient-add-stop studio" data-people-gradient-add="studio">${window.PeopleI18n.t("ui_b452305bbd")}</button>
             <label class="people-theme-studio-range"><span>Direction <b data-studio-direction-value>135°</b></span><input type="range" min="0" max="360" step="1" data-studio-direction /></label>
-            <label class="people-theme-studio-range"><span>Intensité <b data-studio-intensity-value>72%</b></span><input type="range" min="0" max="100" step="1" data-studio-intensity /></label>
+            <label class="people-theme-studio-range"><span>${window.PeopleI18n.t("ui_a6d01dcff3")} <b data-studio-intensity-value>72%</b></span><input type="range" min="0" max="100" step="1" data-studio-intensity /></label>
           </section>
         </div>
         <footer class="people-theme-studio-footer">
           <span data-studio-status></span>
-          <button type="button" class="people-theme-studio-cancel" data-people-theme-studio-cancel>Annuler</button>
-          <button type="button" class="people-theme-studio-save" data-people-theme-studio-save>Sauvegarder</button>
+          <button type="button" class="people-theme-studio-cancel" data-people-theme-studio-cancel>${window.PeopleI18n.t("ui_19766ed6cc")}</button>
+          <button type="button" class="people-theme-studio-save" data-people-theme-studio-save>${window.PeopleI18n.t("ui_35322b5bb5")}</button>
         </footer>
       </aside>
     `;
@@ -389,7 +389,7 @@
       add.disabled = gradient.colors.length >= MAX_STOPS;
       add.textContent = gradient.colors.length >= MAX_STOPS
         ? `Maximum ${MAX_STOPS} couleurs`
-        : `+ Ajouter une couleur (${gradient.colors.length}/${MAX_STOPS})`;
+        : `${window.PeopleI18n.t("ui_eeb07f3a7b")}${gradient.colors.length}/${MAX_STOPS})`;
     }
   }
 
@@ -414,14 +414,14 @@
     studio.hidden = false;
     studioOpen = true;
     renderStudio(studioDraft);
-    setStudioStatus("Modifications non enregistrées.");
+    setStudioStatus(("" + window.PeopleI18n.t("ui_efa5855ff5") + ""));
   }
 
   function closeStudio({ restore = false, reopenSettings = false } = {}) {
     const studio = document.querySelector("[data-people-theme-studio]");
     if (restore && studioOrigin) {
       window.PeopleAppearance?.preview?.(studioOrigin);
-      dispatchDraft(studioOrigin, "Modifications annulées.");
+      dispatchDraft(studioOrigin, ("" + window.PeopleI18n.t("ui_95071425fc") + ""));
       queueMicrotask(() => applyGlobalGradient(studioOrigin));
     }
     studioOpen = false;
@@ -443,7 +443,7 @@
     if (!normalized) return;
     studioDraft.palette[key] = normalized;
     studioDraft.theme = "custom";
-    studioDraft = previewDraft(studioDraft, "Modifications en direct — non enregistrées.");
+    studioDraft = previewDraft(studioDraft, ("" + window.PeopleI18n.t("ui_b7f6eed601") + ""));
   }
 
   document.addEventListener("input", (event) => {
@@ -493,7 +493,7 @@
       if (target.matches("[data-studio-direction]")) gradient.direction = Math.max(0, Math.min(360, Math.round(Number(target.value) || 0)));
       if (target.matches("[data-studio-intensity]")) gradient.intensity = Math.max(0, Math.min(100, Math.round(Number(target.value) || 0)));
       studioDraft.palette.gradient = gradient;
-      studioDraft = previewDraft(studioDraft, "Modifications en direct — non enregistrées.");
+      studioDraft = previewDraft(studioDraft, ("" + window.PeopleI18n.t("ui_b7f6eed601") + ""));
     }
   }, true);
 
@@ -526,15 +526,15 @@
     const save = target.closest("[data-people-theme-studio-save]");
     if (save && studioDraft) {
       save.disabled = true;
-      setStudioStatus("Enregistrement…");
+      setStudioStatus("Saving...");
       try {
         const confirmed = await window.PeopleAppearance.save(studioDraft);
         applyGlobalGradient(confirmed);
-        setStudioStatus("Sauvegardé ✓", "success");
+        setStudioStatus(("" + window.PeopleI18n.t("ui_9ec0cf9f6e") + ""), "success");
         setTimeout(() => closeStudio({ restore: false, reopenSettings: false }), 320);
       } catch (error) {
         save.disabled = false;
-        setStudioStatus(error?.message || "Impossible d'enregistrer.", "error");
+        setStudioStatus(error?.message || ("" + window.PeopleI18n.t("ui_da5eb8a9ed") + ""), "error");
       }
     }
   }, true);
@@ -553,7 +553,7 @@
         gradient: normalizeGradient(palette.gradient, palette)
       }
     };
-    previewDraft(next, "Thème importé — vérifie l'aperçu puis enregistre.");
+    previewDraft(next, ("" + window.PeopleI18n.t("ui_b5ac5d4251") + ""));
   });
 
   window.addEventListener("people-appearance-changed", () => {

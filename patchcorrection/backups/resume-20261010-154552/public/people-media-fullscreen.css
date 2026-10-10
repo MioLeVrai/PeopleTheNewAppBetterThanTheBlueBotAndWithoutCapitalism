@@ -1,0 +1,138 @@
+/* === PEOPLE_MEDIA_FULLSCREEN_V1 === */
+
+.people-media-fullscreen-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: rgba(10,10,14,.72);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0,0,0,.28);
+  font: inherit;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+.people-media-fullscreen-button:hover {
+  background: rgba(35,31,48,.94);
+  border-color: rgba(138,121,202,.52);
+}
+
+.people-media-fullscreen-button:active {
+  transform: scale(.96);
+}
+
+.people-media-fullscreen-button.hidden {
+  display: none !important;
+}
+
+/* Serveur : un bouton sur chaque caméra / partage d'écran. */
+.video-tile > .people-media-server-fullscreen {
+  position: absolute;
+  z-index: 8;
+  top: 9px;
+  left: 9px;
+}
+
+.video-tile:fullscreen,
+.video-tile:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+}
+
+.video-tile:fullscreen video,
+.video-tile:-webkit-full-screen video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  background: #000 !important;
+}
+
+/* MP : bouton de plein écran du média principal. */
+.people-dm-call-stage > .people-media-dm-fullscreen {
+  position: absolute;
+  z-index: 9;
+  top: 12px;
+  right: 12px;
+}
+
+.people-dm-call-stage:fullscreen,
+.people-dm-call-stage:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  max-height: none !important;
+  background: #000 !important;
+}
+
+.people-dm-call-stage:fullscreen .people-dm-call-remote-video,
+.people-dm-call-stage:-webkit-full-screen .people-dm-call-remote-video {
+  object-fit: contain !important;
+  background: #000 !important;
+}
+
+video:fullscreen,
+video:-webkit-full-screen {
+  object-fit: contain !important;
+  background: #000 !important;
+}
+
+/* Mini-appel : le même plein écran reste disponible. */
+.people-dm-call-video-pip-header .people-media-pip-fullscreen {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 15px;
+  box-shadow: none;
+}
+
+/*
+  IMPORTANT : le panneau MP n'occupe plus automatiquement toute la largeur.
+  Sa largeur est calculée par people-media-fullscreen.js à partir de la hauteur
+  que l'utilisateur règle déjà avec la poignée verticale.
+*/
+.people-dm-call-docked .people-dm-call-card {
+  width: min(100%, var(--people-dm-call-inline-media-width, 720px)) !important;
+  max-width: 1100px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* La caméra distante reste entièrement visible : plus de crop quand People s'élargit. */
+.people-dm-call-docked .people-dm-call-remote-video {
+  object-fit: contain !important;
+  background: #000 !important;
+}
+
+@media (max-width: 780px) {
+  .people-media-fullscreen-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    font-size: 17px;
+  }
+
+  .people-dm-call-stage > .people-media-dm-fullscreen {
+    top: 8px;
+    right: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .people-media-fullscreen-button {
+    transition: none;
+  }
+}

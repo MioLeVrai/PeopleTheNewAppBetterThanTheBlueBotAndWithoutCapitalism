@@ -45,7 +45,7 @@
     return false;
   }
 
-  function makeButton(label = "Plein écran") {
+  function makeButton(label = ("" + window.PeopleI18n.t("ui_c461dbb2ba") + "")) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = BUTTON_CLASS;
@@ -72,7 +72,7 @@
     const video = tile.querySelector("video");
     if (!video) return;
 
-    const button = makeButton("Mettre cette caméra / ce stream en plein écran");
+    const button = makeButton(("" + window.PeopleI18n.t("ui_484035d45d") + ""));
     button.classList.add("people-media-server-fullscreen");
 
     button.addEventListener("click", (event) => {
@@ -100,7 +100,7 @@
 
     let button = stage.querySelector(":scope > .people-media-dm-fullscreen");
     if (!button) {
-      button = makeButton("Mettre la caméra / le stream en plein écran");
+      button = makeButton(("" + window.PeopleI18n.t("ui_4f6bb273c9") + ""));
       button.classList.add("people-media-dm-fullscreen");
 
       button.addEventListener("click", (event) => {
@@ -132,7 +132,7 @@
 
     let button = header.querySelector(".people-media-pip-fullscreen");
     if (!button) {
-      button = makeButton("Mettre la caméra en plein écran");
+      button = makeButton(("" + window.PeopleI18n.t("ui_7ad0be0b81") + ""));
       button.classList.add("people-media-pip-fullscreen");
       button.addEventListener("pointerdown", (event) => event.stopPropagation());
       button.addEventListener("click", (event) => {

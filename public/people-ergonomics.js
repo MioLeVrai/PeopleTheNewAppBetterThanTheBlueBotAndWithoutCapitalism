@@ -7,22 +7,22 @@
   const launcher = document.createElement("button");
   launcher.type = "button";
   launcher.className = "people-quick-launch";
-  launcher.innerHTML = '<span>⌕ <span class="people-quick-label">Rechercher</span></span><kbd>Ctrl K</kbd>';
-  launcher.title = "Retrouver un serveur, un salon ou une conversation (Ctrl / ⌘ K)";
-  launcher.setAttribute("aria-label", "Rechercher un serveur, un salon ou une conversation");
+  launcher.innerHTML = "<span>⌕ <span class=\"people-quick-label\">Search</span></span><kbd>Ctrl K</kbd>";
+  launcher.title = ("" + window.PeopleI18n.t("ui_9ccbb46d06") + "");
+  launcher.setAttribute("aria-label", ("" + window.PeopleI18n.t("ui_6adddeff66") + ""));
   launcher.setAttribute("aria-haspopup", "dialog");
   $("#friendsView").prepend(launcher);
 
   const dialog = document.createElement("dialog");
   dialog.className = "people-quick-dialog";
   dialog.setAttribute("aria-labelledby", "peopleQuickTitle");
-  dialog.innerHTML = `<div class="people-quick-head"><h2 id="peopleQuickTitle">Où veux-tu aller ?</h2><button type="button" aria-label="Fermer la recherche">✕</button></div>
-    <label class="people-sr-only" for="peopleQuickInput">Rechercher un serveur, un salon ou une conversation</label>
-    <input id="peopleQuickInput" type="search" placeholder="Un serveur, un salon, une personne…" autocomplete="off" maxlength="100" aria-controls="peopleQuickResults">
-    <p class="people-quick-hint">Salons du serveur actuel · Conversations · Serveurs</p>
+  dialog.innerHTML = `<div class="people-quick-head"><h2 id="peopleQuickTitle">${window.PeopleI18n.t("ui_c022fa5425")}</h2><button type="button" aria-label="${window.PeopleI18n.t("ui_713e781652")}">✕</button></div>
+    <label class="people-sr-only" for="peopleQuickInput">${window.PeopleI18n.t("ui_6adddeff66")}</label>
+    <input id="peopleQuickInput" type="search" placeholder="${window.PeopleI18n.t("ui_f7a025ff78")}" autocomplete="off" maxlength="100" aria-controls="peopleQuickResults">
+    <p class="people-quick-hint">${window.PeopleI18n.t("ui_901579d5bf")}</p>
     <div id="peopleQuickResults" class="people-quick-results"></div>
     <p id="peopleQuickStatus" class="people-sr-only" role="status"></p>
-    <footer>↑ ↓ pour parcourir · Entrée pour ouvrir · Échap pour fermer</footer>`;
+    <footer>${window.PeopleI18n.t("ui_c370512480")}</footer>`;
   document.body.append(dialog);
   const input = dialog.querySelector("input");
   const results = dialog.querySelector(".people-quick-results");
@@ -31,13 +31,13 @@
   let selected = 0;
 
   function destinations() {
-    const items = [{ name: "Amis", kind: "Accueil", source: $("#friendsNavButton") }];
-    document.querySelectorAll(".dynamic-server-button").forEach(source => items.push({ name: source.title, kind: "Serveur", source }));
+    const items = [{ name: ("" + window.PeopleI18n.t("ui_bd104d1b98") + ""), kind: ("" + window.PeopleI18n.t("ui_3a78695388") + ""), source: $("#friendsNavButton") }];
+    document.querySelectorAll(".dynamic-server-button").forEach(source => items.push({ name: source.title, kind: ("" + window.PeopleI18n.t("ui_aef7de28d5") + ""), source }));
     document.querySelectorAll(".people-server-channel").forEach(source => {
       if (source.querySelector(".people-server-channel-icon")?.textContent !== "#") return;
-      items.push({ name: source.querySelector(".people-server-channel-name").textContent, kind: "Salon texte", source });
+      items.push({ name: source.querySelector(".people-server-channel-name").textContent, kind: "Text channel", source });
     });
-    document.querySelectorAll(".dm-conversation-row").forEach(source => items.push({ name: source.dataset.username, kind: "Message privé", source }));
+    document.querySelectorAll(".dm-conversation-row").forEach(source => items.push({ name: source.dataset.username, kind: ("" + window.PeopleI18n.t("ui_cd3e16057d") + ""), source }));
     return items.filter(item => item.source && !item.source.disabled).map(item => ({
       ...item,
       unread: item.source.querySelector(".people-unread-channel-badge, .dm-unread-badge, .rail-badge:not(.hidden)")?.textContent.trim() || ""
@@ -67,7 +67,7 @@
         const badge = document.createElement("span");
         badge.className = "people-quick-unread";
         badge.textContent = item.unread;
-        badge.setAttribute("aria-label", item.unread + " messages non lus");
+        badge.setAttribute("aria-label", item.unread + "  unread messages");
         button.append(badge);
       }
       button.addEventListener("click", () => activate(index));
@@ -76,10 +76,10 @@
     if (!entries.length) {
       const empty = document.createElement("p");
       empty.className = "people-quick-empty";
-      empty.textContent = "Aucun résultat. Essaie un autre nom.";
+      empty.textContent = ("" + window.PeopleI18n.t("ui_72c638b4f7") + "");
       results.append(empty);
     }
-    $("#peopleQuickStatus").textContent = `${entries.length} résultat${entries.length > 1 ? "s" : ""}`;
+    $("#peopleQuickStatus").textContent = `${entries.length} ${window.PeopleI18n.t("ui_f6a214f7a5")}${entries.length > 1 ? "s" : ""}`;
     highlight();
   }
   function activate(index) {
@@ -131,7 +131,7 @@
     const form = document.getElementById(formId);
     const field = document.getElementById(fieldId);
     const messages = document.getElementById(messagesId);
-    field.setAttribute("aria-label", formId === "dmForm" ? "Écrire un message privé" : "Écrire un message dans le salon");
+    field.setAttribute("aria-label", formId === "dmForm" ? ("" + window.PeopleI18n.t("ui_0313c84ba9") + "") : ("" + window.PeopleI18n.t("ui_2bde6d9b86") + ""));
     const counter = document.createElement("span");
     counter.className = "people-composer-count";
     counter.id = fieldId + "Count";
@@ -147,7 +147,7 @@
     const latest = document.createElement("button");
     latest.type = "button";
     latest.className = "people-jump-latest";
-    latest.textContent = "↓ Derniers messages";
+    latest.textContent = "↓ Latest messages";
     latest.hidden = true;
     form.append(latest);
     function updateLatest() {

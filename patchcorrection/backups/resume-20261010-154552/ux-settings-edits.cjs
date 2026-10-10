@@ -1,0 +1,32 @@
+const fs = require('node:fs');
+let s = fs.readFileSync('public/people-server-settings.js', 'utf8');
+s = s.replace('  let serverSnapshot = null;', '  let serverSnapshot = null;\n  let dirty = false;\n  let savingChanges = false;\n  function discardChanges() { if (savingChanges) return false; if (dirty && !confirm("Discard unsaved changes?")) return false; dirty = false; return true; }\n  window.addEventListener("beforeunload", event => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });');
+s = s.replace('    { id: "members", label: "Membres" },\n', '').replace('    { id: "members", label: "Membres" },\r\n', '').replace('{ id: "roles", label: "Rôles et permissions" },\n    { id: "moderation", label: "Modération" }', '{ id: "roles", label: "Roles & Members" }').replace('{ id: "roles", label: "Rôles et permissions" },\r\n    { id: "moderation", label: "Modération" }', '{ id: "roles", label: "Roles & Members" }');
+s = s.replace('    if (!overlay) return;\n    overlay.remove();', '    if (!overlay) return;\n    if (!discardChanges()) return;\n    overlay.remove();').replace('    if (!overlay) return;\r\n    overlay.remove();', '    if (!overlay) return;\n    if (!discardChanges()) return;\n    overlay.remove();');
+s = s.replace('    activeSection = id;', '    if (!discardChanges()) return;\n    activeSection = id;');
+s = s.replace('    content.replaceChildren();', '    content.replaceChildren();\n    if (["roles", "members", "moderation"].includes(id)) {\n      const tabs = document.createElement("nav"); tabs.className = "people-members-tabs";\n      for (const [section, label] of [["roles", "Roles"], ["members", "Members & Banned Members"], ["moderation", "Audit & Moderation"]]) {\n        const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.classList.toggle("active", section === id); button.onclick = () => void renderSection(section); tabs.append(button);\n      }\n      content.append(tabs);\n    }');
+s = s.replace('button.dataset.section === id', 'button.dataset.section === (["members", "moderation"].includes(id) ? "roles" : id)');
+s = s.replace('    const list = document.createElement("div");\n    list.className = "people-role-list";', '    const choices = document.createElement("div"); choices.className = "people-role-choices";\n    const back = document.createElement("button"); back.type = "button"; back.textContent = "Back to roles"; back.hidden = true;\n    content.append(choices, back);\n    const list = document.createElement("div");\n    list.className = "people-role-list";\n    back.onclick = () => { if (!discardChanges()) return; list.querySelectorAll(".people-role-card").forEach(card => card.hidden = true); choices.hidden = false; createCard.hidden = false; back.hidden = true; };');
+s = s.replace('      card.dataset.roleId = String(role.id);', '      card.dataset.roleId = String(role.id); card.hidden = true;\n      card.addEventListener("input", () => { dirty = true; });\n      const choice = document.createElement("button"); choice.type = "button"; choice.textContent = role.name; choice.style.borderLeft = "5px solid " + role.color;\n      choice.onclick = () => { if (!discardChanges()) return; list.querySelectorAll(".people-role-card").forEach(other => other.hidden = other !== card); choices.hidden = true; createCard.hidden = true; back.hidden = false; };\n      choices.append(choice);');
+s = s.replace('      save.textContent = "Enregistrer";', '      save.textContent = "Save Changes";');
+s = s.replace('        state.textContent = "Enregistré.";', '        dirty = false;\n          state.textContent = "Saved.";');
+s = s.replace('          state.textContent = "Enregistré.";', '          dirty = false;\n          state.textContent = "Saved.";');
+s = s.replace('    const overrideCard = document.createElement("section");', '    return; // Channel exceptions are configured from that channel.\n    const overrideCard = document.createElement("section");');
+// The old override UI is removed, not left as unreachable code.
+const start = s.indexOf('    return; // Channel exceptions');
+const end = s.indexOf('\n  function renderPlaceholderSection', start);
+if (start < 0 || end < 0) throw Error('Missing override block');
+s = s.slice(0, start) + '  }\n\n' + s.slice(end);
+// Track overview and assignment edits too; saved operations clear their own dirty state.
+s = s.replace('    input.value = server?.name || "";', '    input.value = server?.name || "";\n    input.addEventListener("input", () => { dirty = true; });');
+s = s.replace('        pendingIcon = iconData;', '        dirty = true;\n        pendingIcon = iconData;');
+s = s.replace('pendingIcon = null; renderSettingsServerIcon', 'dirty = true; pendingIcon = null; renderSettingsServerIcon');
+s = s.replace('      saving = true;', '      saving = true; savingChanges = true;');
+s = s.replace('        saving = false;', '        saving = false; savingChanges = false;');
+s = s.replace('        saveState.textContent = "Nom enregistré. L’invitation n’a pas changé.";', '        dirty = false;\n        saveState.textContent = "Changes saved.";');
+s = s.replace('    memberSelect.addEventListener("change", drawMemberRoles);', '    memberChecks.addEventListener("change", () => { dirty = true; });\n    let selectedMember = memberSelect.value;\n    memberSelect.addEventListener("change", () => { if (!discardChanges()) { memberSelect.value = selectedMember; return; } selectedMember = memberSelect.value; drawMemberRoles(); });');
+s = s.replace('        memberState.textContent = "Rôles mis à jour.";', '        dirty = false;\n        memberState.textContent = "Roles updated.";');
+fs.writeFileSync('public/people-server-settings.js', s);
+let settings = fs.readFileSync('public/people-settings.js', 'utf8');
+settings = settings.replace(/\s*<label\s+class="people-settings-device-field"\s*>\s*<span>Vidéo — Caméra<\/span>[\s\S]*?<\/label>/, '');
+fs.writeFileSync('public/people-settings.js', settings);
