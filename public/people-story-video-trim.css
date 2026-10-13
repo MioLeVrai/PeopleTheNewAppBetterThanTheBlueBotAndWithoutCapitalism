@@ -1,0 +1,15 @@
+/* PEOPLE_STORY_TRIM_V1: story editor overlay; theme-aware and responsive. */
+.people-story-trimmer { z-index: 12500; }
+.people-story-trimmer .people-story-dialog__panel { width: min(540px, 100%); padding-bottom: 14px; }
+.people-story-trimmer p { font-size: 12px; color: var(--muted,#b5bac1); padding: 0 15px; line-height: 1.5; margin: 0 0 12px; }
+.people-story-trimmer__video { width: calc(100% - 30px); max-height: min(42dvh, 360px); object-fit: contain; background: #000; margin: 0 15px; border-radius: 8px; display: block; }
+.people-story-trimmer__ranges { margin: 13px 15px; display: grid; gap: 12px; }
+.people-story-trimmer__ranges label { display: grid; grid-template-columns: 1fr auto; gap: 6px; font-size: 13px; }
+.people-story-trimmer__ranges output { font-variant-numeric: tabular-nums; color: var(--muted,#b5bac1); }
+.people-story-trimmer__ranges input { grid-column: 1/-1; width: 100%; accent-color: var(--brand,#78d8ff); cursor: pointer; }
+.people-story-trimmer__chosen { font-size: 12px; color: var(--muted,#b5bac1); }
+.people-story-trimmer__buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 0 15px; }
+.people-story-trimmer__buttons button { padding: 9px 11px; font: inherit; background: var(--hover,#35373c); color: var(--text,#fff); border: 0; border-radius: 8px; cursor: pointer; }
+.people-story-trimmer__buttons [data-save] { background: var(--brand,#5865f2); color: #fff; }
+.people-story-trimmer__buttons button:disabled { opacity: .55; cursor: progress; }
+.people-story-trimmer__message { color: var(--muted,#b5bac1); font-size: 12px; min-height: 1em; margin: 10px 15px 0; }

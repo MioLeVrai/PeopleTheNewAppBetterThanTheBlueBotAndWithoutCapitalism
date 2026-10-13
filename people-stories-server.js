@@ -53,22 +53,58 @@ module.exports = function registerPeopleStories({ app, io, getPool, sessionForRe
     }
     return search(0, buffer.length, 0);
   }
+  // Read the actual WebM Info elements. A raw byte scan can mistake video
+  // payload for Duration and incorrectly reject otherwise valid recordings.
   function ebmlDuration(buffer) {
-    // Duration (0x4489) is a float in seconds-of-timecode, usually scaled at 1ms.
-    let scale = 1000000, duration = NaN;
-    const limit = Math.min(buffer.length, 3 * 1024 * 1024);
+    const limit = Math.min(buffer.length, 128 * 1024);
+    function vint(pos) {
+      if (pos >= buffer.length) return null;
+      let mask = 0x80, length = 1;
+      while (!(buffer[pos] & mask)) { mask >>= 1; length++; if (length > 8) return null; }
+      if (pos + length > buffer.length) return null;
+      let size = BigInt(buffer[pos] & (mask - 1));
+      for (let i = 1; i < length; i++) size = (size << 8n) | BigInt(buffer[pos + i]);
+      if (size === (1n << BigInt(length * 7)) - 1n || size > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+      return { length, size: Number(size) };
+    }
+    function idAt(pos) {
+      if (pos >= buffer.length) return null;
+      let mask = 0x80, length = 1;
+      while (!(buffer[pos] & mask)) { mask >>= 1; length++; if (length > 4) return null; }
+      if (pos + length > buffer.length) return null;
+      return { length, id: buffer.toString("hex", pos, pos + length) };
+    }
     for (let i = 0; i < limit - 12; i++) {
-      if (buffer[i] === 0x2a && buffer[i+1] === 0xd7 && buffer[i+2] === 0xb1) {
-        const size = buffer[i+3] & 0x7f;
-        if (size >= 1 && size <= 4 && i+4+size <= limit) { scale = 0; for (let k = 0; k < size; k++) scale = scale * 256 + buffer[i+4+k]; }
+      if (buffer[i] !== 0x15 || buffer[i+1] !== 0x49 || buffer[i+2] !== 0xa9 || buffer[i+3] !== 0x66) continue;
+      const header = vint(i + 4);
+      if (!header || header.size > 8192) continue;
+      const start = i + 4 + header.length, end = start + header.size;
+      if (end > buffer.length) continue;
+      let scale = 1000000, duration = NaN, position = start, valid = true;
+      while (position < end) {
+        const id = idAt(position);
+        const size = id && vint(position + id.length);
+        if (!id || !size) { valid = false; break; }
+        const dataStart = position + id.length + size.length;
+        const dataEnd = dataStart + size.size;
+        if (dataEnd > end) { valid = false; break; }
+        if (id.id === "2ad7b1" && size.size >= 1 && size.size <= 8) {
+          let value = 0;
+          for (let j = dataStart; j < dataEnd; j++) value = value * 256 + buffer[j];
+          if (value > 0 && Number.isSafeInteger(value)) scale = value;
+        }
+        if (id.id === "4489") {
+          if (size.size === 4) duration = buffer.readFloatBE(dataStart);
+          else if (size.size === 8) duration = buffer.readDoubleBE(dataStart);
+        }
+        position = dataEnd;
       }
-      if (buffer[i] === 0x44 && buffer[i+1] === 0x89) {
-        const size = buffer[i+2] & 0x7f;
-        if (size === 4 && i+7 <= limit) duration = buffer.readFloatBE(i+3);
-        if (size === 8 && i+11 <= limit) duration = buffer.readDoubleBE(i+3);
+      if (valid && position === end && Number.isFinite(duration) && duration > 0 && scale > 0) {
+        const seconds = duration * scale / 1e9;
+        if (Number.isFinite(seconds) && seconds > 0) return seconds;
       }
     }
-    return duration * scale / 1e9;
+    return NaN;
   }
   async function durationSeconds(data, type) {
     const suffix = types[type];

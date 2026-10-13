@@ -147,7 +147,8 @@
         video.onerror=()=>{clearTimeout(timer);reject(new Error("Invalid video."));};
         video.src=url;
       });
-      if(!Number.isFinite(duration)||duration<=0||duration>10)throw new Error("Videos must be 10 seconds or shorter.");
+      if(!Number.isFinite(duration)||duration<=0)throw new Error("Unable to read video duration.");
+      return duration;
     } finally {URL.revokeObjectURL(url);}
   }
   function buildComposer() {
@@ -167,10 +168,21 @@
         const existing=(await request(`/api/stories/${encodeURIComponent(username)}`)).parts;
         if(existing.length+files.length>maxParts)throw new Error("Maximum 10 story parts. Remove an existing part before adding more.");
         for(let i=0;i<files.length;i++) {
-          const file=files[i];
+          let file=files[i];
           if(!["image/png","image/jpeg","image/webp","image/gif","video/mp4","video/webm"].includes(file.type))throw new Error("Only PNG, JPEG, WebP, GIF, MP4 and WebM files are supported.");
           if(!file.size||file.size>maxBytes)throw new Error("Each file must be 50 MB or smaller.");
-          if(file.type.startsWith("video/"))await checkVideo(file);
+          if(file.type.startsWith("video/")) {
+            const originalDuration=await checkVideo(file);
+            if(originalDuration>10) {
+              if(!window.PeopleStoryVideoTrimmer?.trim)throw new Error("Story video editor unavailable. Please refresh People.");
+              const trimmed=await window.PeopleStoryVideoTrimmer.trim(file,originalDuration);
+              if(!trimmed){status.textContent="Video trimming cancelled.";await renderParts();return;}
+              file=trimmed;
+              if(!file.size||file.size>maxBytes)throw new Error("The trimmed video must be 50 MB or smaller.");
+            }
+            const selectedDuration=await checkVideo(file);
+            if(selectedDuration>10)throw new Error("Videos must be 10 seconds or shorter.");
+          }
           status.textContent=`Uploading ${i+1} of ${files.length}…`;
           await request("/api/stories",{method:"POST",headers:{"Content-Type":"application/octet-stream","X-People-Story-Type":file.type},body:file});
         }

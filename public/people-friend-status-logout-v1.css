@@ -1,0 +1,33 @@
+/* PEOPLE_FRIEND_STATUS_LOGOUT_V1 */
+/* Text only: the existing avatar already supplies the colored presence dot. */
+#friendsList .people-card-copy .people-friend-status-label {
+  display: block;
+  margin-top: 3px;
+  color: var(--people-muted, var(--muted, #a7afbb));
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.25;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Higher specificity than old fixed-color rules in style.css. */
+body #logoutButton.people-fixed-logout {
+  background: var(--people-accent-soft, var(--people-surface, var(--panel))) !important;
+  border: 1px solid var(--people-accent-border, var(--people-border, transparent)) !important;
+  color: var(--people-accent-light, var(--people-text, var(--text))) !important;
+}
+body #logoutButton.people-fixed-logout:hover,
+body #logoutButton.people-fixed-logout:focus-visible {
+  background: var(--people-accent, var(--brand)) !important;
+  border-color: var(--people-accent-strong, var(--people-accent, var(--brand))) !important;
+  color: #fff !important;
+}
+body #logoutButton.people-fixed-logout svg {
+  width: 19px;
+  height: 19px;
+  display: block;
+  pointer-events: none;
+}
