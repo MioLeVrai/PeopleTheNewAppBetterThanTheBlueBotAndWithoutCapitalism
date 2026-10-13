@@ -296,6 +296,21 @@ function peopleRemoveGeneralMessageFromDom(
     row?.remove();
   }
 
+  // Cleanup orphaned day separators
+  const allSeparators = messages.querySelectorAll(".people-message-day");
+  allSeparators.forEach(sep => {
+    let next = sep.nextElementSibling;
+    let hasMessagesForThisDay = false;
+    while (next && !next.classList.contains("people-message-day")) {
+      if (next.classList.contains("message")) {
+        hasMessagesForThisDay = true;
+        break;
+      }
+      next = next.nextElementSibling;
+    }
+    if (!hasMessagesForThisDay) sep.remove();
+  });
+
   peopleResetGeneralGroup();
 }
 // === PEOPLE_GENERAL_MESSAGE_ACTIONS_V1_END ===

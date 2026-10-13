@@ -67,6 +67,11 @@ async function main() {
     const endpoint = base + query + "&sid=" + encodeURIComponent(sid);
     const send = async packet => {
       const response = await fetch(endpoint, { method: "POST", headers: { Cookie: cookie, "Content-Type": "text/plain" }, body: packet });
+      if (response.status !== 200) {
+        console.error(`Socket POST failure: Status ${response.status}, Packet: ${packet}`);
+        const text = await response.text();
+        console.error(`Response: ${text}`);
+      }
       assert.equal(response.status, 200);
     };
     await send("40");

@@ -18,9 +18,10 @@
     return getComputedStyle(document.body).backgroundColor;
   }
   function paint(element) {
-    const status = states.get(key(element.dataset.peopleAvatarUsername))?.status || "offline";
+    const state = states.get(key(element.dataset.peopleAvatarUsername));
+    const status = state?.status || "offline";
     element.dataset.peoplePresence = status;
-    element.dataset.peoplePresenceLabel = labels[status];
+    element.dataset.peoplePresenceLabel = labels[status] || "Offline";
     element.style.setProperty("--presence-surface", surface(element));
     if (!observed.has(element)) { observed.add(element); sizes.observe(element); }
   }
