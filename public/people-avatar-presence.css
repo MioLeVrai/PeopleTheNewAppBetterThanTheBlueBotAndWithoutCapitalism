@@ -13,3 +13,10 @@ body [data-people-presence="idle"]::after { background: #e9b949 !important; }
 body [data-people-presence="dnd"]::after { background: #ed4245 !important; }
 body [data-people-presence="offline"]::after { background: #80848e !important; }
 .online-user-dot { display: none !important; }
+/* PEOPLE_PATCH_NO_MESSAGE_PRESENCE_V2
+   Presence is visible in friend/member lists and DM headers, not on messages. */
+body .message > .avatar[data-people-presence]::after,
+body .dm-message > .dm-message-avatar[data-people-presence]::after {
+  content: none !important;
+  display: none !important;
+}

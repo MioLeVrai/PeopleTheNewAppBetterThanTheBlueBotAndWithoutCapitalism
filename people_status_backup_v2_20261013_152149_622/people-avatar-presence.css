@@ -1,0 +1,15 @@
+/* The decoration survives image loads, fallbacks and avatar replacements. */
+body [data-people-avatar-username].people-avatar-host { position: relative; overflow: visible !important; isolation: isolate; }
+body [data-people-avatar-username] > .people-avatar-image,
+body [data-people-avatar-username] > .people-avatar-fallback { border-radius: inherit; }
+body [data-people-avatar-username][data-people-presence]::after {
+  content: ""; position: absolute; right: -1px; bottom: -1px; z-index: 2;
+  width: var(--presence-size, 12px); height: var(--presence-size, 12px);
+  box-sizing: border-box; border: 2px solid var(--presence-surface, var(--panel));
+  border-radius: 50%; background: #23a55a; pointer-events: none;
+}
+body [data-people-presence="online"]::after { background: #23a55a; }
+body [data-people-presence="idle"]::after { background: #e9b949 !important; }
+body [data-people-presence="dnd"]::after { background: #ed4245 !important; }
+body [data-people-presence="offline"]::after { background: #80848e !important; }
+.online-user-dot { display: none !important; }

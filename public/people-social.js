@@ -2526,13 +2526,8 @@
       "name"
     );
 
-    const status = document.createElement("span");
-    status.textContent =
-      person.online
-        ? "● En ligne"
-        : ("" + window.PeopleI18n.t("ui_a1794783aa") + "");
-
-    copy.append(name, status);
+    /* PEOPLE_PATCH_FRIEND_AVATAR_ONLY_V2: badge deja present sur avatar. */
+    copy.append(name);
 
     const dm = document.createElement("button");
     dm.type = "button";
