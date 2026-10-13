@@ -8,7 +8,8 @@ body [data-people-avatar-username][data-people-presence]::after {
   box-sizing: border-box; border: 2px solid var(--presence-surface, var(--panel));
   border-radius: 50%; background: #23a55a; pointer-events: none;
 }
-body [data-people-presence="idle"]::after { background: radial-gradient(circle at 28% 25%, var(--presence-surface) 0 40%, #f0b232 44%); }
-body [data-people-presence="dnd"]::after { background: linear-gradient(#f23f43 0 39%, #fff 40% 59%, #f23f43 60%); }
-body [data-people-presence="offline"]::after { background: radial-gradient(circle, var(--presence-surface) 0 32%, #80848e 36%); }
+body [data-people-presence="online"]::after { background: #23a55a; }
+body [data-people-presence="idle"]::after { background: #e9b949 !important; }
+body [data-people-presence="dnd"]::after { background: #ed4245 !important; }
+body [data-people-presence="offline"]::after { background: #80848e !important; }
 .online-user-dot { display: none !important; }
