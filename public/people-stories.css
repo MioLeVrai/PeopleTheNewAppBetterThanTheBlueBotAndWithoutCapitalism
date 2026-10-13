@@ -1,0 +1,41 @@
+/* PEOPLE_STORIES_V1 — light-blue rings; keep existing presence dots untouched. */
+body [data-people-avatar-username][data-people-story="1"]:not(.message .avatar):not(.dm-message .dm-message-avatar),
+body #profileModalAvatar[data-people-story="1"] {
+  outline: 3px solid #78d8ff !important;
+  outline-offset: 2px;
+  border-radius: 50% !important;
+  cursor: pointer;
+}
+body .message [data-people-story],
+body .dm-message [data-people-story],
+body .people-message-group [data-people-story] { outline: none !important; box-shadow: none; }
+#profileModalAvatar, .people-self-card__avatar { cursor: pointer; }
+#peopleStoryProfileAdd { margin-top: 6px; }
+.people-story-dialog[hidden] { display: none !important; }
+.people-story-dialog { position: fixed; inset: 0; z-index: 12000; background: rgba(0,0,0,.88); display: grid; place-items: center; padding: 16px; color: var(--text, #f2f3f5); }
+.people-story-dialog__panel { position: relative; width: min(440px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; background: var(--panel, #1e1f22); border: 1px solid var(--panel-dark, #25252b); border-radius: 16px; box-shadow: 0 14px 60px #0009; outline: none; }
+.people-story-dialog__panel header { display: flex; align-items: center; gap: 12px; padding: 14px 15px; }
+.people-story-dialog__panel header strong { flex: 1; overflow-wrap: anywhere; }
+.people-story-close { flex: 0 0 auto; border: 0; border-radius: 8px; background: #ffffff1b; color: inherit; cursor: pointer; padding: 6px 10px; font: inherit; }
+.people-story-viewer .people-story-dialog__panel { background: #0c0c11; width: min(460px, 100%); overflow: hidden; }
+.people-story-viewer__count { color: #a8b1be; font-size: 12px; }
+.people-story-viewer__progress { display: flex; gap: 5px; padding: 0 14px 9px; }
+.people-story-viewer__progress span { display: block; flex: 1; height: 3px; border-radius: 6px; background: #565b67; }
+.people-story-viewer__progress span.complete, .people-story-viewer__progress span.current { background: #78d8ff; }
+.people-story-viewer__media { display: grid; place-items: center; min-height: 180px; max-height: min(72dvh, 690px); background: #050508; overflow: hidden; }
+.people-story-viewer__media img, .people-story-viewer__media video { display: block; width: 100%; height: auto; max-height: min(72dvh, 690px); object-fit: contain; }
+.people-story-viewer__controls { display:flex; justify-content:space-between; padding: 8px 12px; }
+.people-story-viewer__controls button { width: 44px; height: 34px; background: #ffffff1c; color: white; border: 0; border-radius: 9px; cursor: pointer; font-size: 24px; }
+.people-story-viewer__footer { padding: 0 12px 12px; display:flex; justify-content:space-between; gap:8px; }
+.people-story-viewer__footer button:not([hidden]), .people-story-composer__actions button, .people-story-composer__part button { padding: 9px 12px; border: 0; border-radius: 8px; background: var(--brand, #67589d); color: white; font: inherit; cursor: pointer; }
+.people-story-viewer__footer button[hidden] { display:none; }
+.people-story-viewer__delete { background: #ad3945 !important; }
+.people-story-composer .people-story-dialog__panel { padding: 5px 15px 17px; }
+.people-story-composer p { font-size: 12px; color: var(--muted, #b5bac1); line-height: 1.6; margin: 0 0 14px; }
+.people-story-composer__part { display:flex; align-items:center; justify-content:space-between; gap: 9px; padding: 8px 0; border-bottom: 1px solid #ffffff20; }
+.people-story-composer__part button { background: var(--hover, #38383c) !important; }
+.people-story-composer__part button:last-child { color: #ff9ea8; }
+.people-story-composer__actions { margin-top: 15px; }
+.people-story-composer__actions button:disabled { opacity:.5; cursor: not-allowed; }
+#peopleStoryFeedback { margin-top: 9px; min-height: 1.3em; font-size: 12px; color: var(--muted, #b5bac1); }
+@media(max-width:480px) { .people-story-dialog { padding: 7px; } .people-story-dialog__panel { max-height:calc(100dvh - 14px); } }

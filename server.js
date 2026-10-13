@@ -18960,9 +18960,20 @@ async function peopleMigrateStoredMessageEncryption() {
 }
 // === PEOPLE_MESSAGE_ENCRYPTION_MIGRATION_V2_END ===
 
+/* PEOPLE_STORIES_V1_SERVER_INSTALL */
+const peopleStoriesFeature = require(pathAccounts.join(
+  fsAccounts.existsSync(pathAccounts.join(__dirname, "people-stories-server.js")) ? __dirname : process.cwd(),
+  "people-stories-server.js"
+))({
+  app, io, dataDir: __dirname, getPool: () => peoplePool, sessionForRequest: peopleSessionForRequest,
+  findAccount: peopleFindAccount, findAccountById: peopleFindAccountById,
+  isDeleted: id => peopleSimpleDeletedAccounts.has(String(id))
+});
+
 const PORT = Number(process.env.PORT) || 3000;
 
 peopleInitAccounts()
+  .then(() => peopleStoriesFeature.init())
   .then(() => peopleInitSocial())
   .then(() => peopleInitServersV1())
   .then(() => peopleInitServerChannelsV2())
