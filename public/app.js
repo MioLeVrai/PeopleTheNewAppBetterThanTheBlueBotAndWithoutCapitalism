@@ -1038,13 +1038,7 @@ function peopleGeneralTextLine(
   if (grouped) {
     text.title =
       timeText(data.time);
-    const time = document.createElement("time");
-    time.className = "people-grouped-time";
-    time.textContent = timeText(data.time);
-    if (data.time && !Number.isNaN(new Date(data.time).getTime())) {
-      time.dateTime = new Date(data.time).toISOString(); time.title = new Date(data.time).toLocaleString("en-US");
-    }
-    unit.append(time);
+    // PEOPLE_PATCH_HIDE_GROUPED_TIME_V1: conserver uniquement l'infobulle temporelle.
   }
 
   unit.appendChild(text);
