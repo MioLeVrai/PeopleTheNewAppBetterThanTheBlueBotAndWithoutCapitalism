@@ -93,3 +93,22 @@
 .people-self-card__native .people-presence-feedback:empty { display: none; }
 .people-self-card__native .people-install-app:not([hidden]) { width: calc(100% - 20px); margin: 5px 10px; }
 @media (prefers-reduced-motion: reduce) { .people-self-card { scroll-behavior: auto; } }
+
+/* PEOPLE_PROFILE_LAYOUT_V2: attached, compact profile card. */
+.people-self-card {
+  border-radius: 11px 11px 7px 7px;
+  border-color: var(--panel-dark, #1e1f22);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, .25);
+}
+.people-self-card__banner { height: 68px; }
+.people-self-card__identity { padding: 0 13px 11px; }
+.people-self-card__avatar {
+  width: 64px;
+  height: 64px;
+  margin-top: -31px;
+  border-width: 4px;
+}
+.people-self-card__name { font-size: 16px; margin-top: 4px; }
+.people-self-card__bio { margin-top: 9px; padding-top: 9px; }
+.people-self-card__actions { margin: 0 8px 8px; padding: 5px; }
+.people-self-card__action { min-height: 37px; }

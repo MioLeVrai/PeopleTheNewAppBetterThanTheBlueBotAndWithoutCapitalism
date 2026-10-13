@@ -1,0 +1,42 @@
+/* PEOPLE_HEADER_ALIGNMENT_V1
+   Match the 56px DM/conversation header, without affecting mobile drawers. */
+@media (min-width: 781px) {
+  .sidebar .sidebar-mode > .server-title {
+    box-sizing: border-box;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    flex: 0 0 56px;
+    padding: 6px 12px;
+    gap: 10px;
+    align-items: center;
+  }
+  .sidebar .sidebar-mode > .server-title > .server-icon {
+    box-sizing: border-box;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    max-width: 34px;
+    max-height: 34px;
+    flex: 0 0 34px;
+    border-radius: 11px;
+  }
+  .sidebar .sidebar-mode > .server-title > div:nth-child(2) {
+    min-width: 0;
+  }
+  .sidebar .sidebar-mode > .server-title > div:nth-child(2) > strong {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 14px;
+  }
+  .sidebar .sidebar-mode > .server-title > div:nth-child(2) > span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 11px;
+    margin-top: 1px;
+  }
+}

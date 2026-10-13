@@ -105,16 +105,43 @@
     statusOptions.append(option);
   }
 
+  /* PEOPLE_PROFILE_LAYOUT_V2: anchor the popup flush to the sidebar footer. */
   function positionCard() {
     if (card.hidden) return;
-    const rect = (lastTrigger || profileButton).getBoundingClientRect();
-    const width = card.getBoundingClientRect().width;
+    const sidebar = profileButton.closest(".sidebar");
+    const footer = profileButton.closest(".profile");
+    const anchor = footer || lastTrigger || profileButton;
+    const rect = anchor.getBoundingClientRect();
+    const sidebarRect = sidebar ? sidebar.getBoundingClientRect() : rect;
+    const gap = 6;
+    const viewportWidth = Math.max(1, window.innerWidth);
+    const width = Math.min(
+      Math.max(220, sidebarRect.width - gap * 2),
+      Math.max(1, viewportWidth - gap * 2)
+    );
+    card.style.width = `${Math.round(width)}px`;
+    // Reserve a visible gap above the footer. This also works when the
+    // biography or status options make the card grow after it opens.
+    const footerGap = 12;
+    card.style.maxHeight = `${Math.max(80, Math.floor(rect.top - footerGap - 6))}px`;
     const height = card.getBoundingClientRect().height;
-    const x = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-    const above = rect.top - height - 10;
-    const y = above >= 8 ? above : Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - height - 8));
-    card.style.left = `${Math.round(x)}px`;
-    card.style.top = `${Math.round(y)}px`;
+    const left = Math.max(gap, Math.min(sidebarRect.left + gap, viewportWidth - gap - width));
+    const top = Math.max(6, rect.top - height - footerGap);
+    card.style.left = `${Math.round(left)}px`;
+    card.style.top = `${Math.round(top)}px`;
+  }
+
+  /* PEOPLE_PROFILE_POSITION_V3: follow async changes to the card height. */
+  let pendingCardPosition = false;
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(() => {
+      if (card.hidden || pendingCardPosition) return;
+      pendingCardPosition = true;
+      requestAnimationFrame(() => {
+        pendingCardPosition = false;
+        if (!card.hidden) positionCard();
+      });
+    }).observe(card);
   }
 
   function closeCard({ returnFocus = false } = {}) {
@@ -141,6 +168,7 @@
       const description = String(data.profile.description || "").trim();
       bioPreview.textContent = description;
       bioPreview.hidden = !description;
+      positionCard();
     } catch (error) {
       if (error.name !== "AbortError") console.warn("[People self card] Bio unavailable.");
     } finally {
