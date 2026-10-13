@@ -1208,7 +1208,7 @@ function addChatMessage(
     document.createElement("time");
 
   time.textContent =
-    timeText(data.time);
+    formatDate(data.time, true);
   if (data.time && !Number.isNaN(new Date(data.time).getTime())) {
     time.dateTime = new Date(data.time).toISOString(); time.title = new Date(data.time).toLocaleString("en-US");
   }

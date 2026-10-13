@@ -545,10 +545,11 @@
 
     return (
       withTime
-        ? PEOPLE_DATE_TIME_FORMATTER
-        : PEOPLE_DATE_FORMATTER
-    ).format(date);
+        ? PEOPLE_DATE_TIME_FORMATTER.format(date)
+        : PEOPLE_DATE_FORMATTER.format(date)
+    );
   }
+  window.formatDate = formatDate;
 
   async function api(url, options = {}) {
     const response = await fetch(url, {
