@@ -1,0 +1,37 @@
+/* PEOPLE_HOME_THEME_BADGE_FIX_V1 */
+/* A zero unread count does not need its own dot (the old 0 was clipped). */
+#homeRailButton { overflow: visible !important; }
+#homeRailButton .rail-badge:not(.has-unread),
+#homeRailButton .rail-badge.hidden {
+  display: none !important;
+}
+#homeRailButton .rail-badge.has-unread:not(.hidden) {
+  display: grid !important;
+  opacity: 1 !important;
+  background: var(--people-accent, var(--brand)) !important;
+  border-color: var(--people-ink, var(--panel-dark)) !important;
+  color: #fff !important;
+}
+
+/* Follow PeopleAppearance's dynamic palette instead of legacy violet rules. */
+:root[data-people-theme] .friends-view .friend-request-column {
+  background: var(--people-surface) !important;
+  border: 1px solid var(--people-border) !important;
+  color: var(--people-text) !important;
+}
+:root[data-people-theme] .friends-view .friend-request-label,
+:root[data-people-theme] .friends-view .friend-request-column .home-empty,
+:root[data-people-theme] .friends-view .home-section-title {
+  color: var(--people-muted) !important;
+}
+:root[data-people-theme] .friends-view .home-section-title > span {
+  color: var(--people-accent) !important;
+}
+:root[data-people-theme] .friends-view .friend-request-refuse {
+  background: var(--people-hover) !important;
+  color: var(--people-text) !important;
+}
+:root[data-people-global-gradient="on"] .friends-view .friend-request-column {
+  background-color: var(--people-global-panel-soft-overlay) !important;
+  background-image: none !important;
+}
