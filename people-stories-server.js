@@ -8,12 +8,13 @@ const { execFile } = require("child_process");
 const { promisify } = require("util");
 const runProbe = promisify(execFile);
 
-module.exports = function registerPeopleStories({ app, io, getPool, sessionForRequest, findAccount, findAccountById, isDeleted, dataDir }) {
+module.exports = function registerPeopleStories({ app, io, getPool, sessionForRequest, findAccount, findAccountById, isDeleted, dataDir, mediaCrypto }) {
   const MAX_BYTES = 50 * 1024 * 1024;
   const MAX_PARTS = 10;
   const TTL = 24 * 60 * 60 * 1000;
   const storeDir = path.join(dataDir || __dirname, "people-stories");
   const indexPath = path.join(storeDir, "stories.json");
+  if (!mediaCrypto || typeof mediaCrypto.sealBuffer !== "function") throw new Error("Media encryption unavailable");
   const activeUploads = new Set();
   let local = [];
   let lastCleanup = 0;
@@ -128,6 +129,12 @@ module.exports = function registerPeopleStories({ app, io, getPool, sessionForRe
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ NOT NULL
       )`);
       await pool.query("CREATE INDEX IF NOT EXISTS people_stories_active_idx ON people_stories(account_id, expires_at)");
+      await pool.query(`CREATE TABLE IF NOT EXISTS people_story_views (
+        part_id UUID NOT NULL REFERENCES people_stories(id) ON DELETE CASCADE,
+        viewer_id BIGINT NOT NULL REFERENCES people_accounts(id) ON DELETE CASCADE,
+        viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (part_id, viewer_id)
+      )`);
     } else {
       try { const records = JSON.parse(fs.readFileSync(indexPath, "utf8")); local = Array.isArray(records) ? records : []; } catch (_) { local = []; }
     }
@@ -152,15 +159,18 @@ module.exports = function registerPeopleStories({ app, io, getPool, sessionForRe
       }
     }
   }
-  async function parts(accountId) {
+  async function parts(accountId, viewerId = null) {
     await cleanup();
     const id = String(accountId);
     const pool = getPool();
     if (pool) {
-      const result = await pool.query("SELECT id, mime_type, created_at, expires_at FROM people_stories WHERE account_id=$1 AND expires_at > NOW() ORDER BY created_at,id", [id]);
-      return result.rows.map(x => ({ id: x.id, mime: x.mime_type, createdAt: new Date(x.created_at).toISOString(), expiresAt: new Date(x.expires_at).toISOString() }));
+      const result = await pool.query(`SELECT s.id, s.mime_type, s.created_at, s.expires_at,
+        EXISTS(SELECT 1 FROM people_story_views v WHERE v.part_id=s.id AND v.viewer_id=$2) AS seen
+        FROM people_stories s WHERE s.account_id=$1 AND s.expires_at > NOW()
+        ORDER BY s.created_at,s.id`, [id, viewerId]);
+      return result.rows.map(x => ({ id: x.id, mime: x.mime_type, createdAt: new Date(x.created_at).toISOString(), expiresAt: new Date(x.expires_at).toISOString(), seen: Boolean(x.seen) }));
     }
-    return local.filter(x => x.accountId === id && x.expiresAt > now()).sort((a,b)=> a.createdAt - b.createdAt).map(x => ({ id:x.id, mime:x.mime, createdAt: new Date(x.createdAt).toISOString(), expiresAt:new Date(x.expiresAt).toISOString() }));
+    return local.filter(x => x.accountId === id && x.expiresAt > now()).sort((a,b)=> a.createdAt - b.createdAt).map(x => ({ id:x.id, mime:x.mime, createdAt: new Date(x.createdAt).toISOString(), expiresAt:new Date(x.expiresAt).toISOString(), seen: viewerId !== null && (x.seenBy || []).includes(String(viewerId)) }));
   }
   async function getRecord(id, withData) {
     if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
@@ -168,12 +178,12 @@ module.exports = function registerPeopleStories({ app, io, getPool, sessionForRe
     if (pool) {
       const row = (await pool.query(`SELECT id, account_id, mime_type, expires_at${withData ? ', media_data' : ''} FROM people_stories WHERE id=$1 AND expires_at > NOW()`, [id])).rows[0];
       if (!row) return null;
-      return { id:row.id, accountId:String(row.account_id), mime:row.mime_type, data:row.media_data };
+      return { id:row.id, accountId:String(row.account_id), mime:row.mime_type, data:withData ? mediaCrypto.openBuffer(row.media_data, "story", id) : undefined };
     }
     const record = local.find(x => x.id === id && x.expiresAt > now());
     if (!record) return null;
     const file = path.join(storeDir, record.id + "." + types[record.mime]);
-    return { ...record, data:withData ? await fs.promises.readFile(file) : undefined };
+    return { ...record, data:withData ? mediaCrypto.openBuffer(await fs.promises.readFile(file), "story", id) : undefined };
   }
   function notify(username) { io.emit("people-stories-changed", { username }); }
   app.post("/api/stories/active", async (req, res) => {
@@ -184,18 +194,25 @@ module.exports = function registerPeopleStories({ app, io, getPool, sessionForRe
       const pool = getPool();
       let users;
       if (pool) {
-        const result = await pool.query(`SELECT a.username, COUNT(s.id)::int AS count FROM people_accounts a
+        const result = await pool.query(`SELECT a.username, COUNT(s.id)::int AS count,
+          COUNT(s.id) FILTER (WHERE NOT EXISTS(
+            SELECT 1 FROM people_story_views v WHERE v.part_id=s.id AND v.viewer_id=$2
+          ))::int AS unseen_count
+          FROM people_accounts a
           JOIN people_stories s ON s.account_id=a.id AND s.expires_at>NOW()
           WHERE a.username_key = ANY($1::text[]) AND a.password_hash NOT LIKE '!deleted:%'
-          GROUP BY a.id,a.username`, [names.map(nameKey)]);
-        users = result.rows.map(r => ({ username:r.username, count:r.count }));
+          GROUP BY a.id,a.username`, [names.map(nameKey), String(session.id)]);
+        users = result.rows.map(r => ({ username:r.username, count:r.count, unseenCount:r.unseen_count }));
       } else {
         users = [];
         for (const username of names) {
           const account = await findAccount(username);
           if (!account || isDeleted(account.id)) continue;
           const count = (await parts(account.id)).length;
-          if (count) users.push({ username:account.username, count });
+          if (count) {
+            const unseenCount = local.filter(x => x.accountId === String(account.id) && x.expiresAt > now() && !(x.seenBy || []).includes(String(session.id))).length;
+            users.push({ username:account.username, count, unseenCount });
+          }
         }
       }
       res.setHeader("Cache-Control", "private, no-store"); res.json({ok:true, users});
@@ -207,8 +224,28 @@ module.exports = function registerPeopleStories({ app, io, getPool, sessionForRe
       const account = await findAccount(req.params.username);
       if (!account || isDeleted(account.id)) return res.status(404).json({ok:false,error:"User not found."});
       res.setHeader("Cache-Control", "private, no-store");
-      return res.json({ok:true, username:account.username, isSelf:String(account.id)===String(session.id), parts:await parts(account.id)});
+      return res.json({ok:true, username:account.username, isSelf:String(account.id)===String(session.id), parts:await parts(account.id, session.id)});
     } catch (err) { console.error("[People stories/list]",err); res.status(500).json({ok:false,error:"Unable to load stories."}); }
+  });
+  // A story counts as seen only after the viewer actually opens that part.
+  app.post("/api/stories/:id/view", async (req,res) => {
+    const session = sessionForRequest(req,res); if (!session) return;
+    try {
+      const id = String(req.params.id);
+      const record = await getRecord(id,false);
+      if (!record) return res.status(404).json({ok:false,error:"Story not found."});
+      const author = await findAccountById(record.accountId);
+      if (!author || isDeleted(author.id)) return res.status(404).json({ok:false,error:"Story not found."});
+      if (getPool()) await getPool().query("INSERT INTO people_story_views(part_id, viewer_id) VALUES($1,$2) ON CONFLICT DO NOTHING",[id,String(session.id)]);
+      else {
+        const existing = local.find(part => part.id === id);
+        if (!existing) return res.status(404).json({ok:false,error:"Story not found."});
+        existing.seenBy ||= [];
+        if (!existing.seenBy.includes(String(session.id))) { existing.seenBy.push(String(session.id)); writeLocal(); }
+      }
+      res.setHeader("Cache-Control","private, no-store");
+      return res.json({ok:true});
+    } catch(err) {console.error("[People stories/view]",err);return res.status(500).json({ok:false,error:"Unable to save story view."});}
   });
   app.post("/api/stories", require("express").raw({type: "application/octet-stream", limit:MAX_BYTES+1024}), async (req,res) => {
     const session = sessionForRequest(req,res); if (!session) return;
@@ -236,12 +273,12 @@ module.exports = function registerPeopleStories({ app, io, getPool, sessionForRe
           const row = await client.query("SELECT COUNT(*)::int AS count FROM people_stories WHERE account_id=$1 AND expires_at>NOW()", [owner]);
           count = row.rows[0].count;
           if (count >= MAX_PARTS) { await client.query("ROLLBACK"); return res.status(409).json({ok:false,error:"Maximum 10 story parts."}); }
-          await client.query("INSERT INTO people_stories (id,account_id,mime_type,media_data,created_at,expires_at) VALUES ($1,$2,$3,$4,$5,$6)", [id,owner,mime,buffer,new Date(createdAt),new Date(expiresAt)]);
+          await client.query("INSERT INTO people_stories (id,account_id,mime_type,media_data,created_at,expires_at) VALUES ($1,$2,$3,$4,$5,$6)", [id,owner,mime,mediaCrypto.sealBuffer(buffer, "story", id),new Date(createdAt),new Date(expiresAt)]);
           await client.query("COMMIT");
         } catch(err) { await client.query("ROLLBACK"); throw err; } finally { client.release(); }
       } else {
         const file = path.join(storeDir,id+"."+types[mime]);
-        await fs.promises.writeFile(file,buffer,{flag:"wx"});
+        await fs.promises.writeFile(file,mediaCrypto.sealBuffer(buffer,"story",id),{flag:"wx"});
         local.push({id,accountId:owner,mime,createdAt,expiresAt});
         try {writeLocal();} catch(err) {local=local.filter(x=>x.id!==id);fs.unlinkSync(file);throw err;}
       }
@@ -289,5 +326,36 @@ module.exports = function registerPeopleStories({ app, io, getPool, sessionForRe
       res.setHeader("Content-Length",String(data.length));return res.end(data);
     } catch(err){console.error("[People stories/media]",err);res.status(500).end();}
   });
-  return { init };
+  // Explicit opt-in: all currently active legacy story payloads are converted in place.
+  async function migrate() {
+    if (process.env.PEOPLE_MEDIA_MIGRATE !== "1") return;
+    let converted=0;
+    const pool=getPool();
+    if (pool) {
+      let after="00000000-0000-0000-0000-000000000000";
+      for (;;) {
+        const result=await pool.query("SELECT id,media_data FROM people_stories WHERE id>$1 ORDER BY id LIMIT 10",[after]);
+        if(!result.rows.length)break;
+        for(const row of result.rows) {
+          after=String(row.id);
+          if(mediaCrypto.isEncrypted(row.media_data)) {mediaCrypto.openBuffer(row.media_data,"story",after);continue;}
+          const ciphertext=mediaCrypto.sealBuffer(row.media_data,"story",after);
+          const updated=await pool.query("UPDATE people_stories SET media_data=$1 WHERE id=$2 AND media_data=$3",[ciphertext,after,row.media_data]);
+          converted+=updated.rowCount;
+        }
+      }
+    } else {
+      for (const record of local) {
+        const file=path.join(storeDir,record.id+"."+types[record.mime]);
+        if(!fs.existsSync(file))continue;
+        const raw=fs.readFileSync(file);
+        if(mediaCrypto.isEncrypted(raw)) {mediaCrypto.openBuffer(raw,"story",record.id);continue;}
+        const temp=file+"."+crypto.randomUUID()+".tmp";
+        fs.writeFileSync(temp,mediaCrypto.sealBuffer(raw,"story",record.id),{flag:"wx",mode:0o600});
+        fs.renameSync(temp,file);converted++;
+      }
+    }
+    console.log(`[People stories] Secure storage migration: ${converted} stories converted.`);
+  }
+  return { init, migrate };
 };

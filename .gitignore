@@ -22,3 +22,6 @@ People_SOURCE_SAFE_*.zip
 .env.example
 backup_security_v2_*/
 People_SOURCE_SAFE_V2*.zip
+.people-media-encryption-key
+people-media-migrate.once
+people-backups/

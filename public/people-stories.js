@@ -6,6 +6,8 @@
   const maxBytes = 50 * 1024 * 1024;
   const maxParts = 10;
   const active = new Map();
+  const unseen = new Map();
+  const viewing = new Set();
   const known = new Set();
   let refreshTimer = 0, refreshing = false, view = null, composer = null;
   let playbackTimer = 0;
@@ -28,14 +30,17 @@
       const hasStory = (active.get(name) || 0) > 0 && !excluded(element);
       if (hasStory) {
         element.dataset.peopleStory = "1";
+        element.dataset.peopleStorySeen = (unseen.get(name) === 0) ? "1" : "0";
         if (!element.hasAttribute("title")) element.setAttribute("title", "View story");
-      } else delete element.dataset.peopleStory;
+      } else { delete element.dataset.peopleStory; delete element.dataset.peopleStorySeen; }
     });
     const modalAvatar = document.getElementById("profileModalAvatar");
     if (modalAvatar) {
       const name = key(document.getElementById("profileModalName")?.textContent);
-      if (active.get(name)) modalAvatar.dataset.peopleStory = "1";
-      else delete modalAvatar.dataset.peopleStory;
+      if (active.get(name)) {
+        modalAvatar.dataset.peopleStory = "1";
+        modalAvatar.dataset.peopleStorySeen = (unseen.get(name) === 0) ? "1" : "0";
+      } else { delete modalAvatar.dataset.peopleStory; delete modalAvatar.dataset.peopleStorySeen; }
     }
   }
   async function updateActive() {
@@ -50,15 +55,18 @@
         const response = await fetch("/api/stories/active", {method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({usernames:batch})});
         if (!response.ok) return;
         const result = await response.json();
-        batch.forEach(name => { known.add(key(name)); active.delete(key(name)); });
-        (result.users || []).forEach(user => active.set(key(user.username), Number(user.count)||0));
+        batch.forEach(name => { known.add(key(name)); active.delete(key(name)); unseen.delete(key(name)); });
+        (result.users || []).forEach(user => {
+          active.set(key(user.username), Number(user.count)||0);
+          unseen.set(key(user.username), Number(user.unseenCount ?? user.count)||0);
+        });
       }
       repaint();
     } catch (err) { console.warn("[People stories] Ring refresh failed",err); }
     finally { refreshing = false; }
   }
   function schedule(delay=100) { if (refreshTimer) return; refreshTimer=setTimeout(() => {refreshTimer=0;void updateActive();},delay); }
-  function invalidate(username) { if (username) { known.delete(key(username)); active.delete(key(username)); } else {known.clear();active.clear();} repaint();schedule(); }
+  function invalidate(username) { if (username) { known.delete(key(username)); active.delete(key(username)); unseen.delete(key(username)); } else {known.clear();active.clear();unseen.clear();} repaint();schedule(); }
   function makeDialog(className,label) {
     const overlay=document.createElement("div");overlay.className=`people-story-dialog ${className}`;overlay.hidden=true;
     overlay.setAttribute("role","presentation");
@@ -105,17 +113,26 @@
     view.panel.querySelector(".people-story-viewer__delete").hidden=!view.isSelf;
     const progress=view.panel.querySelector(".people-story-viewer__progress");progress.replaceChildren();
     view.parts.forEach((_,i)=>{const part=document.createElement("span");part.className=i<view.index?"complete":i===view.index?"current":"";progress.append(part);});
+    // A story becomes seen only after the photo loads or the video starts playing.
+    const markSeen = () => {
+      if (!view || view.overlay.hidden || token !== `${view.username}|${view.index}|${view.parts[view.index]?.id}` || item.seen || viewing.has(item.id)) return;
+      viewing.add(item.id);
+      void request(`/api/stories/${encodeURIComponent(item.id)}/view`, {method:"POST"})
+        .then(() => {item.seen=true;invalidate(view.username);})
+        .catch(err => console.warn("[People stories] Unable to save view",err))
+        .finally(() => viewing.delete(item.id));
+    };
     const media=view.panel.querySelector(".people-story-viewer__media");media.replaceChildren();
     const token=`${view.username}|${view.index}|${item.id}`;
     if(item.mime.startsWith("video/")) {
-      const video=document.createElement("video");video.src=mediaUrl(item.id);video.autoplay=true;video.playsInline=true;video.controls=true;video.preload="metadata";
+      const video=document.createElement("video");video.addEventListener("playing",markSeen,{once:true});video.src=mediaUrl(item.id);video.autoplay=true;video.playsInline=true;video.controls=true;video.preload="metadata";
       video.setAttribute("aria-label",`Story video ${view.index+1}`);
       video.addEventListener("ended",()=>{if(view && token===`${view.username}|${view.index}|${view.parts[view.index]?.id}`)moveStory(1);});
       media.append(video);
       video.play().catch(()=>{});
       playbackTimer=setTimeout(()=>{if(view && !view.overlay.hidden && token===`${view.username}|${view.index}|${view.parts[view.index]?.id}`)moveStory(1);},10500);
     } else {
-      const image=document.createElement("img");image.src=mediaUrl(item.id);image.alt=`Story photo ${view.index+1}`;media.append(image);
+      const image=document.createElement("img");image.addEventListener("load",markSeen,{once:true});image.src=mediaUrl(item.id);image.alt=`Story photo ${view.index+1}`;media.append(image);
       playbackTimer=setTimeout(()=>{if(view && !view.overlay.hidden && token===`${view.username}|${view.index}|${view.parts[view.index]?.id}`)moveStory(1);},5500);
     }
   }
@@ -259,9 +276,9 @@
   if(selfPreview){selfPreview.setAttribute("role","button");selfPreview.tabIndex=0;selfPreview.setAttribute("aria-label","Open my stories");selfPreview.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();selfPreview.click();}});}
   window.addEventListener("people-authenticated",()=>invalidate());
   window.peopleSocket?.on("people-stories-changed",payload=>invalidate(payload?.username));
-  window.peopleSocket?.on("disconnect",()=>{known.clear();active.clear();repaint();});
+  window.peopleSocket?.on("disconnect",()=>{known.clear();active.clear();unseen.clear();repaint();});
   new MutationObserver(()=>{repaint();schedule(250);}).observe(document.body,{childList:true,subtree:true});
-  window.setInterval(()=>{known.clear();active.clear();schedule();},60*1000);
+  window.setInterval(()=>{known.clear();active.clear();unseen.clear();schedule();},60*1000);
   window.PeopleStories={refresh:invalidate,open:openViewer,add:openComposer};
   schedule(300);
 })();

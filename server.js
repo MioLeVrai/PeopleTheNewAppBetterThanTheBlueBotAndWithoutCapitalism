@@ -261,6 +261,24 @@ function peopleMessageEncryptionKey() {
 const PEOPLE_MESSAGE_ENCRYPTION_KEY =
   peopleMessageEncryptionKey();
 
+// PEOPLE_MEDIA_AT_REST_V1: distinct HKDF keys for story, avatar and server-icon data.
+const PEOPLE_LOCAL_MEDIA_KEY = pathAccounts.join(__dirname, ".people-media-encryption-key");
+function peopleMediaEncryptionKey() {
+  const configured = String(process.env.PEOPLE_MEDIA_ENCRYPTION_KEY || "").trim();
+  if (configured) return peopleDecodeMessageEncryptionKey(configured);
+  if (PEOPLE_PRODUCTION) throw new Error("PEOPLE_MEDIA_ENCRYPTION_KEY is required in production.");
+  if (fsAccounts.existsSync(PEOPLE_LOCAL_MEDIA_KEY)) {
+    return peopleDecodeMessageEncryptionKey(fsAccounts.readFileSync(PEOPLE_LOCAL_MEDIA_KEY, "utf8"));
+  }
+  const key = cryptoAccounts.randomBytes(32);
+  fsAccounts.writeFileSync(PEOPLE_LOCAL_MEDIA_KEY, key.toString("base64url") + "\n", {mode:0o600,flag:"wx"});
+  return key;
+}
+const peopleMediaCrypto = require(pathAccounts.join(
+  fsAccounts.existsSync(pathAccounts.join(__dirname, "people-media-crypto.js")) ? __dirname : process.cwd(),
+  "people-media-crypto.js"
+))(peopleMediaEncryptionKey());
+
 function peopleMessageIsEncrypted(
   value
 ) {
@@ -5026,7 +5044,7 @@ async function peopleSaveAvatar(accountId, buffer) {
       "mime_type = EXCLUDED.mime_type, " +
       "data = EXCLUDED.data, " +
       "updated_at = NOW()",
-      [ownerId, mime, buffer]
+      [ownerId, mime, peopleMediaCrypto.sealBuffer(buffer, "avatar", ownerId)]
     );
 
     return {
@@ -5062,7 +5080,7 @@ async function peopleSaveAvatar(accountId, buffer) {
       PEOPLE_LOCAL_AVATAR_DIR,
       file
     ),
-    buffer
+    peopleMediaCrypto.sealBuffer(buffer, "avatar", ownerId)
   );
 
   meta[ownerId] = {
@@ -5099,7 +5117,7 @@ async function peopleLoadAvatar(accountId) {
 
     return {
       mime: row.mime_type,
-      data: row.data
+      data: peopleMediaCrypto.openBuffer(row.data, "avatar", ownerId)
     };
   }
 
@@ -5120,7 +5138,7 @@ async function peopleLoadAvatar(accountId) {
 
   return {
     mime: item.mime,
-    data: fsAccounts.readFileSync(filePath)
+    data: peopleMediaCrypto.openBuffer(fsAccounts.readFileSync(filePath), "avatar", ownerId)
   };
 }
 
@@ -8767,7 +8785,10 @@ function peopleReadLocalServers() {
     return {
       servers:
         Array.isArray(raw?.servers)
-          ? raw.servers
+          ? raw.servers.map(server => ({
+              ...server,
+              iconData: peopleMediaCrypto.openText(server.iconData, "server-icon", server.id)
+            }))
           : [],
       members:
         Array.isArray(raw?.members)
@@ -8812,7 +8833,12 @@ function peopleWriteLocalServers(data) {
       {
         servers:
           Array.isArray(data?.servers)
-            ? data.servers
+            ? data.servers.map(server => ({
+                ...server,
+                iconData: server.iconData
+                  ? peopleMediaCrypto.sealText(server.iconData, "server-icon", server.id)
+                  : (server.iconData ?? null)
+              }))
             : [],
         members:
           Array.isArray(data?.members)
@@ -8911,7 +8937,7 @@ async function peopleGetServer(serverId) {
       inviteCode:
         row.invite_code,
       official: Boolean(row.is_official),
-      iconData: row.icon_data || null,
+      iconData: peopleMediaCrypto.openText(row.icon_data, "server-icon", row.id) || null,
       createdAt:
         row.created_at
     };
@@ -8961,7 +8987,7 @@ async function peopleGetServerByInvite(code) {
       inviteCode:
         row.invite_code,
       official: Boolean(row.is_official),
-      iconData: row.icon_data || null,
+      iconData: peopleMediaCrypto.openText(row.icon_data, "server-icon", row.id) || null,
       createdAt:
         row.created_at
     };
@@ -9546,7 +9572,7 @@ async function peopleListServersForUser(
             ? String(row.owner_id)
             : null,
         official: Boolean(row.is_official),
-        iconData: row.icon_data || null,
+        iconData: peopleMediaCrypto.openText(row.icon_data, "server-icon", row.id) || null,
         createdAt:
           row.created_at
       })
@@ -13062,7 +13088,7 @@ app.patch(
       if (peoplePool) {
         await peoplePool.query(
           "UPDATE people_servers SET icon_data = $2 WHERE id = $1",
-          [String(current.id), iconData]
+          [String(current.id), iconData ? peopleMediaCrypto.sealText(iconData, "server-icon", current.id) : null]
         );
       } else {
         const data = peopleReadLocalServers();
@@ -18965,15 +18991,78 @@ const peopleStoriesFeature = require(pathAccounts.join(
   fsAccounts.existsSync(pathAccounts.join(__dirname, "people-stories-server.js")) ? __dirname : process.cwd(),
   "people-stories-server.js"
 ))({
-  app, io, dataDir: __dirname, getPool: () => peoplePool, sessionForRequest: peopleSessionForRequest,
+  app, io, dataDir: __dirname, mediaCrypto: peopleMediaCrypto, getPool: () => peoplePool, sessionForRequest: peopleSessionForRequest,
   findAccount: peopleFindAccount, findAccountById: peopleFindAccountById,
   isDeleted: id => peopleSimpleDeletedAccounts.has(String(id))
 });
+
+// PEOPLE_MEDIA_MIGRATION_V1 — explicit opt-in after a verified backup.
+// Set PEOPLE_MEDIA_MIGRATE=1 for one startup, then unset it.
+async function peopleMigrateMediaStorage() {
+  const oneTimeLocalMarker = pathAccounts.join(__dirname, "people-media-migrate.once");
+  const localRequest = !peoplePool && fsAccounts.existsSync(oneTimeLocalMarker);
+  if (process.env.PEOPLE_MEDIA_MIGRATE !== "1" && !localRequest) return;
+  if (localRequest) process.env.PEOPLE_MEDIA_MIGRATE = "1";
+  let avatars = 0, icons = 0;
+  if (peoplePool) {
+    // Back up the PostgreSQL database before enabling the migration flag.
+    await peopleEnsureAvatarTable();
+    let after = "0";
+    for (;;) {
+      const result = await peoplePool.query("SELECT account_id, data FROM people_profile_avatars WHERE account_id > $1 ORDER BY account_id LIMIT 25", [after]);
+      if (!result.rows.length) break;
+      for (const row of result.rows) {
+        const id = String(row.account_id); after = id;
+        if (peopleMediaCrypto.isEncrypted(row.data)) { peopleMediaCrypto.openBuffer(row.data,"avatar",id); continue; }
+        const cipher = peopleMediaCrypto.sealBuffer(row.data,"avatar",id);
+        const result = await peoplePool.query("UPDATE people_profile_avatars SET data=$1 WHERE account_id=$2 AND data=$3",[cipher,id,row.data]);
+        avatars += result.rowCount;
+      }
+    }
+    after = "0";
+    for (;;) {
+      const result = await peoplePool.query("SELECT id, icon_data FROM people_servers WHERE id > $1 ORDER BY id LIMIT 50", [after]);
+      if (!result.rows.length) break;
+      for (const row of result.rows) {
+        const id=String(row.id); after=id;
+        if (!row.icon_data) continue;
+        if (peopleMediaCrypto.isEncryptedText(row.icon_data)) {peopleMediaCrypto.openText(row.icon_data,"server-icon",id);continue;}
+        const cipher=peopleMediaCrypto.sealText(row.icon_data,"server-icon",id);
+        const updated=await peoplePool.query("UPDATE people_servers SET icon_data=$1 WHERE id=$2 AND icon_data=$3",[cipher,id,row.icon_data]);
+        icons+=updated.rowCount;
+      }
+    }
+  } else {
+    const metadata=peopleReadAvatarMeta();
+    for (const [id,item] of Object.entries(metadata)) {
+      if(!item?.file)continue;
+      const filename=pathAccounts.join(PEOPLE_LOCAL_AVATAR_DIR,item.file);
+      if(!fsAccounts.existsSync(filename))continue;
+      const data=fsAccounts.readFileSync(filename);
+      if(peopleMediaCrypto.isEncrypted(data)){peopleMediaCrypto.openBuffer(data,"avatar",id);continue;}
+      const temp=filename+"."+cryptoAccounts.randomUUID()+".tmp";
+      fsAccounts.writeFileSync(temp,peopleMediaCrypto.sealBuffer(data,"avatar",id),{flag:"wx",mode:0o600});
+      fsAccounts.renameSync(temp,filename);avatars++;
+    }
+    if(fsAccounts.existsSync(PEOPLE_LOCAL_SERVERS)){
+      const before=fsAccounts.readFileSync(PEOPLE_LOCAL_SERVERS,"utf8");
+      const parsed=JSON.parse(before);icons=Array.isArray(parsed?.servers)?parsed.servers.filter(x=>x.iconData && !peopleMediaCrypto.isEncryptedText(x.iconData)).length:0;
+      peopleWriteLocalServers(peopleReadLocalServers());
+    }
+  }
+  console.log(`[People] Secure media migration: ${avatars} avatars, ${icons} server icons processed.`);
+}
 
 const PORT = Number(process.env.PORT) || 3000;
 
 peopleInitAccounts()
   .then(() => peopleStoriesFeature.init())
+  .then(() => peopleMigrateMediaStorage())
+  .then(() => peopleStoriesFeature.migrate())
+  .then(() => {
+    const marker = pathAccounts.join(__dirname, "people-media-migrate.once");
+    if (!peoplePool && fsAccounts.existsSync(marker)) fsAccounts.unlinkSync(marker);
+  })
   .then(() => peopleInitSocial())
   .then(() => peopleInitServersV1())
   .then(() => peopleInitServerChannelsV2())
