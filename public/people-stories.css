@@ -41,7 +41,7 @@ body .people-message-group [data-people-story] { outline: none !important; box-s
 @media(max-width:480px) { .people-story-dialog { padding: 7px; } .people-story-dialog__panel { max-height:calc(100dvh - 14px); } }
 
 /* PEOPLE_STORY_SEEN_RING_V1 — muted ring for stories fully viewed by this account. */
-body [data-people-avatar-username][data-people-story="1"][data-people-story-seen="1"],
+body [data-people-avatar-username][data-people-story="1"][data-people-story-seen="1"]:not(.message .avatar):not(.dm-message .dm-message-avatar),
 body #profileModalAvatar[data-people-story="1"][data-people-story-seen="1"] {
   outline-color: #767b88 !important;
 }
